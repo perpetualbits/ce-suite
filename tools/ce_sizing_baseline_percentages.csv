@@ -1,0 +1,4 @@
+Baseline,Baseline area (mm²),Baseline transistors (M),Baseline SRAM (KB),CE total area (mm²),CE SRAM transistors (M),CE SRAM (KB),Area %,Transistors %,SRAM %
+Small in-order (uC-class),0.7,18.0,80.0,0.0469,5.087,90.0,6.69,28.26,112.5
+Mid in-order (apps),1.5,30.0,128.0,0.0469,5.087,90.0,3.12,16.96,70.31
+Small OoO,3.0,60.0,192.0,0.0469,5.087,90.0,1.56,8.48,46.88

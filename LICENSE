@@ -1,0 +1,13 @@
+[Placeholder]
+
+Choose a license before publishing.
+
+For a specification document intended for community review and
+eventual contribution to RISC-V International, **CC BY 4.0** is a
+common choice for the text, and **Apache 2.0** is common for
+reference RTL and software. Examples in the RISC-V ecosystem use
+this pairing.
+
+If you intend to keep this repository private until the CE Suite is
+mature, you may wish to defer licensing entirely; in that case,
+keep the repository private and the contents under default copyright.

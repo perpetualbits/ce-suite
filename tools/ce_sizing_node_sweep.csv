@@ -1,0 +1,4 @@
+Node,Total CE SRAM (KB),Bitcell area (µm²/bit),SRAM periphery factor,SRAM area (mm²),Logic overhead (mm²),Total CE area (mm²),CE SRAM transistors (M)
+28nm-ish,90.0,0.08,1.25,0.0737,0.01,0.0837,5.087
+16/12nm,90.0,0.04,1.25,0.0369,0.01,0.0469,5.087
+7/5nm-ish,90.0,0.027,1.25,0.0249,0.01,0.0349,5.087

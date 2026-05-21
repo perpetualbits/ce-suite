@@ -1,0 +1,2 @@
+NV banks,NV bank size (KB),VMT banks,VMT bank size (KB),Staging NV banks,Staging VMT banks,Total CE SRAM (KB),Bitcell area (µm²/bit),SRAM periphery factor,SRAM area (mm²),Logic overhead (mm²),Total CE area (mm²),Bitcell trans/bit,Periphery trans factor,CE SRAM transistors (M)
+64,1.0,4,4.0,2,2,90.0,0.04,1.25,0.0369,0.01,0.0469,6,1.15,5.087

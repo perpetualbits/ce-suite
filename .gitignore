@@ -1,0 +1,54 @@
+# Editor / IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Python (for tools/)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Build outputs (future: RTL synthesis, simulation)
+hw/build/
+hw/sim/work/
+hw/sim/*.vcd
+hw/sim/*.fst
+hw/sim/transcript
+hw/sim/*.log
+hw/rtl/build/
+*.bit
+*.bin
+*.elf
+*.hex
+
+# Vivado / FPGA tooling
+*.jou
+*.str
+*.dir/
+.Xil/
+xsim.dir/
+webtalk*.log
+hs_err_pid*.log
+
+# Linux kernel build (sw/)
+sw/linux/*.o
+sw/linux/*.ko
+sw/linux/.*
+sw/linux/Module.symvers
+sw/linux/modules.order
+
+# Misc
+*.tmp
+*.bak
+.cache/
