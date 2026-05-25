@@ -57,7 +57,7 @@ ownership layer that ties the other four together.
 | **Chapter 4** (HW Microarchitecture) | Two versions exist; **the REVISED version is the one to keep** (S/R staging banks, copy engine, VMT-ready flag) | Add SRAM-vs-RAM residency story, radix-tree lookup path |
 | **Chapter 5** (Linux Kernel Integration) | Frames CME ops as pointer-based; obsolete | Refactor: pointer idioms are Linux conventions, not architectural |
 | **Chapter 6** (CME Usage Examples) | Mostly fine but uses pre-ECID phrasing | Rename `ec_*` operands to ECIDs explicitly |
-| **Chapter 7** (CPE Instruction Set Reference) | Already ECID-framed; uses `cp.ip`/`cp.op` | Light pass: confirm 16-bit ECID field; align mnemonics to `cp.*` per charter §6.1 |
+| **Chapter 7** (CPE Instruction Set Reference) | Done — mnemonics aligned to `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
 | **Chapter 8+** (MSE) | Not drafted; rich material in `101-mse-scratchpad.md` and `102-mse-scratchpad2.md` | Write from scratch using the Contract model + alternating BE/contract slot scheme |
 | **Chapter 9+** (QoS) | Not drafted | Write after MSE; reuse arbitration philosophy |
 | **Appendix A** (ECID) | Scratchpad of resolved issues | Convert to proper appendix with radix tree algorithms and diagrams |
@@ -114,6 +114,10 @@ these, stop — that's a charter-level change.
 6. **Then Appendix A** as a real document.
 7. **Then write MSE** as its own chapter from the scratchpads.
 8. **Then QoS** from the MSE template.
+9. **Then Usage Examples chapters** for each extension (CME, CPE, MSE, QoS) — one
+   session per chapter, after all instruction-set and semantics chapters are stable.
+   Chapter 6 covers CME examples; equivalent chapters for CPE, MSE, and QoS do not
+   yet exist.
 
 Roughly: charter → Chapter 0 → Chapter 1 → instruction-reference chapters
 → semantics chapters → microarch → kernel → examples → appendix → MSE → QoS.
