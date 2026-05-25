@@ -46,30 +46,18 @@ relationships table), ch03 §3.4.1 and §3.4.2.
 
 ---
 
-### D3 · CPE Contract delegation
+### D3 · CPE Contract delegation ✓ RESOLVED (v0.11)
 
-**Affects:** ch07 (CPE instruction set).
+**Decision:** Option 2 — CPE Contracts are delegatable. `cp.it` and `cp.ot` are
+required; CPE subset is `{r, t}`. Rationale: a nested hypervisor (L1) holding a
+cache-way Contract from L0 must be able to independently allocate sub-partitions
+to its guests (L2) without back-channel communication with L0. Making CPE an
+exception would break the isolation hierarchy the delegation model exists to provide.
 
-**Problem:** MSE and QoS both define delegation instructions (`ms.it`/`ms.ot`,
-`qs.it`/`qs.ot`) because their Contracts are hierarchically splittable (charter §4.3).
-CPE declares subset `{r}` only — no `cp.it`/`cp.ot`.
+**Propagated to:** charter §4.3 item 7 (placeholder resolved); v0.11 changelog.
 
-Charter §4.3 says all Contracts are splittable. Either:
-
-- CPE cache-partition Contracts are an exception to this rule, or
-- `cp.it`/`cp.ot` are missing from ch07.
-
-**Decision needed:** Choose one of:
-
-1. **CPE Contracts are not delegatable** — state this explicitly in ch07 and in
-   charter §4.3 as an exception. Rationale: cache ways are a per-hart resource with
-   fixed total capacity; splitting them hierarchically adds complexity with little gain
-   since the OS already controls assignment directly.
-2. **Add `cp.it` and `cp.ot`** — CPE subset becomes `{r, t}`; ch07 gains two new
-   instructions with semantics parallel to MSE's.
-
-**Done when:** Decision recorded in charter §4.3 (as exception or as acknowledgment
-that cp.it/cp.ot are required); ch07 updated.
+**Deferred to F1:** Full `cp.it`/`cp.ot` instruction semantics are specified in
+the CPE chapter redesign (F1), which is now fully unblocked (D1 ✓, D3 ✓).
 
 ---
 
@@ -107,7 +95,7 @@ where no design decision is needed.
 ### F1 · CPE ch07 complete redesign
 
 **Affects:** ch07.
-**Depends on:** D3 (delegation decision), D1 (error reporting policy).
+**Depends on:** D3 ✓, D1 ✓ — **fully unblocked.**
 
 **Problems:**
 
@@ -355,7 +343,7 @@ with a rationale.
 
 1. ~~**D1** (error/status policy)~~ — **DONE** (v0.9).
 2. ~~**D2** (`ec.it` selection)~~ — **DONE** (v0.10).
-3. **D3** (CPE delegation) — prerequisite for F1.
+3. ~~**D3** (CPE delegation)~~ — **DONE** (v0.11).
 4. **D4** (`qs.or` domain selector) — prerequisite for F2.
 5. **F5** (charter §6.1 CME subset) — small; do alongside D decisions.
 6. **F3** (`ec.ir` clarification) — small; do in same session as ch02.

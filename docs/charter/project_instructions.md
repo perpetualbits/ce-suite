@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.10
+**Version:** 0.11
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -293,9 +293,11 @@ Full byte-level layouts are in Chapter 0. This section fixes the
 7. **Per-extension delegation instructions.** Contract delegation and
    revocation are handled by the extension that owns the Contract type,
    not by `ec.it`. Specifically: `ms.it`/`ms.ot` for MSE Contracts,
-   `qs.it`/`qs.ot` for QoS Contracts, and (subject to D3) `cp.it`/`cp.ot`
-   for CPE Contracts. The CME instruction `ec.it` handles **Bank delegation
+   `qs.it`/`qs.ot` for QoS Contracts, and `cp.it`/`cp.ot` for CPE
+   Contracts. The CME instruction `ec.it` handles **Bank delegation
    only** — one Bank per call, implementation-chosen from the parent's Group.
+   CPE's subset is therefore `{r, t}` (resource assign/revoke + delegation).
+   Full `cp.it`/`cp.ot` semantics are in Chapter 7.
 
 ### 4.4 Banks vs ECS
 
@@ -558,7 +560,7 @@ changes, this charter changes, and vice versa.
 
 ## 8. Open items deferred to later versions
 
-These items are acknowledged but not resolved in v0.10. They do not block
+These items are acknowledged but not resolved in v0.11. They do not block
 the rest of the spec.
 
 1. **NUMA-aware Contract assignment.** Multi-socket / NUMA semantics for
@@ -584,7 +586,10 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.10 (this version).** D2 resolved — `ec.it` delegates Banks only, one per
+- **v0.11 (this version).** D3 resolved — CPE Contracts are delegatable; `cp.it`
+  and `cp.ot` are required; CPE subset is `{r, t}`; §4.3 item 7 updated to confirm
+  this. Full instruction semantics deferred to Chapter 7 (F1). This unblocks F1.
+- **v0.10.** D2 resolved — `ec.it` delegates Banks only, one per
   call; Contract delegation is extension-owned (`ms.it`, `qs.it`, `cp.it` per D3);
   stated in §4.3 item 7. Propagated to ch02 §4 and ch03 §3.4.
 - **v0.9.** D1 resolved — unified error/status policy (§6.6):
@@ -613,4 +618,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.10.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.11.*
