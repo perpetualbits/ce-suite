@@ -34,32 +34,15 @@ F1 depends on D3. D1 for CPE is deferred to the F1 session.
 
 ---
 
-### D2 · `ec.it` resource selection mechanism
+### D2 · `ec.it` resource selection mechanism ✓ RESOLVED (v0.10)
 
-**Affects:** ch02 (`ec.it`), ch03 (delegation semantics), ch06 (CME usage examples).
+**Decision:** Option 3 — `ec.it` delegates **Banks only**, one per call.
+Contract delegation uses per-extension instructions (`ms.it`, `qs.it`, `cp.it`
+per D3). The implementation selects which bank from the parent's Group; to
+delegate N banks, call `ec.it` N times.
 
-**Problem:** `ec.it rs1, rs2` (parent ECID, child ECID) specifies *who* receives
-resources but not *which* resources. A parent with three banks and two Contracts cannot
-use `ec.it` to delegate a specific subset.
-
-**Decision needed:** Choose one of:
-
-1. **`ec.it` delegates all resources** — semantics become "move everything from parent
-   to child." Simple, but inflexible; parent cannot retain any resources after calling
-   `ec.it`. Subsequent delegation requires separate `ec.ig`/`ms.ir` calls to the parent.
-2. **Resource mask in rs2** — rs2 encodes a bitmask of resource types to delegate.
-   Keeps ECID in rs1; rs2 specifies e.g. which bank slot, which Contract type.
-3. **Delegate by type per instruction** — separate instructions for bank delegation
-   and Contract delegation (e.g. `ec.it` for banks only; Contract delegation goes
-   through `ms.it`/`qs.it`/`cp.it`). This is partially already the case for MSE/QoS.
-
-**Note:** MSE's `ms.it` and QoS's `qs.it` already handle Contract delegation for
-their respective resources. The question is whether `ec.it` should delegate banks only
-(leaving Contracts to the per-extension instructions), or serve as a general delegation
-dispatcher.
-
-**Done when:** Semantics of `ec.it` are precisely defined; ch02, ch03, and the charter
-updated accordingly.
+**Propagated to:** charter §4.3 item 7, ch02 §4 (`ec.it` description and §11
+relationships table), ch03 §3.4.1 and §3.4.2.
 
 ---
 
@@ -371,7 +354,7 @@ with a rationale.
 ## Priority order for execution
 
 1. ~~**D1** (error/status policy)~~ — **DONE** (v0.9).
-2. **D2** (`ec.it` selection) — affects CME examples directly.
+2. ~~**D2** (`ec.it` selection)~~ — **DONE** (v0.10).
 3. **D3** (CPE delegation) — prerequisite for F1.
 4. **D4** (`qs.or` domain selector) — prerequisite for F2.
 5. **F5** (charter §6.1 CME subset) — small; do alongside D decisions.
