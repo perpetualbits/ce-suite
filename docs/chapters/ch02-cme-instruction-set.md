@@ -114,7 +114,7 @@ bank's up-pointer and checked at the bank (the reversal trick).
 * **Side effects**: One bank is removed from ECID `rs1`'s Group and returned to the
   free pool. Its owner field is cleared.
 * **Warning**: Do not release banks from an ECID whose context is currently running or
-  actively scheduled. To safely reclaim resources from a tenant, use `ec.ot` or `ec.od`.
+  actively scheduled. To safely reclaim resources from a tenant, use `ec.ot` or `ec.oe`.
 * **Cycles**: 1–4.
 
 ---
@@ -160,9 +160,9 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
   instruction operands.
 * **Cycles**: 1–8 (log of radix tree depth).
 
-### `ec.od` — Forced destroy of ECID and subtree
+### `ec.oe` — Forced destroy of ECID and subtree
 
-* **Syntax**: `ec.od rs1`
+* **Syntax**: `ec.oe rs1`
   * `rs1`: Target ECID to destroy.
 * **Semantics** (per charter §6.5):
   1. Revokes all Contracts held by `rs1` and every descendant in its subtree.
@@ -173,8 +173,8 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 * **Privileged**: Yes. The caller must be a parent or privileged ancestor of `rs1`.
 * **Cycles**: O(log N) average; proportional to subtree size.
 
-> `ec.od` replaces the retired `ec.or`. Any reference to `ec.or` in earlier drafts
-> is incorrect; see charter §2.1.
+> `ec.oe` replaces the retired `ec.od` (v0.8) and the earlier `ec.or`. Any
+> reference to either in earlier drafts is incorrect; see charter §2.1 and §6.5.
 
 ---
 
@@ -251,7 +251,7 @@ each entry (charter §3.2).
 | `ec.it`     | 1–4               | —        | —          |
 | `ec.ot`     | 1–8               | —        | —          |
 | `ec.ir`     | 1–8               | —        | —          |
-| `ec.od`     | 1–8               | —        | —          |
+| `ec.oe`     | 1–8               | —        | —          |
 | `ec.iv`     | —                 | —        | 8–16       |
 | `ec.ov`     | —                 | —        | 8–16       |
 
@@ -281,7 +281,7 @@ Full binary encoding is deferred to the formal opcode assignment stage.
 | Delegate Group resources to a child ECID              | `ec.it`  |
 | Revoke all resources from a child ECID                | `ec.ot`  |
 | Allocate a new child ECID                             | `ec.ir`  |
-| Destroy an ECID and its entire subtree (forced)       | `ec.od`  |
+| Destroy an ECID and its entire subtree (forced)       | `ec.oe`  |
 | Seal a bank under hardware encryption                 | `ec.iv`  |
 | Unseal a bank for a secure enclave                    | `ec.ov`  |
 
@@ -289,7 +289,7 @@ Full binary encoding is deferred to the formal opcode assignment stage.
 
 * Cooperative (tenant responsive): `ec.ot` to reclaim resources, then release the ECID
   with the parent's bookkeeping.
-* Forced (zombie, hostile, or failed context): `ec.od` — always succeeds, full subtree.
+* Forced (zombie, hostile, or failed context): `ec.oe` — always succeeds, full subtree.
 
 ---
 
@@ -303,7 +303,7 @@ slot, generation mismatch, privilege violation, or Group ownership failure) must
 
 Silent ignore is prohibited (charter §6.6).
 
-`ec.od` is the sole exception to the "may fail" rule: it **always** succeeds and
+`ec.oe` is the sole exception to the "may fail" rule: it **always** succeeds and
 imposes no obligation on the target context's responsiveness.
 
 ---
@@ -312,7 +312,7 @@ imposes no obligation on the target context's responsiveness.
 
 * **Context switch sequence**: `ec.ib` → `ec.ob`, showing `current_ecid` transition.
 * **ECID operand lookup**: how `ec.ob rs1` locates the bank via `EC[rs1]`.
-* **`ec.od` subtree walk**: radix-tree traversal and generation-counter increments.
+* **`ec.oe` subtree walk**: radix-tree traversal and generation-counter increments.
 
 ---
 
