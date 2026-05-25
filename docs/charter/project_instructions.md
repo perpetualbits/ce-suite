@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.8
+**Version:** 0.9
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -388,9 +388,9 @@ changelog entry) before they may appear in any chapter.
 3. Example:
 
    ```text
-   ec.ob rs1, rs2     # rs1 = target ECID, rs2 = restore mask
-   ec.om rs1, rs2     # rs1 = target ECID, rs2 = mask
-   ec.oe rs1          # rs1 = target ECID to destroy
+   ec.ob rd, rs1, rs2 # rd = result, rs1 = target ECID, rs2 = restore mask
+   ec.om rd, rs1, rs2 # rd = result, rs1 = target ECID, rs2 = mask
+   ec.oe rs1          # rs1 = target ECID to destroy (no rd — always succeeds)
    ```
 
 This is a **change** from earlier draft chapters (notably Ch2 and Ch5),
@@ -454,14 +454,38 @@ kind (existence), not the operation.
 
 ### 6.6 Errors and traps
 
-If an instruction references an ECID for which:
+#### Primary error channel: `rd`
 
-- `EC[e]` is invalid (slot unallocated, or generation mismatch), or
-- the caller violates delegation rules or Group ownership,
+Every CE Suite instruction that can return a failure code without
+trapping writes its result in `rd`:
 
-then the implementation **must** either raise a defined trap or return
-a documented failure code via `rd` or a status CSR. Silent ignore is
-prohibited.
+- **0** — success (operation completed normally).
+- **Non-zero** — error code (documented per instruction).
+
+Callers who do not need the result write to `x0` (the RISC-V discard
+register). All instructions that can fail take `rd` as their first
+operand; the status CSRs (`cme_status`, `mse_status`, `qos_status`,
+`cpe_status`) are updated in parallel for diagnostic use but are **not**
+the primary error channel.
+
+#### Exceptions (no `rd`)
+
+Two CME instructions take no `rd` operand because they cannot produce a
+soft failure code:
+
+- **`ec.ib rs1`** — saves the running context; either succeeds or raises
+  a trap. No soft failure is possible (the hardware always has a bank
+  allocated before a context switch reaches this instruction).
+- **`ec.oe rs1`** — forced destroy; always succeeds (§6.5). No failure
+  is possible.
+
+#### Trap path
+
+If an instruction references an ECID for which `EC[e]` is invalid
+(slot unallocated, or generation mismatch), or the caller violates
+delegation rules or Group ownership, the implementation **must** either
+raise a defined trap or return a documented failure code in `rd` as
+above. Silent ignore is prohibited.
 
 ---
 
@@ -528,7 +552,7 @@ changes, this charter changes, and vice versa.
 
 ## 8. Open items deferred to later versions
 
-These items are acknowledged but not resolved in v0.8. They do not block
+These items are acknowledged but not resolved in v0.9. They do not block
 the rest of the spec.
 
 1. **NUMA-aware Contract assignment.** Multi-socket / NUMA semantics for
@@ -554,7 +578,14 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.8 (this version).** `ec.od` → `ec.oe`: trailing letter `e`=existence
+- **v0.9 (this version).** D1 resolved — unified error/status policy (§6.6):
+  every CE Suite instruction that can fail writes 0 (success) or a non-zero
+  error code in `rd`; `x0` discards the result. Status CSRs (`cme_status`,
+  etc.) updated in parallel for diagnostics only. Two exceptions: `ec.ib`
+  (always succeeds or traps; no `rd`) and `ec.oe` (always succeeds; no `rd`).
+  §6.2 example updated to show `rd` on `ec.ob` and `ec.om`. Syntax changes
+  propagated to ch00 and ch02.
+- **v0.8.** `ec.od` → `ec.oe`: trailing letter `e`=existence
   restores full consistency of the "trailing letter names the target or kind"
   rule; `ec.od` retired (§2.1); `d`=destroy removed from letter table,
   `e`=existence added (§6.1); §6.5 updated; §8 item 1 resolved and removed.
@@ -573,4 +604,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.7.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.9.*

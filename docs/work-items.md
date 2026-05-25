@@ -19,32 +19,18 @@ or here, then propagate to the affected chapters.
 
 ---
 
-### D1 · Error and status reporting policy
+### D1 · Error and status reporting policy ✓ RESOLVED (v0.9)
 
-**Affects:** All instruction-set chapters (ch02, ch07, ch08, ch09).
+**Decision:** `rd` always for instructions that can fail; use `x0` to discard.
+Two exceptions with no `rd`: `ec.ib` (always succeeds or traps) and `ec.oe`
+(always succeeds). Status CSRs updated for diagnostics only.
 
-**Problem:** There is no stated policy for how instructions report errors. The current
-practice is inconsistent:
+**Propagated to:** charter §6.6, ch00 §0.9–§0.10, ch02 (all affected instructions
++ §12), ch03 §3.5.1, ch05 §2, ch06 (all pseudocode blocks). Ch08 and ch09
+were already compliant.
 
-- Some CME instructions return status in `rd` (`ec.ig`, `ec.og`, `ec.ir`, `ec.ib`).
-- Other CME instructions have no `rd` and implicitly rely on the `cme_status` CSR
-  (`ec.ob`, `ec.im`, `ec.om`).
-- MSE and QoS instructions consistently use `rd` for error codes.
-- CPE instructions use neither, relying on a separate CSR.
-
-**Decision needed:** Choose one of:
-
-1. **`rd` always** — every instruction that can fail takes `rd`; use `x0` to discard.
-   Clean, uniform, consistent with MSE/QoS. Means adding `rd` to `ec.ob`, `ec.im`,
-   `ec.om`. Means CPE gains `rd`.
-2. **CSR always** — status always in `cme_status` / `mse_status` / `qos_status`.
-   Means removing `rd` from instructions that currently have it. Higher interrupt
-   latency since CSR reads are slower than register checks.
-3. **Rule-based** — `rd` for synchronous results; CSR for asynchronous/DMA operations.
-   More nuanced, but must be stated explicitly and applied uniformly.
-
-**Done when:** Rule is written, added to the charter instruction principles (§6), and
-propagated to all four instruction-set chapters.
+**CPE (ch07):** CPE redesign (F1) is required before D1 can be applied there.
+F1 depends on D3. D1 for CPE is deferred to the F1 session.
 
 ---
 
@@ -362,7 +348,7 @@ cause a trap? A writer implementing this extension needs to know.
 
 ## Priority order for execution
 
-1. **D1** (error/status policy) — affects every instruction chapter; decide first.
+1. ~~**D1** (error/status policy)~~ — **DONE** (v0.9).
 2. **D2** (`ec.it` selection) — affects CME examples directly.
 3. **D3** (CPE delegation) — prerequisite for F1.
 4. **D4** (`qs.or` domain selector) — prerequisite for F2.
