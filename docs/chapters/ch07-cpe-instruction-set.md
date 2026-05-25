@@ -1,164 +1,269 @@
-# Chapter 7: CPE Instruction Set Reference (Per-Hart Cache Partitioning)
+# Chapter 7 — CPE Instruction Set Reference
 
 ## 1. Overview
 
-The **Cache Partitioning Extension (CPE)** provides hardware mechanisms for isolating and reserving portions of **per-hart private caches** (L1I, L1D, and L2-private) for specific Execution Contexts (ECIDs). This ensures that a hard real-time EC can operate without cache line evictions caused by other ECs scheduled on the same hart.
+The **Cache Partitioning Extension (CPE)** provides hardware mechanisms for
+isolating and reserving per-hart private cache capacity (L1I, L1D, and
+L2-private) for specific Execution Contexts (ECIDs). A hard real-time EC
+holding a CPE Contract is guaranteed that cache lines in its assigned ways
+will not be evicted by other ECs on the same hart.
 
-CPE v1 is **per-hart only** and does **not** manage shared caches (e.g., L3). L3 cache partitioning may be handled by platform-specific mechanisms or a future CPE-S extension.
+CPE v1 covers **per-hart private caches only** and does not manage shared
+caches (e.g., L3). L3 partitioning may be addressed by a future CPE-S
+extension.
 
-Key design points:
+Three rules from the charter govern every CPE instruction:
 
-* Focus on **isolation and determinism** for hard real-time contexts.
-* Supports **coupled** or **independent** allocation of L1 and L2-private.
-* Allows **inline descriptors** for common operations and **pointer-based descriptors** for complex configurations.
-* Sanity rules enforced in hardware to prevent unsafe or conflicting assignments.
-
----
-
-## 2. Instruction Naming Convention
-
-All CPE instructions follow the CE suite pattern:
-
-```text
-cp.ir   // cache partition: assign (in) resource
-cp.or   // cache partition: revoke (out) resource
-```
-
-`cp` = CPE extension; `i`/`o` = direction (in/out); `r` = resource/region (per charter §6.1).
-CPE uses the subset `{r}` from the target-letter table.
+1. **ECID-first operands.** `rs1` holds the ECID number — a plain 16-bit
+   integer. Parameters go in `rs2`. (Charter §6.2)
+2. **`rd` is the primary error channel.** 0 = success; non-zero = error code.
+   Pass `x0` to discard. (Charter §6.6)
+3. **CPE Contracts are hierarchically delegatable.** `cp.it`/`cp.ot` follow
+   the same splitting semantics as MSE and QoS. (Charter §4.3, D3)
 
 ---
 
-## 3. Operand Overview
+## 2. Instruction Naming
 
-### rs1: Target ECID + Control Fields
+CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
-```
-[63:48] ECID              ; 16 bits (hart-local ECID)
-[47:46] LEVEL_SEL         ; 0=Auto (L1+L2 together), 1=L1 only, 2=L2-private only, 3=Reserved
-[45]    COUPLE_L1L2       ; 1=Enforce equal ratio between L1 & L2
-[44]    MODE              ; 0=WAY_MASK, 1=PERCENT (both map to ways internally)
-[43]    INLINE            ; 1=rs2 is inline descriptor, 0=rs2 is pointer to CPD
-[42]    LOCK_EN           ; 1=Lock minimum ways to prevent replacement
-[41]    INSTR_DATA_SEL    ; 0=Both L1I+L1D, 1=Data-only
-[40]    PREFETCH_CLASS    ; 0=Default, 1=Low, 2=Med, 3=High (hint)
-[39:32] WEIGHT            ; QoS weight for fills (hint)
-[31:24] OPC               ; 0=ASSIGN, 1=MODIFY, 2=REVOKE, 3=QUERY
-[23:16] VERSION           ; Encoding version (start=1)
-[15:0]  RESERVED
-```
+| Mnemonic | Name | Direction | Target |
+|---|---|---|---|
+| `cp.ir` | Cache Partition: assign (In) Resource | in | resource |
+| `cp.or` | Cache Partition: revoke (Out) Resource | out | resource |
+| `cp.it` | Cache Partition: delegate (In) Tenant | in | tenant |
+| `cp.ot` | Cache Partition: revoke (Out) Tenant | out | tenant |
 
-### rs2: Partition Descriptor
+---
 
-* If **INLINE=1**, rs2 contains mask/percent values directly.
-* If **INLINE=0**, rs2 contains a pointer to a **Cache Partition Descriptor (CPD)** in memory.
+## 3. Instruction Reference
 
-#### 3.1 INLINE + MODE=WAY\_MASK
+### `cp.ir` — Assign a cache partition to an ECID
 
-```
-[63:48] L2_WAY_MASK_HI
-[47:32] L2_WAY_MASK_LO
-[31:16] L1D_WAY_MASK
-[15:0]  L1I_WAY_MASK
-```
+* **Syntax**: `cp.ir rd, rs1, rs2`
+  * `rd`: 0 on success; error code on failure (see §8).
+  * `rs1`: Target ECID.
+  * `rs2`: Partition descriptor — inline or pointer (see §4).
+* **Semantics**:
+  1. Validates `rs1` is an allocated ECID on this hart.
+  2. Validates the partition descriptor in `rs2` (see §4 and §6).
+  3. Checks that assigned ways do not overlap with ways already assigned to
+     other ECIDs at the same level. If overlap: returns `CPE_ERR_OVERLAP`.
+  4. Checks that the assignment is consistent with any parent Contract the
+     caller holds (if `rs1` was delegated a sub-partition via `cp.it`).
+  5. Applies the assignment: programs the L1/L2 way-partition controllers
+     for ECID `rs1`. If a prior assignment exists for `rs1`, it is replaced.
+  6. Stores the assignment parameters in `EC[rs1]` for context-switch
+     restore by CME.
+  7. If `rs1` is currently active on this hart, the change takes effect
+     immediately (or on the next instruction boundary; implementation-defined).
+* **Cycles**: 1–8 (hardware writeback and invalidation of displaced lines may
+  extend latency; see §6 sanity rule 4).
 
-Validity: If COUPLE\_L1L2=1, ratio of set bits in L1 and L2 masks must match.
+---
 
-#### 3.2 INLINE + MODE=PERCENT
+### `cp.or` — Revoke all cache partitions from an ECID
 
-```
-[63:56] PCT_256_L2   ; percent * 256 (e.g., 128=50%)
-[55:48] PCT_256_L1D
-[47:40] PCT_256_L1I
-[39:24] LOCK_MIN_WAYS
-[23:0]  RESERVED
-```
+* **Syntax**: `cp.or rd, rs1`
+  * `rd`: 0 on success; error code on failure.
+  * `rs1`: Target ECID.
+* **Semantics**:
+  1. Validates `rs1`.
+  2. Revokes all partition assignments for ECID `rs1` at all cache levels.
+  3. Invalidates all cache lines in the revoked ways that belong to `rs1`
+     (required for isolation; see §6 sanity rule 5).
+  4. If `rs1` holds child CPE Contracts (delegated via `cp.it`), those are
+     revoked first recursively (bounded by D ≤ 3). Always makes forward
+     progress; cannot be stalled by a hostile child.
+  5. Clears the CPE state in `EC[rs1]`.
+* **Cycles**: 1–16 (invalidation latency).
 
-Validity: If COUPLE\_L1L2=1, L1D and L2 percentages must be equal.
+---
 
-#### 3.3 CPD in Memory (INLINE=0)
+### `cp.it` — Delegate a cache-partition sub-slice to a child ECID
+
+* **Syntax**: `cp.it rd, rs1, rs2`
+  * `rd`: 0 on success; error code on failure.
+  * `rs1`: Parent ECID — must hold a CPE Contract (assigned via `cp.ir`).
+  * `rs2`: Delegation descriptor — child ECID plus way counts (see §5).
+* **Semantics**:
+  1. Validates `rs1` holds a CPE Contract on this hart.
+  2. Extracts `child_ecid`, `l1_ways`, `l2_ways` from `rs2` (see §5).
+  3. Verifies `child_ecid` is a child of `rs1` in the delegation tree and
+     satisfies `EC[child_ecid].delegation_L < D`.
+  4. Checks that `l1_ways + existing_l1_sum(children of rs1) ≤ l1_ways(rs1)`
+     and same for L2. If exceeded: returns `CPE_ERR_CAP_EXCEEDED`.
+  5. Splits the Contract: reduces `rs1`'s effective allocation by the
+     delegated amounts; assigns the delegated slice to `child_ecid`.
+  6. Updates running sums for ancestor groups.
+* **Cycles**: 1–8.
+
+---
+
+### `cp.ot` — Revoke a delegated cache partition from a child ECID
+
+* **Syntax**: `cp.ot rd, rs1`
+  * `rd`: 0 on success; error code on failure.
+  * `rs1`: Child ECID whose delegated CPE Contract is being revoked.
+* **Semantics**:
+  1. Validates `rs1` holds a delegated CPE Contract.
+  2. If `rs1` itself has child Contracts, revokes those first (recursive,
+     bounded by D ≤ 3). Always makes forward progress.
+  3. Revokes `rs1`'s Contract; returns the ways to the parent's allocation.
+  4. Invalidates cache lines in the revoked ways owned by `rs1`.
+  5. Clears the CPE state in `EC[rs1]`.
+* **Cycles**: 1–16 (invalidation latency; proportional to subtree depth).
+
+---
+
+## 4. Partition Descriptor (`rs2` for `cp.ir`)
+
+`rs2` is an XLEN-wide value that is either an inline descriptor or a pointer
+to a `CPE_Assignment_Params` struct:
+
+**Inline form (bit [XLEN-1] = 0):**
+
+| Bits | Field | Meaning |
+|---|---|---|
+| 7:0 | `l1_way_mask` | L1 cache way mask (1 bit per way; supports ≤8 ways inline) |
+| 15:8 | `l2_way_mask` | L2-private way mask (1 bit per way; supports ≤8 ways inline) |
+| 17:16 | `level_sel` | 0=L1+L2, 1=L1 only, 2=L2 only, 3=reserved |
+| 18 | `couple` | 1 = enforce equal fraction across L1 and L2 |
+| 19 | `lock_en` | 1 = lock minimum ways (prevent eviction, not just replacement) |
+| [XLEN-2]:20 | — | Reserved; must be zero |
+| [XLEN-1] | 0 | Indicates inline form |
+
+Implementations with more than 8 ways per cache level must use the pointer
+form for those levels.
+
+**Pointer form (bit [XLEN-1] = 1):**
+
+Bits [XLEN-2]:0 of `rs2` are a pointer to a `CPE_Assignment_Params` struct
+(2-byte aligned; hardware clears bit [XLEN-1] before dereferencing):
 
 ```c
-struct CPE_CPD_v1 {
-    u16 version;     // must match rs1.VERSION
-    u8  level_sel;   // LEVEL_SEL
-    u8  flags;       // COUPLE_L1L2, LOCK_EN, INSTR_DATA_SEL, PREFETCH_CLASS
-    u8  mode;        // WAY_MASK or PERCENT
-    u8  reserved[3];
-    union {
-        struct { u64 l2_mask; u32 l1d_mask; u32 l1i_mask; u16 lock_min; } way;
-        struct { u8 pct256_l2, pct256_l1d, pct256_l1i; u16 lock_min; } percent;
-    } cfg;
+struct CPE_Assignment_Params {
+    uint16_t l1i_way_mask;   /* L1I way mask */
+    uint16_t l1d_way_mask;   /* L1D way mask */
+    uint32_t l2_way_mask;    /* L2-private way mask (up to 32 ways) */
+    uint8_t  level_sel;      /* 0=L1+L2, 1=L1 only, 2=L2 only */
+    uint8_t  flags;          /* bit 0=couple, bit 1=lock_en */
+    uint16_t reserved;       /* must be zero */
+};
+```
+
+**Reserved-bit policy.** Reserved fields must be zero. Non-zero reserved
+bits return `CPE_ERR_ILLEGAL_FIELD`.
+
+---
+
+## 5. Delegation Descriptor (`rs2` for `cp.it`)
+
+`rs2` is an XLEN-wide value encoding the child ECID and the way counts
+to delegate:
+
+**Inline form (bit [XLEN-1] = 0):**
+
+| Bits | Field | Meaning |
+|---|---|---|
+| 15:0 | `child_ecid` | Child ECID to receive the sub-partition |
+| 19:16 | `l1_ways` | Number of L1 ways to delegate (0 = none) |
+| 23:20 | `l2_ways` | Number of L2 ways to delegate (0 = none) |
+| [XLEN-2]:24 | — | Reserved; must be zero |
+| [XLEN-1] | 0 | Indicates inline form |
+
+**Pointer form (bit [XLEN-1] = 1):**
+
+Bits [XLEN-2]:0 are a pointer to a `CPE_Delegation_Params` struct:
+
+```c
+struct CPE_Delegation_Params {
+    uint16_t child_ecid;
+    uint16_t l1_ways;   /* L1 ways to delegate */
+    uint16_t l2_ways;   /* L2 ways to delegate */
+    uint16_t reserved;  /* must be zero */
 };
 ```
 
 ---
 
-## 4. Sanity Rules (Hardware-Enforced)
+## 6. Hardware Sanity Rules
 
-1. Masks for different ECIDs at the same level must be disjoint.
-2. If COUPLE\_L1L2=1, allocated fraction must match across L1 and L2.
-3. LOCK\_EN cannot lock more ways than assigned.
-4. ASSIGN may require writeback+invalidate of prior occupant’s lines before completion.
-5. REVOKE must invalidate all assigned lines for that ECID.
+The hardware enforces the following invariants on every `cp.ir` and `cp.it`
+call. Violations return an error code; no state changes on failure.
 
----
-
-## 5. Example Usage
-
-### Example 1: Assign 4 ways to ECID 0x1234, coupled L1/L2
-
-```
-rs1 = {ECID=0x1234, LEVEL_SEL=Auto, COUPLE=1, MODE=WAY_MASK, INLINE=1, LOCK_EN=0, OPC=ASSIGN}
-rs2 = {L2 mask=0x000F, L1D mask=0x0F, L1I mask=0x00}
-cp.ir rs1, rs2
-```
-
-### Example 2: Reserve 50% of L1D and L2 for ECID 0x1234
-
-```
-rs1 = {ECID=0x1234, LEVEL_SEL=Auto, COUPLE=1, MODE=PERCENT, INLINE=1, OPC=ASSIGN}
-rs2 = {PCT_256_L2=128, PCT_256_L1D=128, PCT_256_L1I=0}
-cp.ir rs1, rs2
-```
-
-### Example 3: Revoke ECID’s Partition
-
-```
-rs1 = {ECID=0x1234, LEVEL_SEL=Auto, OPC=REVOKE}
-cp.or rs1, x0
-```
+1. **Way-mask disjointness.** The set of ways assigned to any two ECIDs at
+   the same cache level must be disjoint.
+2. **Coupling constraint.** If `couple=1`, the fraction of ways assigned in
+   L1 and L2 must be equal (±1 way rounding). If the masks violate this,
+   returns `CPE_ERR_COUPLE_MISMATCH`.
+3. **Lock constraint.** `lock_en` may not be set if no ways are assigned.
+4. **Writeback on reassignment.** Before completing an assignment that
+   displaces ways previously held by a different ECID, the implementation
+   must writeback and invalidate those ways.
+5. **Invalidation on revoke.** `cp.or` and `cp.ot` must invalidate all
+   lines in the revoked ways before returning.
 
 ---
 
-## 6. Status Reporting
+## 7. CPE CSRs
 
-CPE operations return status via `rd` or a dedicated CSR:
+| CSR | Access | Purpose |
+|---|---|---|
+| `cpe_caps` | RO | Capability bits: supported cache levels, max ways per level, delegation support |
+| `cpe_status` | RO | Result code from the last CPE operation on this hart |
+| `cpe_violation` | RO (sticky) | Set when an assigned partition boundary was crossed; cleared by writing 1 |
+| `cpe_violation_en` | RW (privileged) | Enable interrupt on `cpe_violation` |
 
-* `OK`
-* `UNSUPPORTED_LEVEL`
-* `INVALID_MASK`
-* `COUPLE_MISMATCH`
-* `INSUFFICIENT_WAYS`
-* `PERMISSION_DENIED`
-* `BUSY_TRY_AGAIN`
+`cpe_caps` bit layout (informative; normative layout in a future encoding pass):
 
----
-
-## 7. Interaction with CME and OS
-
-* Partition assignments are **per-hart** and bound to ECID.
-* CME restores CP state from bank when context is resumed.
-* OS must reapply CPE settings on context migration between harts.
+* Bits 3:0 — max L1 ways (log2; e.g., 4 = up to 16 L1 ways)
+* Bits 7:4 — max L2 ways (log2)
+* Bit 8 — L1I partitioning supported
+* Bit 9 — L1D partitioning supported
+* Bit 10 — L2-private partitioning supported
+* Bit 11 — delegation (`cp.it`/`cp.ot`) supported
 
 ---
 
-## 8. Out-of-Scope for v1
+## 8. Error Codes
 
-* Shared L3 cache partitioning.
-* Dynamic repartitioning during a running timeslice without OS cooperation.
+| Code | Name | Meaning |
+|---|---|---|
+| 0 | OK | Success |
+| 1 | `CPE_ERR_INVALID_ECID` | ECID not allocated or generation mismatch |
+| 2 | `CPE_ERR_OVERLAP` | Assigned ways overlap with another ECID's partition |
+| 3 | `CPE_ERR_CAP_EXCEEDED` | Delegation exceeds parent Contract allocation |
+| 4 | `CPE_ERR_COUPLE_MISMATCH` | Coupling constraint violated |
+| 5 | `CPE_ERR_ILLEGAL_FIELD` | Reserved or out-of-range field value |
+| 6 | `CPE_ERR_UNSUPPORTED` | Requested level or feature not implemented |
+| 7 | `CPE_ERR_PERMISSION` | Caller is not a parent or privileged ancestor |
 
 ---
 
-**Next:** Chapter 8 – MSE (Memory Scheduling Extension)
+## 9. Interaction with CME
 
+CPE partition assignments are part of an ECID's architectural state.
+
+* CME stores the CPE state in the non-VMT bank's CP field (Chapter 0 §0.6).
+  On `ec.ob`, the hardware restores the target ECID's CPE assignment
+  automatically — no separate `cp.ir` is needed per context switch.
+* On `ec.oe` (forced destroy), all CPE Contracts held by the target ECID
+  and its subtree are revoked as part of the destroy sequence.
+* After hart migration, the kernel must re-issue `cp.ir` on the destination
+  hart; CPE state is per-hart and does not transfer automatically.
+
+---
+
+## 10. Instruction Timing Summary
+
+| Instruction | Cycles | Notes |
+|---|---|---|
+| `cp.ir` | 1–8 | May extend for writeback of displaced lines |
+| `cp.or` | 1–16 | Invalidation latency |
+| `cp.it` | 1–8 | — |
+| `cp.ot` | 1–16 | Invalidation + subtree depth |
+
+---
+
+[Next: Chapter 8 — MSE Memory Scheduling Extension](ch08-mse-memory-scheduling.md)
