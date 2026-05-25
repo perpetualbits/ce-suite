@@ -1,0 +1,1 @@
+Read docs/charter/project_instructions.md and docs/refamiliarize.md first. Follow the rules in working_notes_for_authors.md — especially: one chapter per session, no sweeps, no charter edits as a side effect.
