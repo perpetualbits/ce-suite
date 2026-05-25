@@ -261,4 +261,4 @@ cache partitions per ECID, and the inline and pointer-based partition descriptor
 encodings.
 
 **Appendix A** covers the ECID radix-tree data structure and the algorithms for
-allocation, delegation, and forced destruction (`ec.od`).
+allocation, delegation, and forced destruction (`ec.oe`).
