@@ -47,6 +47,11 @@ ownership layer that ties the other four together.
 
 ### A.3 Chapter status (as of v0.8 of the charter, all `ec.oe` propagation complete)
 
+> **Note:** An instruction audit (2026-05-25) identified inconsistencies and gaps
+> across the instruction-set chapters. All chapters below are "done" in the sense of
+> being written and architecturally aligned, but several have known issues tracked in
+> `docs/work-items.md`. Do not start usage-example chapters until work items are resolved.
+
 | Chapter | State | Next action |
 |---|---|---|
 | **Charter** (Project Instructions) | v0.8 — current | — |
@@ -101,11 +106,19 @@ these, stop — that's a charter-level change.
 
 ### A.6 What's *next* (the suggested work order)
 
-1. **Usage Examples chapters** for CPE, MSE, and QoS — one session per chapter.
-   Chapter 6 covers CME examples; equivalent chapters for CPE, MSE, and QoS do not
-   yet exist. This is the next unfinished item.
+**Phase 1 — Resolve work items (current priority).**
+An instruction audit found inconsistencies across ch02, ch07, ch08, ch09.
+See `docs/work-items.md` for the full list. Work through items in the priority
+order given there: design decisions (D1–D4) first, then specification fixes (F1–F10),
+then new content (G1–G2).
 
-All instruction-set and semantics chapters (Ch 0–9) are done.
+**Phase 2 — Usage examples chapters (blocked until Phase 1 is complete).**
+- Chapter 10 — CPE Usage Examples
+- Chapter 11 — MSE Usage Examples
+- Chapter 12 — QoS Usage Examples
+
+Chapter 6 covers CME usage examples. The three above do not yet exist and must not
+be started until the instruction definitions they illustrate are fully consistent.
 
 ### A.7 Where things live
 
