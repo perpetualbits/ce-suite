@@ -130,15 +130,20 @@ These instructions delegate Group resources (banks, contracts, child ECIDs) from
 parent ECID to a child, or revoke them. The delegation tree is bounded by depth D ≤ 3
 (charter §5).
 
-### `ec.it` — Delegate resources to a child ECID
+### `ec.it` — Delegate one bank to a child ECID
 
 * **Syntax**: `ec.it rd, rs1, rs2`
-  * `rd`: 0 on success; error code on privilege violation or invalid ECID.
-  * `rs1`: Source ECID — the parent whose Group resources are transferred.
-  * `rs2`: Child ECID — the recipient.
-* **Side effects**: Selected resources from ECID `rs1`'s Group are transferred to
-  ECID `rs2`'s Group. Updates owner up-pointers on all affected resources. Requires
-  `rs2` to have delegation level `L < D` for the child to be able to re-delegate.
+  * `rd`: 0 on success; error code if `rs1` has no banks, privilege violation, or
+    invalid ECID.
+  * `rs1`: Source ECID — the parent Group from which one bank is taken.
+  * `rs2`: Child ECID — the recipient Group.
+* **Scope**: Banks only. `ec.it` transfers exactly **one** bank per call;
+  the implementation selects which bank from `rs1`'s Group. To delegate N banks,
+  call `ec.it` N times. Contract delegation is handled by per-extension instructions:
+  `ms.it` for MSE, `qs.it` for QoS (charter §4.3).
+* **Side effects**: The selected bank's owner field is updated from `rs1` to `rs2`.
+  Requires `rs1` to be a privileged ancestor of `rs2`. Requires `rs2` to have
+  `L < D` if the child is to be able to re-delegate the bank further.
 * **Cycles**: 1–4.
 
 ### `ec.ot` — Revoke resources from a child ECID
@@ -292,7 +297,7 @@ Full binary encoding is deferred to the formal opcode assignment stage.
 | Fill bank state from ECS in RAM                       | `ec.om`  |
 | Add a free bank to an ECID's Group                    | `ec.ig`  |
 | Return a bank from an ECID's Group to the free pool   | `ec.og`  |
-| Delegate Group resources to a child ECID              | `ec.it`  |
+| Delegate one bank to a child ECID (call N times for N banks) | `ec.it`  |
 | Revoke all resources from a child ECID                | `ec.ot`  |
 | Allocate a new child ECID                             | `ec.ir`  |
 | Destroy an ECID and its entire subtree (forced)       | `ec.oe`  |

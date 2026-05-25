@@ -195,17 +195,22 @@ that Group are dissolved:
 Delegation transfers resources from a parent ECID's Group to a child
 ECID's Group. After delegation:
 
-- The delegated Bank's owner field is updated from the parent ECID to the
-  child ECID.
-- The delegated Contract's owner field is updated from the parent ECID to
+- The delegated resource's owner field is updated from the parent ECID to
   the child ECID.
-- The parent ECID **no longer has access** to the delegated resources. It
+- The parent ECID **no longer has access** to the delegated resource. It
   cannot issue `ec.ib` against a Bank it has delegated away, and it cannot
   use a Contract it has delegated away.
 
-The instruction `ec.it` (Chapter 2 §4) performs delegation. It takes the
-parent ECID (`rs1`) and child ECID (`rs2`) as ECID-number operands. It
-never takes a Group ID as a separate argument, because GroupID = ECID.
+**Bank delegation** uses `ec.it` (Chapter 2 §4): one bank per call,
+parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
+`ec.it` N times.
+
+**Contract delegation** is handled by the extension that owns the Contract:
+`ms.it` for MSE Contracts, `qs.it` for QoS Contracts (charter §4.3 item 7).
+`ec.it` does not transfer Contracts.
+
+Neither instruction takes a Group ID as a separate argument, because
+GroupID = ECID.
 
 ### 3.4.2 Creating a child ECID
 
@@ -216,12 +221,13 @@ The kernel then:
 1. Sets `EC[child].ecs_ptr` to point to the child's ECS in RAM.
 2. Sets `EC[child].delegation_L` to `parent_L + 1`.
 3. Sets `EC[child].parent_ecid` to the parent ECID number.
-4. Uses `ec.it` to transfer Banks and/or Contracts to the child's Group.
+4. Uses `ec.it` (once per bank) to transfer Banks to the child's Group.
+   Uses `ms.it`, `qs.it`, or the appropriate extension instruction to
+   transfer Contracts.
 
 Steps 1–3 are kernel software operations (writes to the `EC[e]` array via
-the kernel's privileged view). Step 4 is the hardware delegation instruction.
-The kernel may perform delegation in multiple `ec.it` calls, one resource
-at a time, or in a single call with a resource mask — see Chapter 2 §4.
+the kernel's privileged view). Step 4 issues one `ec.it` call per bank
+being delegated; each call is O(1).
 
 ### 3.4.3 Delegation-level invariants
 
