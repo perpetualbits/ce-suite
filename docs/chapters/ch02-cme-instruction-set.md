@@ -209,6 +209,9 @@ derivation, attestation, and rotation are deferred open items (charter §8.7).
 
 ## 7. Register Mask Encoding
 
+The mask is an XLEN-wide value held in one instruction operand register (32 bits
+on RV32, 64 bits on RV64). The coarse-grained group bits are:
+
 | Bit | Register Group | Notes                    |
 |-----|----------------|--------------------------|
 | 0   | GPR            | Integer registers         |
@@ -219,6 +222,11 @@ derivation, attestation, and rotation are deferred open items (charter §8.7).
 | 5   | CSR            | Control/status registers  |
 | 6   | SATP           | Address translation       |
 | 7   | —              | Reserved                  |
+
+Bits 8–31 are reserved for future GPR subset selection. Bits 32–63 (RV64 only)
+are reserved for FPR subsets, CP/CSR subsets, and VMT subsets. See Chapter 0
+§0.10 for the full table. On RV32, bits 32–63 are unreachable; all currently
+defined coarse-grained groups (bits 0–6) work identically on RV32 and RV64.
 
 If bit 4 (PC) is set in an `ec.ob` mask, execution jumps to the restored program
 counter immediately on commit of the instruction.

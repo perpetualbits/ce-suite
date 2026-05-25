@@ -346,6 +346,28 @@ cause a trap? A writer implementing this extension needs to know.
 
 ---
 
+### G3 · RV32 width audit — "64-bit" assumptions throughout
+
+**Affects:** All chapters; highest risk in ch02, ch07, ch08, ch09 (instruction
+operand descriptions).
+
+**Problem:** The mask width bug found in ch00 §0.10 / ch02 §7 (said "64-bit value";
+should be "XLEN-wide") is a symptom of a broader pattern: the spec was written with
+RV64 implicitly assumed. Similar silent assumptions may lurk elsewhere:
+
+- Instruction operand widths stated as "64-bit" instead of XLEN.
+- EC entry field sizes that only make sense on RV64.
+- ECS pointer arithmetic that assumes 8-byte pointers.
+- Timing or bandwidth figures that assume 64-bit bus transactions.
+
+**Done when:** A full audit of all chapters replaces hard-coded "64-bit" claims with
+XLEN-aware language where the value is passed in a register or affects hardware
+behavior differently on RV32 vs RV64. Items that are genuinely 64-bit (e.g., a
+64-bit counter that lives in memory, not in a register) should be annotated as such
+with a rationale.
+
+---
+
 ## Priority order for execution
 
 1. ~~**D1** (error/status policy)~~ — **DONE** (v0.9).
@@ -364,6 +386,7 @@ cause a trap? A writer implementing this extension needs to know.
 14. **F10** (working notes stale note) — trivial.
 15. **G1** (diagrams) — own session after ch02 is stable.
 16. **G2** (reserved-bit policy) — small; fold into ch02 session.
+17. **G3** (RV32 width audit) — systematic sweep after other ch02 work settles.
 
 ---
 

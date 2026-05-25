@@ -312,7 +312,8 @@ Full instruction definitions are in Chapter 2.
 ## 0.10 Context Restore Mask
 
 The register mask passed as `rs1` to `ec.ib` and as `rs2` to `ec.ob`, `ec.im`, and `ec.om`
-is a 64-bit value selecting which register groups participate in the operation:
+is an XLEN-wide value (32 bits on RV32, 64 bits on RV64) held in one instruction operand
+register. It selects which register groups participate in the operation:
 
 | Bits | Register group | Notes |
 |---|---|---|
@@ -334,3 +335,8 @@ If bit 4 (PC) is set in an `ec.ob` mask, execution jumps to the restored
 program counter immediately on commit of the instruction.
 
 Bits not assigned above are reserved and must be zero.
+
+**RV32 note.** On RV32, the operand register is 32 bits, so bits 32–63 of
+the table above are architecturally unreachable. All entries at those positions
+are currently Reserved or VMT-only; coarse-grained group selection (bits 0–6)
+works identically on RV32 and RV64.
