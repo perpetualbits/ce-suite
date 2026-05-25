@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.11 of the charter)
+### A.3 Chapter status (as of v0.12 of the charter)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state. Do not start usage-example chapters
@@ -53,20 +53,20 @@ ownership layer that ties the other four together.
 
 | Chapter | State | Notes |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.11 — current | D1, D2, D3 locked; D4 open |
-| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.11 |
+| **Charter** (Project Instructions) | v0.12 — current | D1–D4 locked; F1–F10 resolved |
+| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.12 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
-| **Chapter 2** (CME Instruction Set Reference) | Done | D1 applied; minor open items (F3, F7, G1, G2) |
+| **Chapter 2** (CME Instruction Set Reference) | Done | D1 applied; F3/F7/G2 resolved; G1 open (diagrams) |
 | **Chapter 3** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 4** (HW Microarchitecture) | Done | — |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
-| **Chapter 7** (CPE Instruction Set Reference) | **Known structural issues** | F1 (redesign) in progress; see work-items.md |
-| **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; minor open item F4 |
-| **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4 open (qs.or/qs.ot domain selector) |
+| **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3 applied |
+| **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; F4 resolved |
+| **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2 resolved |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 
-### A.4 What's been *decided* (locked in v0.7–v0.11)
+### A.4 What's been *decided* (locked in v0.7–v0.12)
 
 If a chapter you're reading contradicts any of these, the chapter is wrong:
 
@@ -93,6 +93,8 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
     per-extension instructions: `ms.it`, `qs.it`, `cp.it`. *(v0.10)*
 14. **CPE Contracts are delegatable.** CPE subset is `{r, t}`; `cp.it` and
     `cp.ot` are required. *(v0.11)*
+15. **`qs.or`/`qs.ot` use `rs2` for the domain selector.** `rd` is write-only;
+    "rd as input" is prohibited. *(v0.12)*
 
 ### A.5 What's *open*
 
@@ -108,36 +110,32 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 7. The CE-disable CSR name, bit layout, reset defaults, per-extension
    granularity.
 
-**`docs/work-items.md` open items** (specification-level fixes):
+**`docs/work-items.md` remaining open items** (specification-level):
 
-- **D4** — `qs.or`/`qs.ot` domain selector (architecturally illegal `rd`-as-input)
-- **F1** — CPE ch07 complete redesign (blocked on D1✓/D3✓; unblocked)
-- **F2** — `qs.or`/`qs.ot` syntax correction (follows from D4)
-- **F3** — `ec.ir` rs1 semantics clarification
-- **F4** — `ms.it` rs2 bitfield table
-- **F5** — Charter §6.1 CME subset correction
-- **F6** — `ec.is`/`ec.os` decision (resolve vs. remove `s` from subset)
-- **F7** — `ec.iv`/`ec.ov` incompleteness marker
-- **F8** — Binary encoding (all extensions; significant effort)
-- **G1** — ch02 §13 diagrams
-- **G2** — Reserved-bit policy for masks
-- **G3** — RV32/RV64 width audit
+- **F8** — Binary encoding (all extensions; significant effort; own session per extension)
+- **G1** — ch02 §13 diagrams (three ASCII diagrams; ch02 is now stable)
+- **G3** — RV32/RV64 width audit (systematic sweep; lowest urgency)
+
+All D items (D1–D4) and all other F/G items are resolved. See work-items.md for details.
 
 ### A.6 What's *next* (the suggested work order)
 
-**Phase 1 — Resolve work items (current priority).**
-An instruction audit found inconsistencies across ch02, ch07, ch08, ch09.
-See `docs/work-items.md` for the full list. Work through items in the priority
-order given there: design decisions (D1–D4) first, then specification fixes (F1–F10),
-then new content (G1–G2).
+**Phase 1 — Resolve work items.**
+All D items and most F/G items are resolved as of v0.12. Remaining items: F8 (binary
+encoding), G1 (diagrams), G3 (RV32 audit). See work-items.md for details.
 
-**Phase 2 — Usage examples chapters (blocked until Phase 1 is complete).**
+**Phase 2 — Usage examples chapters.** Now unblocked for CPE, MSE, and QoS.
 - Chapter 10 — CPE Usage Examples
 - Chapter 11 — MSE Usage Examples
 - Chapter 12 — QoS Usage Examples
 
-Chapter 6 covers CME usage examples. The three above do not yet exist and must not
-be started until the instruction definitions they illustrate are fully consistent.
+Chapter 6 covers CME usage examples. The three above do not yet exist. They may now
+be started; the instruction definitions they illustrate are fully consistent.
+
+**Phase 3 — Remaining F/G items** (can be done in parallel with Phase 2):
+- **F8** — Binary encoding. Significant effort; one session per extension.
+- **G1** — Diagrams for ch02 §13. ch02 is stable; diagrams can be drawn.
+- **G3** — RV32 width audit. Systematic; lowest urgency.
 
 ### A.7 Where things live
 
@@ -169,6 +167,8 @@ docs/
 │   ├── ucs.md                       # exploratory; charter §8.5
 │   ├── ce-tree-of-truths.md         # axiom sketch; predates charter
 │   └── working_with_chatgpt.md      # workflow lessons; absorbed into working notes
+├── future-directions.md             # non-normative ideas to revisit post-v1
+├── work-items.md                    # tracked inconsistencies and open items
 ├── refamiliarize.md                 # this document
 └── working_notes_for_authors.md     # workflow rules for authors and AI assistants
 ```

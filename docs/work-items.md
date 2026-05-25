@@ -61,27 +61,12 @@ the CPE chapter redesign (F1), which is now fully unblocked (D1 ✓, D3 ✓).
 
 ---
 
-### D4 · `qs.or` / `qs.ot` domain selector operand
+### D4 · `qs.or` / `qs.ot` domain selector operand ✓ RESOLVED (v0.12)
 
-**Affects:** ch09 (`qs.or`, `qs.ot`).
+**Decision:** Option 1 — `rs2` for domain. `qs.or rd, rs1, rs2` and `qs.ot rd, rs1, rs2`
+where rs2 = domain_id; 0 = all domains. Consistent with `qs.ir`; rd-as-input prohibited.
 
-**Problem:** An ECID can hold Contracts on multiple QoS domains simultaneously. `qs.or`
-needs to know which domain's Contract to revoke. The current text encodes the `domain_id`
-in "the low bits of `rd` on input" — but `rd` is a destination register in RISC-V; it
-cannot be read by hardware. This is architecturally illegal.
-
-**Decision needed:** How to pass the domain selector:
-
-1. **`rs2` for domain** — `qs.or rd, rs1, rs2` where rs2 = domain_id (or 0 = all
-   domains). Consistent with `qs.ir` which already uses rs2 for parameters.
-2. **Implicit from Contract state** — `qs.or rd, rs1` revokes the sole Contract held
-   by `rs1` on whichever domain; if rs1 holds multiple, the hardware picks one
-   (requires software to call `qs.or` once per domain). Less convenient but simpler encoding.
-3. **Separate instruction per domain** — explicit domain in the instruction encoding
-   via an immediate. Complex; probably not worth it.
-
-**Done when:** Syntax of `qs.or` and `qs.ot` is corrected; ch09 updated; RISC-V
-architectural validity confirmed (rd is write-only).
+**Propagated to:** charter §6.7 (new section); ch09 (`qs.or`, `qs.ot` syntax corrected).
 
 ---
 
@@ -92,143 +77,72 @@ where no design decision is needed.
 
 ---
 
-### F1 · CPE ch07 complete redesign
+### F1 · CPE ch07 complete redesign ✓ RESOLVED
 
 **Affects:** ch07.
-**Depends on:** D3 ✓, D1 ✓ — **fully unblocked.**
 
-**Problems:**
-
-1. `cp.ir rs1, rs2` packs the ECID into bits 63:48 of `rs1` along with a dozen flag
-   fields. This violates the ECID-first convention (charter §6.2): `rs1` should be the
-   plain ECID number; parameters go in `rs2`.
-2. `rs1` contains an `OPC` field (ASSIGN / MODIFY / REVOKE / QUERY) that overlaps with
-   the instruction mnemonics. `cp.ir` with OPC=REVOKE and `cp.or` are redundant. The
-   mnemonic should determine the operation.
-3. The QUERY operation (OPC=QUERY) is mentioned but not defined: what does it return,
-   in which register, in what format?
-
-**Done when:** ch07 rewritten with `rs1` = ECID, `rs2` = partition descriptor;
-OPC field removed; QUERY either defined properly or removed; delegation settled per D3;
-error reporting settled per D1.
+ch07 rewritten with `rs1` = ECID, `rs2` = partition descriptor; OPC field removed;
+QUERY replaced by `cpe_caps` CSR (F9 resolved as part of F1); delegation per D3;
+rd-primary per D1. Four instructions: `cp.ir`, `cp.or`, `cp.it`, `cp.ot`.
 
 ---
 
-### F2 · `qs.or` and `qs.ot` syntax correction
+### F2 · `qs.or` and `qs.ot` syntax correction ✓ RESOLVED
 
 **Affects:** ch09.
-**Depends on:** D4.
 
-**Done when:** Syntax corrected to not use `rd` as input; ch09 updated consistently.
+Fixed as part of D4 resolution. `qs.or rd, rs1, rs2` and `qs.ot rd, rs1, rs2`; rd is
+write-only; ch09 updated consistently.
 
 ---
 
-### F3 · `ec.ir` rs1 semantics clarification
+### F3 · `ec.ir` rs1 semantics clarification ✓ RESOLVED
 
 **Affects:** ch02 (`ec.ir`).
 
-**Problem:** The description says rs1 is "maximum delegation depth permitted for the
-child (must satisfy `child_L = parent_L + 1 ≤ D`; pass 0 to prevent further
-delegation)." These two clauses contradict each other: if the value *must* equal
-`parent_L + 1`, it cannot also be 0 for a different semantic.
-
-**Fix:** Choose one clear meaning:
-
-- rs1 is a **flag**: 0 = allocate leaf ECID (L = D, no further delegation); non-zero =
-  allocate delegating ECID (L = parent_L + 1 < D). The constraint L = parent_L + 1
-  is always satisfied by hardware; software only chooses leaf vs. non-leaf.
-- rs1 is the **desired delegation level** for the child: hardware validates that it
-  equals parent_L + 1 and rejects 0.
-
-**Done when:** ch02 `ec.ir` description states one unambiguous meaning.
+Fixed in ch02: rs1=0 → leaf child (delegation_L=D, cannot delegate further);
+rs1=1 → delegating child (delegation_L=parent_L+1, provided parent_L<D);
+rs1>1 → ILLEGAL_FIELD. Hardware always sets child_L = parent_L+1; software only
+chooses leaf vs. non-leaf via 0/1.
 
 ---
 
-### F4 · `ms.it` rs2 dual-purpose encoding
+### F4 · `ms.it` rs2 dual-purpose encoding ✓ RESOLVED
 
 **Affects:** ch08 (`ms.it`).
 
-**Problem:** `ms.it rd, rs1, rs2` describes rs2 as the child ECID, but then says "the
-portion [bw_class] is encoded in the low bits of `rs2` if bit 62 is set." This makes
-rs2 simultaneously a 16-bit ECID (bits 15:0) *and* a bw_class selector (low bits when
-bit 62 is set). The field layout is never shown explicitly.
-
-**Fix:** Provide a formal bit-field table for rs2 in the context of `ms.it`:
-
-| Bits | Field | Meaning |
-|---|---|---|
-| 15:0 | child_ecid | Child ECID to receive the split Contract |
-| 19:16 | child_bw_class | Bandwidth class to delegate (0 = delegate all) |
-| 23:20 | child_lat_class | Latency class to delegate (0 = delegate all) |
-| 62:24 | — | Reserved, must be zero |
-| 63 | ptr_flag | If set, rs2 is a pointer to an `MSE_Delegation_Params` struct |
-
-(Exact layout TBD; the table above is illustrative.)
-
-**Done when:** A formal bit-field table for `ms.it` rs2 appears in ch08; the
-description no longer relies on "bit 62" as a magic flag without context.
+Fixed in ch08: formal bitfield table added — bits 15:0=child_ecid, 19:16=child_bw_class,
+23:20=child_lat_class, bit[XLEN-1]=pointer flag; "bit 62" magic removed. Pointer form
+points to `MSE_Delegation_Params` struct.
 
 ---
 
-### F5 · Charter §6.1 — CME subset list incomplete
+### F5 · Charter §6.1 — CME subset list incomplete ✓ RESOLVED
 
 **Affects:** Charter `project_instructions.md` §6.1.
 
-**Problem:** Charter §6.1 lists CME's target-letter subset as `{b, m, s, v, e}`. But
-ch02 defines instructions using `g` (ec.ig, ec.og), `t` (ec.it, ec.ot), and `r`
-(ec.ir). These letters are in the global table and the instructions are correct, but
-the charter's declared subset is wrong.
-
-**Fix:** Update the CME subset to `{b, m, s, v, e, g, t, r}` (or whatever the settled
-list is after D2 is resolved).
-
-**Done when:** Charter §6.1 lists the correct CME subset; version bumped; changelog
-entry added.
+Fixed: CME subset corrected to `{b, m, g, t, r, e, v}`; `s` removed (no ec.is/ec.os
+instructions — F6 option 2 chosen). Per-extension subset table added. Charter v0.12.
 
 ---
 
-### F6 · `ec.is` / `ec.os` — staging bank instructions absent
+### F6 · `ec.is` / `ec.os` — staging bank instructions absent ✓ RESOLVED
 
 **Affects:** ch02, charter §6.1.
 
-**Problem:** Charter §6.1 lists `s` (stream / staging bank) as part of CME's subset,
-implying instructions `ec.is` and `ec.os` exist or are planned. They do not appear in
-ch02. The fast-path `ec.ib`/`ec.ob` operate through staging banks in hardware, but
-there are no explicit staging-bank instructions.
-
-**Decision needed:** Either:
-
-1. **Define `ec.is` / `ec.os`** — specify what software control over staging banks is
-   needed and add the instructions to ch02.
-2. **Remove `s` from the CME subset** — staging banks are entirely hardware-managed;
-   no software instruction is needed. Update charter §6.1.
-
-**Done when:** One of the two options is implemented; ch02 and charter §6.1 consistent.
+Decision: Option 2 — `s` removed from CME subset. Staging banks are entirely
+hardware-managed; no software instruction needed. Charter §6.1 corrected (F5).
 
 ---
 
-### F7 · `ec.iv` / `ec.ov` — vault instructions partially defined
+### F7 · `ec.iv` / `ec.ov` — vault instructions partially defined ✓ RESOLVED (option 1)
 
 **Affects:** ch02 (`ec.iv`, `ec.ov`).
 
-**Problem:** `ec.iv` and `ec.ov` have syntax and basic side-effect descriptions, but
-the semantics of "hardware-managed encryption" are underspecified: which key is used,
-how it is derived, what the sealed representation looks like, how the unsealing ECID
-is authenticated. Charter §8.6 defers key derivation, attestation, and rotation.
-
-**Current state:** The instructions exist but cannot be used by an implementer or OS
-author without the missing pieces.
-
-**Options:**
-
-1. **Flag as incomplete in ch02** — add an explicit note to `ec.iv`/`ec.ov` definitions
-   stating that full semantics await resolution of charter §8.6. Prevents false
-   confidence.
-2. **Move to a future appendix** — remove from ch02's main instruction table; list as
-   a planned extension pending §8.6 resolution.
-
-**Done when:** ch02 clearly communicates the boundary between what is defined and what
-is deferred, so a reader knows exactly what is and is not specified.
+Added explicit "Status — instruction shells only" block in ch02 §6 noting that full
+key-derivation, attestation, and sealing-format semantics await resolution of charter
+§8.6. Instructions remain in the table; a reader now knows exactly what is and is not
+specified.
 
 ---
 
@@ -260,28 +174,21 @@ sections in ch07, ch08, ch09 likewise completed.
 
 ---
 
-### F9 · CPE QUERY operation undefined
+### F9 · CPE QUERY operation undefined ✓ RESOLVED (as part of F1)
 
 **Affects:** ch07.
-**Depends on:** F1 (CPE redesign).
 
-**Problem:** The current ch07 rs1 field includes `OPC=3=QUERY` but never defines what
-a QUERY returns, in what register, in what format. If QUERY is kept after F1, it needs
-a full definition.
-
-**Done when:** Either QUERY is defined (return register, format), or it is removed from
-the spec.
+QUERY removed. Capability information is now in the `cpe_caps` read-only CSR (ch07 §7).
+No software-visible query instruction needed.
 
 ---
 
-### F10 · `working_notes_for_authors.md` §5.5 stale
+### F10 · `working_notes_for_authors.md` §5.5 stale ✓ RESOLVED
 
 **Affects:** `docs/working_notes_for_authors.md`.
 
-**Problem:** §5.5 says "MSE has been substantially designed in `scratchpads/mse/` but
-does not yet have a chapter." MSE now has ch08. The scratchpads are in `docs/archive/`.
-
-**Done when:** §5.5 updated to reflect that ch08 exists and is complete.
+§5.5 updated: ch08 (MSE) and ch09 (QoS) are normative; scratchpads archived; open
+items tracked in work-items.md.
 
 ---
 
@@ -305,15 +212,12 @@ Three diagrams are called out but not drawn:
 
 ---
 
-### G2 · Reserved-bit policy for instruction masks
+### G2 · Reserved-bit policy for instruction masks ✓ RESOLVED
 
 **Affects:** ch02 §7 (register mask encoding).
 
-**Problem:** The mask table lists many reserved bits (7, 8–31, 32–47, 48–51, 52–59,
-60–63). There is no stated policy: are reserved bits silently ignored, or do they
-cause a trap? A writer implementing this extension needs to know.
-
-**Done when:** A one-line policy statement appears in ch02 §7.
+Added policy to ch02 §7: non-zero reserved bits return a defined error code (or raise
+an illegal-instruction trap); silent ignore prohibited.
 
 ---
 
@@ -344,20 +248,20 @@ with a rationale.
 1. ~~**D1** (error/status policy)~~ — **DONE** (v0.9).
 2. ~~**D2** (`ec.it` selection)~~ — **DONE** (v0.10).
 3. ~~**D3** (CPE delegation)~~ — **DONE** (v0.11).
-4. **D4** (`qs.or` domain selector) — prerequisite for F2.
-5. **F5** (charter §6.1 CME subset) — small; do alongside D decisions.
-6. **F3** (`ec.ir` clarification) — small; do in same session as ch02.
-7. **F1** (CPE redesign) — large; own session after D3 settled.
-8. **F2** (`qs.or`/`qs.ot` fix) — own session after D4 settled.
-9. **F4** (`ms.it` encoding) — own session.
-10. **F6** (`ec.is`/`ec.os`) — decision + charter update.
-11. **F7** (`ec.iv`/`ec.ov` incompleteness flag) — editorial; own session.
-12. **F8** (binary encoding) — significant effort; own session(s) per extension.
-13. **F9** (CPE QUERY) — resolved as part of F1.
-14. **F10** (working notes stale note) — trivial.
-15. **G1** (diagrams) — own session after ch02 is stable.
-16. **G2** (reserved-bit policy) — small; fold into ch02 session.
-17. **G3** (RV32 width audit) — systematic sweep after other ch02 work settles.
+4. ~~**D4** (`qs.or` domain selector)~~ — **DONE** (v0.12).
+5. ~~**F5** (charter §6.1 CME subset)~~ — **DONE**.
+6. ~~**F3** (`ec.ir` clarification)~~ — **DONE**.
+7. ~~**F1** (CPE redesign)~~ — **DONE**.
+8. ~~**F2** (`qs.or`/`qs.ot` fix)~~ — **DONE** (with D4).
+9. ~~**F4** (`ms.it` encoding)~~ — **DONE**.
+10. ~~**F6** (`ec.is`/`ec.os`)~~ — **DONE** (option 2: `s` removed).
+11. ~~**F7** (`ec.iv`/`ec.ov` incompleteness flag)~~ — **DONE**.
+12. ~~**F9** (CPE QUERY)~~ — **DONE** (resolved in F1).
+13. ~~**F10** (working notes stale note)~~ — **DONE**.
+14. ~~**G2** (reserved-bit policy)~~ — **DONE**.
+15. **F8** (binary encoding) — significant effort; own session(s) per extension.
+16. **G1** (diagrams) — own session; ch02 is now stable enough.
+17. **G3** (RV32 width audit) — systematic sweep; lowest urgency.
 
 ---
 
