@@ -168,7 +168,7 @@ The two layers interact as follows:
 
 - **Kernel** allocates ECID `e` by inserting it into the radix tree and populating `EC[e]` via privileged writes to the EC table.
 - **Hardware** looks up `EC[e]` directly via `cme_ec_table_base + e × stride`. No tree traversal occurs in hardware.
-- **Forced destruction** (`ec.od`): hardware clears the `EC[e]` entries for the target ECID and all descendants, increments their generation counters, frees their banks, and revokes their Contracts. The kernel is then responsible for updating the radix tree to reflect the freed slots. Hardware guarantees that the `EC[e]` entries are invalidated and cannot be reached via stale references.
+- **Forced destruction** (`ec.oe`): hardware clears the `EC[e]` entries for the target ECID and all descendants, increments their generation counters, frees their banks, and revokes their Contracts. The kernel is then responsible for updating the radix tree to reflect the freed slots. Hardware guarantees that the `EC[e]` entries are invalidated and cannot be reached via stale references.
 
 This separation is intentional. The radix tree is a kernel policy structure — it enforces quotas, tracks ownership lineage, and supports fast subtree revocation. The `EC[e]` array is the architectural interface — indexed directly by ECID number, fast enough for the hardware fast path.
 
