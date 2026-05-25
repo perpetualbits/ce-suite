@@ -45,22 +45,22 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.7 of the charter)
+### A.3 Chapter status (as of v0.8 of the charter)
 
 | Chapter | State | Next action |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.7 — current | — |
-| **Chapter 0** (Fundamental Structure) | Has 3 conflicting drafts; the file `Chapter0-fundamental-structure.md` is closest to current truth | Consolidate to one canonical Chapter 0, sync with charter v0.7 |
-| **Chapter 1** (Execution Context Model) | Pre-ECID-radix-tree framing; obsolete | Full refactor to lead with ECID and `EC[e]` model |
-| **Chapter 2** (CME Instruction Set Reference) | Uses pointer-based operands; missing `ec.od`; has retired `ec.or` | Refactor to ECID operands; add `ec.od`; remove `ec.or` |
-| **Chapter 3** (Bank/Group/Delegation Semantics) | Uses 6-bit Group IDs separate from ECIDs | Refactor: GroupID = ECID; tie delegation to radix tree |
-| **Chapter 4** (HW Microarchitecture) | Two versions exist; **the REVISED version is the one to keep** (S/R staging banks, copy engine, VMT-ready flag) | Add SRAM-vs-RAM residency story, radix-tree lookup path |
-| **Chapter 5** (Linux Kernel Integration) | Frames CME ops as pointer-based; obsolete | Refactor: pointer idioms are Linux conventions, not architectural |
-| **Chapter 6** (CME Usage Examples) | Mostly fine but uses pre-ECID phrasing | Rename `ec_*` operands to ECIDs explicitly |
-| **Chapter 7** (CPE Instruction Set Reference) | Done — mnemonics aligned to `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
-| **Chapter 8+** (MSE) | Not drafted; rich material in `101-mse-scratchpad.md` and `102-mse-scratchpad2.md` | Write from scratch using the Contract model + alternating BE/contract slot scheme |
-| **Chapter 9+** (QoS) | Not drafted | Write after MSE; reuse arbitration philosophy |
-| **Appendix A** (ECID) | Scratchpad of resolved issues | Convert to proper appendix with radix tree algorithms and diagrams |
+| **Charter** (Project Instructions) | v0.8 — current | — |
+| **Chapter 0** (Fundamental Structure) | Done — aligned to charter v0.8; `ec.oe` throughout | — |
+| **Chapter 1** (Execution Context Model) | Done — ECID-first gateway chapter | — |
+| **Chapter 2** (CME Instruction Set Reference) | Done — ECID operands, `ec.oe`, mnemonic scheme, per-extension subsets | — |
+| **Chapter 3** (Bank/Group/Delegation Semantics) | Done — GroupID=ECID, reversal trick, delegation invariants | — |
+| **Chapter 4** (HW Microarchitecture) | Done — EC[e] SRAM residency, radix-tree lookup path | — |
+| **Chapter 5** (Linux Kernel Integration) | Done — pointer idioms framed as Linux conventions, not architectural | — |
+| **Chapter 6** (CME Usage Examples) | Done — ECID-first operands, mnemonic scheme | — |
+| **Chapter 7** (CPE Instruction Set Reference) | Done — `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
+| **Chapter 8** (MSE) | Not drafted; rich material in `101-mse-scratchpad.md` and `102-mse-scratchpad2.md` | Write from scratch using the Contract model + alternating BE/contract slot scheme |
+| **Chapter 9** (QoS) | Not drafted | Write after MSE; reuse arbitration philosophy |
+| **Appendix A** (ECID) | Not converted | Convert scratchpad to proper appendix with radix tree algorithms and diagrams |
 
 ### A.4 What's been *decided* (locked in v0.7)
 
@@ -78,8 +78,8 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 8. **No ECID migration across harts** — kernel rebinds, reusing ECS.
 9. **ECID allocation via radix tree** with prefix ownership and per-prefix
    quotas. Kernel-side data structure; the architectural view is `EC[e]`.
-10. **Instruction naming** is `{ec, cp, ms, qs}.{i, o}{verb}` with verbs
-    `b m s g t v d r`. No exceptions without a charter change.
+10. **Instruction naming** is `{ec, cp, ms, qs}.{i, o}{target}` with target
+    letters `b m s g t v e r`. No exceptions without a charter change.
 11. **CE is opt-in.** Firmware can disable CE entirely. Any privilege level
     can ignore CE even when enabled.
 
