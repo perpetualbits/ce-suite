@@ -54,7 +54,11 @@ ce-suite/
 │   │   ├── ch05-linux-integration.md
 │   │   ├── ch06-cme-usage-examples.md
 │   │   ├── ch07-cpe-instruction-set.md
+│   │   ├── ch08-mse-memory-scheduling.md
+│   │   ├── ch09-qos-io-quality-of-service.md
 │   │   └── appendix-a-ecid.md
+│   ├── work-items.md                 # tracked inconsistencies and open items
+│   └── future-directions.md         # non-normative: ideas, research notes, future extensions
 │   ├── reference/                    # quick reference materials
 │   │   └── instruction-card.md
 │   ├── diagrams/                     # SVG / mermaid figures
@@ -99,19 +103,19 @@ The documents in `docs/` are arranged by normative authority:
 
 | Component | State |
 |---|---|
-| Charter (project instructions) | **v0.7 — current** |
-| Chapter 0 | **needs sync with charter v0.7** |
-| Chapters 1, 2, 3, 5 | **need refactor** to ECID-first model |
-| Chapter 4 | **REVISED version is current**, needs SRAM/RAM residency story |
-| Chapter 6 | needs light refresh |
-| Chapter 7 | needs light alignment to `cp.*` mnemonics |
-| Chapter 8 (MSE), 9 (QoS) | **not yet drafted** |
-| Appendix A | scratchpad — **needs conversion to real appendix** |
+| Charter (project instructions) | **v0.11 — current** |
+| Chapter 0 (Fundamental Structure) | Done — aligned to charter v0.11 |
+| Chapters 1–6 | Done — ECID-first; known issues tracked in `docs/work-items.md` |
+| Chapter 7 (CPE) | **Being redesigned** — see work item F1 in `docs/work-items.md` |
+| Chapter 8 (MSE) | Done — ms.{ir,or,it,ot}, BE/contract slot model |
+| Chapter 9 (QoS) | Done — qs.{ir,or,it,ot}, per-domain contracts |
+| Appendix A (ECID) | Done — radix-tree algorithms and diagrams |
 | `hw/` | empty; future work |
 | `sw/` | empty; future work |
 
-See `docs/refamiliarize.md` Part A.3 for the detailed status table and
-suggested work order.
+See `docs/refamiliarize.md` Part A.3 for the detailed chapter status table,
+and `docs/work-items.md` for all tracked inconsistencies and open design
+decisions.
 
 ---
 

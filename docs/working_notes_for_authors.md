@@ -350,18 +350,15 @@ fail — there was no single comb to follow.
 `docs/archive/`. If a third version reappears, that's drift; archive
 it or delete it (rare, see Rule 4.3) immediately.
 
-### 5.5 The MSE work accumulated in scratchpads but never made it to a chapter
+### 5.5 MSE and QoS chapters now exist
 
-MSE has been substantially designed in `scratchpads/mse/` but does not
-yet have a chapter in `docs/chapters/`. This is fine — MSE was the
-right thing to defer — but it means there is mature thinking that
-isn't normative anywhere, which is a drift risk if you start writing
-MSE-adjacent material in other chapters.
+`docs/chapters/ch08-mse-memory-scheduling.md` and
+`docs/chapters/ch09-qos-io-quality-of-service.md` both exist and are
+the normative reference for their extensions. The `scratchpads/mse/`
+material has been superseded; treat it as archive only.
 
-**Defense:** Don't write MSE content in non-MSE chapters until the MSE
-chapter exists. When the MSE chapter is finally written, do it carefully:
-the scratchpads are dense, and translating them into spec language
-requires the same chapter-refactor discipline as for any other chapter.
+Known open items for ch08 and ch09 are tracked in `docs/work-items.md`
+(F4 for ms.it encoding; D4/F2 for qs.or/qs.ot domain selector).
 
 ---
 

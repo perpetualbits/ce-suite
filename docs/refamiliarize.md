@@ -45,29 +45,28 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.8 of the charter, all `ec.oe` propagation complete)
+### A.3 Chapter status (as of v0.11 of the charter)
 
-> **Note:** An instruction audit (2026-05-25) identified inconsistencies and gaps
-> across the instruction-set chapters. All chapters below are "done" in the sense of
-> being written and architecturally aligned, but several have known issues tracked in
-> `docs/work-items.md`. Do not start usage-example chapters until work items are resolved.
+> **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
+> decisions. The table below shows high-level state. Do not start usage-example chapters
+> (ch10–ch12) until all D and F items in work-items.md are resolved.
 
-| Chapter | State | Next action |
+| Chapter | State | Notes |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.8 — current | — |
-| **Chapter 0** (Fundamental Structure) | Done — aligned to charter v0.8; `ec.oe` throughout | — |
-| **Chapter 1** (Execution Context Model) | Done — ECID-first; `ec.oe` aligned (v0.8) | — |
-| **Chapter 2** (CME Instruction Set Reference) | Done — ECID operands, `ec.oe`, mnemonic scheme, per-extension subsets | — |
-| **Chapter 3** (Bank/Group/Delegation Semantics) | Done — GroupID=ECID, reversal trick, delegation invariants; `ec.oe` aligned (v0.8) | — |
-| **Chapter 4** (HW Microarchitecture) | Done — EC[e] SRAM residency, radix-tree lookup path; `ec.oe` aligned (v0.8) | — |
-| **Chapter 5** (Linux Kernel Integration) | Done — pointer idioms as Linux conventions; `ec.oe` aligned (v0.8) | — |
-| **Chapter 6** (CME Usage Examples) | Done — ECID-first operands, mnemonic scheme; `ec.oe` aligned (v0.8) | — |
-| **Chapter 7** (CPE Instruction Set Reference) | Done — `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
-| **Chapter 8** (MSE) | Done — BE/contract slot alternation, K nesting bound, ms.{ir,or,it,ot}, subset {r,t} | — |
-| **Chapter 9** (QoS) | Done — BE/contract slot alternation per domain, DMA attribution, qs.{ir,or,it,ot}, subset {r,t} | — |
-| **Appendix A** (ECID) | Done — radix-tree structs, allocation/delegation/destruction algorithms, diagrams | — |
+| **Charter** (Project Instructions) | v0.11 — current | D1, D2, D3 locked; D4 open |
+| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.11 |
+| **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
+| **Chapter 2** (CME Instruction Set Reference) | Done | D1 applied; minor open items (F3, F7, G1, G2) |
+| **Chapter 3** (Bank/Group/Delegation Semantics) | Done | D2 applied |
+| **Chapter 4** (HW Microarchitecture) | Done | — |
+| **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
+| **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
+| **Chapter 7** (CPE Instruction Set Reference) | **Known structural issues** | F1 (redesign) in progress; see work-items.md |
+| **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; minor open item F4 |
+| **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4 open (qs.or/qs.ot domain selector) |
+| **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 
-### A.4 What's been *decided* (locked in v0.7–v0.8)
+### A.4 What's been *decided* (locked in v0.7–v0.11)
 
 If a chapter you're reading contradicts any of these, the chapter is wrong:
 
@@ -84,15 +83,20 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 9. **ECID allocation via radix tree** with prefix ownership and per-prefix
    quotas. Kernel-side data structure; the architectural view is `EC[e]`.
 10. **Instruction naming** is `{ec, cp, ms, qs}.{i, o}{target}` with target
-    letters `b m s g t v e r`. No exceptions without a charter change.
+    letters `b m g t v e r`. No `s` (staging banks are hardware-internal). *(v0.12)*
 11. **CE is opt-in.** Firmware can disable CE entirely. Any privilege level
     can ignore CE even when enabled.
+12. **`rd` is the primary error channel.** Every instruction that can fail
+    writes 0 (success) or non-zero (error) in `rd`. Exceptions: `ec.ib` and
+    `ec.oe` carry no `rd`. *(v0.9)*
+13. **`ec.it` delegates Banks only, one per call.** Contract delegation uses
+    per-extension instructions: `ms.it`, `qs.it`, `cp.it`. *(v0.10)*
+14. **CPE Contracts are delegatable.** CPE subset is `{r, t}`; `cp.it` and
+    `cp.ot` are required. *(v0.11)*
 
-### A.5 What's *open* (parked in §8 of the charter)
+### A.5 What's *open*
 
-These are real questions you have not yet decided. They do not block work
-on the rest of the spec. If a writing session tries to "resolve" one of
-these, stop — that's a charter-level change.
+**Charter §8 open items** (architectural decisions deferred):
 
 1. NUMA-aware Contract assignment.
 2. Whether a Contract can span multiple resource classes.
@@ -103,6 +107,21 @@ these, stop — that's a charter-level change.
 6. Secure Vault key derivation, attestation, rotation.
 7. The CE-disable CSR name, bit layout, reset defaults, per-extension
    granularity.
+
+**`docs/work-items.md` open items** (specification-level fixes):
+
+- **D4** — `qs.or`/`qs.ot` domain selector (architecturally illegal `rd`-as-input)
+- **F1** — CPE ch07 complete redesign (blocked on D1✓/D3✓; unblocked)
+- **F2** — `qs.or`/`qs.ot` syntax correction (follows from D4)
+- **F3** — `ec.ir` rs1 semantics clarification
+- **F4** — `ms.it` rs2 bitfield table
+- **F5** — Charter §6.1 CME subset correction
+- **F6** — `ec.is`/`ec.os` decision (resolve vs. remove `s` from subset)
+- **F7** — `ec.iv`/`ec.ov` incompleteness marker
+- **F8** — Binary encoding (all extensions; significant effort)
+- **G1** — ch02 §13 diagrams
+- **G2** — Reserved-bit policy for masks
+- **G3** — RV32/RV64 width audit
 
 ### A.6 What's *next* (the suggested work order)
 
