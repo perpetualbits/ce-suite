@@ -5,178 +5,217 @@
 
 ## Overview
 
-This chapter describes the internal microarchitecture for the Context Management Extension (CME), expressed in terms consistent with Chapter 0’s foundational definitions. All design elements below operate under the ECID, group, and delegation rules specified in Chapter 0:
+This chapter describes the hardware that implements the Context Management Extension (CME). It covers:
 
-* **Every bank belongs to exactly one group.**
-* **Every group is bound to exactly one ECID by that ECID’s parent** — the parent ECID prepares a child ECID by binding it to a group, assigning resources, setting delegation rights if needed and allowed, etc.
-* **Only the parent ECID** of a group may perform `ec.ob` / `ec.om` to load a context from that group.
-* **Delegation levels** are enforced in hardware; delegation beyond the maximum allowed level is rejected.
+- The context bank arrays (non-VMT and VMT) and their per-ECID ownership model.
+- The `EC[e]` array: how hardware locates per-ECID metadata, and how implementations trade SRAM speed against RAM capacity.
+- The S/R staging banks and copy engine that deliver 1–9 cycle context switches.
+- Masked transfers, the VMT-ready flag, and the DMA slow path.
+- The radix-tree lookup path: the relationship between the kernel's ECID allocator and the flat `EC[e]` array visible to hardware.
 
-This chapter assumes the `ECID` model described in Chapter 1 and the CME instruction set in Chapter 2.
+This chapter assumes the foundational definitions from Chapter 0 and the instruction semantics from Chapter 2. Three invariants govern all hardware decisions:
+
+- Every bank belongs to exactly one ECID. The bank tag records the owning ECID number directly; GroupID = ECID (Chapter 0 §0.5).
+- Ownership is verified at the resource via an up-pointer, not by walking a membership list. This is the O(1) enforcement property.
+- Delegation depth is bounded by D ≤ 3; hardware rejects any attempt to exceed it.
 
 ---
 
 ## 1. Context Bank Types
 
-Each hart contains a configurable number of context banks, divided into:
+Each hart contains a configurable number of context banks:
 
-* **Non-Vector (NV) banks** – Hold scalar integer, floating point, PC, SATP, and CSR state.
+**Non-VMT (NV) banks** — hold GPRs, FPRs, PC, SATP, cache partition configuration, and selected CSRs.
 
-  * Typical size: \~1 KiB
-  * Always bound to a group and therefore to an ECID.
-* **Vector/Matrix/Tensor (VMT) banks** – Hold RVV or other wide register state.
+- 1 KB on RV64; 512 B on RV32 (layout in Chapter 0 §0.6).
+- Tagged with the owning ECID.
 
-  * Typical size: \~4 KiB (based on 1024-bit registers × 32 registers)
-  * Always bound to a group and therefore to an ECID.
+**Vector/Matrix/Tensor (VMT) banks** — hold vector, matrix, and tensor register files.
+
+- Typical size: ~4 KB (1024-bit registers × 32 entries); scales with the implementation's vector width.
+- Tagged with the owning ECID.
+- Allocated and managed separately from NV banks.
 
 ---
 
-## 2. Bank Ownership and Security Checks
+## 2. EC[e] Array and SRAM Residency
 
-Hardware maintains for each bank:
+The `EC[e]` array is the primary hardware-visible per-ECID data structure (Chapter 0 §0.3). Each entry holds:
 
-* **Bank tag** – Contains:
+```c
+struct EC_entry {
+    void     *ecs_ptr;      /* ECS pointer — always at offset 0            */
+    uint8_t   generation;   /* incremented on every slot reuse             */
+    uint8_t   delegation_L; /* delegation level, 0 ≤ L ≤ D                */
+    uint16_t  parent_ecid;  /* ECID of the parent in the delegation tree   */
+    /* implementation-defined: cached bank refs, flags, etc.               */
+};
+```
 
-  * Group ID (GID)
-  * ECID bound to the group (set by parent ECID)
-  * Delegation level
-  * Dirty bit(s) per register group (for partial save/restore)
-  * Lock bit (for sealed banks)
-* **Group parent map** – CAM or small table mapping each group to its parent group.
-* **ECID–Group binding** – Ensures that only the correct ECID, or an ECID with valid delegated rights, may access the bank.
+The `cme_ec_table_base` CSR and an implementation-defined `stride` give the lookup address for ECID `e`:
+
+```text
+entry_addr(e) = cme_ec_table_base + e × stride
+ecs_ptr(e)    = *entry_addr(e)          // ecs_ptr is always at offset 0
+```
+
+### 2.1 SRAM vs RAM residency
+
+The full `EC[e]` table is RAM-resident. Implementations keep a **hot set** of entries in on-chip SRAM — typically the entries for ECIDs currently runnable on that hart.
+
+- **Fast path** (`ec.ib`, `ec.ob`): touches only SRAM-resident `EC[e]` entries and the bank arrays. No RAM access on the critical path.
+- **DMA path** (`ec.im`, `ec.om`): may access the RAM-resident table to locate `ecs_ptr` and initiate the transfer.
+
+A fast-path access to an entry not in the SRAM hot set must either stall until the entry is promoted, or be handled by a hardware prefetch mechanism. Implementations may expose the hot-set capacity as a read-only parameter CSR.
+
+### 2.2 Generation checks
+
+Before acting on any `EC[e]` entry, hardware compares the stored `generation` field against any software-held reference. A mismatch indicates the slot was freed and reallocated; the instruction must trap or return a documented failure code (Chapter 0 §0.9). Silent ignore is prohibited.
+
+---
+
+## 3. Bank Ownership and Security Checks
+
+Hardware maintains a **bank tag** per bank:
+
+- **Owning ECID** (= GroupID) — the 16-bit ECID number of the owning context (Chapter 0 §0.5, §0.6).
+- **Delegation level** — cached from `EC[e].delegation_L` of the owning ECID; an implementation convenience.
+- **Dirty bits** — one per register group, for masked transfers (§6).
+- **Lock bit** — set when the bank is sealed; no access permitted until unsealed.
+
+The parent relationship used for delegation checks is read from `EC[e].parent_ecid` of the owning ECID. No separate parent-mapping CAM is required; the `EC[e]` SRAM hot set supplies this field on the fast path.
 
 On every `ec.ib` / `ec.ob` / `ec.im` / `ec.om`:
 
-1. **Hardware checks** that the executing hart’s current ECID has visibility of the target group.
-2. **If delegation is involved**, hardware verifies that the delegation level does not exceed the maximum allowed and that the target ECID is a descendant of the calling ECID’s group.
-3. **If check fails**, instruction traps with a CME access fault.
+1. Hardware looks up `EC[e]` for the target ECID.
+2. Hardware verifies that the calling ECID is the owner or holds delegated rights. Delegation is verified by following `parent_ecid` links upward — at most D steps, where D ≤ 3.
+3. Hardware checks that neither the caller nor the target exceeds the delegation cap D.
+4. If any check fails: the instruction traps with a CME access fault (Chapter 0 §0.9).
 
 ---
 
-## 3. Staging Banks and Copy Engine
+## 4. Staging Banks and Copy Engine
 
-To avoid the area/timing cost of direct per-bit 64-way muxing, each hart uses two **staging banks**:
+Direct per-bit N-way muxing from the live register file to any bank is area- and timing-prohibitive at scale. Each hart therefore uses two **staging banks**:
 
-* **S** (Save staging bank) – for Live → Bank transfers
-* **R** (Restore staging bank) – for Bank → Live transfers
+- **S** (save staging bank) — for Live → Bank transfers.
+- **R** (restore staging bank) — for Bank → Live transfers.
 
-### Path and Timing
+### Path and timing
 
-* **Live ↔ S/R**: Fixed 1:1 wiring from each live register bit to its matching bit in S or R; 1 cycle.
-* **S/R ↔ Bank**: Transfers via a **wide internal bus** and a **one-hot bank-select decoder**:
+**Live ↔ S/R**: fixed 1:1 wiring from each live register bit to the corresponding bit in S or R; completes in 1 cycle.
 
-  * Bus width: 4096 b (512 B) in the reference fast path
-  * Bank decoder: 6→64 one-hot output (only one bank active per transfer)
-  * Wordlines in the selected bank are asserted; all others idle.
-  * Write drivers or sense amps operate only on the active bank.
+**S/R ↔ Bank**: a wide internal bus with a one-hot bank-select decoder:
 
----
-
-## 4. Reference Profile: Option A (Fast Path)
-
-**Lane count:** 16
-**Lane width:** 256 b (32 B)
-**Effective width:** 4096 b (512 B) per beat
-
-Cycle counts (no turnaround bubble):
-
-| Bank Type | Size (bits) | Beats | Save Cycles   | Restore Cycles |
-| --------- | ----------- | ----- | ------------- | -------------- |
-| NV        | 8192        | 2     | 1 + 2 = **3** | 2 + 1 = **3**  |
-| VMT       | 32768       | 8     | 1 + 8 = **9** | 8 + 1 = **9**  |
+- Bus width: 4096 b (512 B) in the reference fast path.
+- Decoder: 6-to-64 one-hot; only the selected bank's wordlines are asserted; all others idle.
+- Write drivers or sense amplifiers operate only on the active bank.
 
 ---
 
-## 5. Masked Transfers
+## 5. Reference Profile: Option A (Fast Path)
 
-Each bank stores dirty/used bits per register group. On save or restore:
+**Lane count:** 16  
+**Lane width:** 256 b (32 B)  
+**Effective width per beat:** 4096 b (512 B)
 
-* **Only groups with dirty = 1** are transferred.
-* Saves cycles and power.
-* For example, GPR+PC only (\~272 B) in Option A:
+| Bank type | Size (bits) | Beats | Save cycles   | Restore cycles |
+|-----------|-------------|-------|---------------|----------------|
+| NV        | 8 192       | 2     | 1 + 2 = **3** | 2 + 1 = **3**  |
+| VMT       | 32 768      | 8     | 1 + 8 = **9** | 8 + 1 = **9**  |
 
-  * Beats = 2 → Save/Restore = **3 cycles**.
-
----
-
-## 6. VMT-Ready Flag
-
-Because VMT banks are larger, hardware can allow scalar/FPR execution to resume before VMT state is fully restored:
-
-* On `ec.ob` with VMT state:
-
-  1. Bank→R begins immediately for scalar/FPR groups.
-  2. R→Live completes in 1 cycle; hart resumes scalar/FPR execution.
-  3. VMT copy continues in background into VMT registers.
-  4. First vector/matrix/tensor instruction checks **VMT-ready CSR bit**:
-
-     * If 0, hart stalls until restore completes.
-     * If 1, proceed with vector execution.
-
-This mechanism avoids delaying scalar work when vectors aren’t immediately needed.
+The "+1" on each end is the Live ↔ S/R wiring cycle.
 
 ---
 
-## 7. Bank Allocation Engine
+## 6. Masked Transfers
+
+Each bank stores dirty/used bits per register group. On save or restore, only register groups with dirty = 1 are transferred. This saves cycles and power proportionally to the number of inactive groups.
+
+Example: GPR + PC only (~272 B in Option A) → 2 beats → save/restore = **3 cycles**.
+
+---
+
+## 7. VMT-Ready Flag
+
+VMT banks are larger than NV banks; restoring them in full before resuming execution would penalize scalar-only code. Hardware supports early scalar resume:
+
+On `ec.ob` with VMT state:
+1. Bank → R begins immediately for scalar and FPR groups.
+2. R → Live completes in 1 cycle; the hart resumes scalar/FPR execution.
+3. The VMT copy continues in the background into the VMT registers.
+4. The first vector, matrix, or tensor instruction checks the **VMT-ready CSR bit**:
+   - 0: the hart stalls until the VMT restore completes.
+   - 1: the instruction proceeds.
+
+---
+
+## 8. Bank Allocation Engine
 
 Per hart:
 
-* **Free list** for NV banks and VMT banks, restricted to the ECID’s visible groups.
-* Allocates in response to CME instructions, enforcing group/ECID rules.
-* Returns `0` or traps on allocation failure.
+- Separate free lists for NV banks and VMT banks.
+- On allocation, the requesting ECID is recorded in the bank tag as the owning ECID (= GroupID).
+- On allocation failure, the instruction returns a documented failure code; no silent failure.
 
 ---
 
-## 8. Group Tracking Logic
+## 9. Radix-Tree Lookup Path
 
-* **cme\_group\_map**: hardware-only CAM mapping visible groups.
-* **cme\_group\_parent**: parent relationship for delegation checks.
-* **cme\_bank\_tags**: group binding, ECID binding, dirty/lock flags.
+The kernel maintains a **radix tree** keyed on ECID numbers to track allocation, ownership, and per-prefix quotas (Chapter 0 §0.2). Hardware does not traverse this tree. From the hardware perspective, ECID `e` is simply an index into the flat `EC[e]` array.
 
-All updates are atomic and visible only to hardware and privileged code.
+The two layers interact as follows:
 
----
+- **Kernel** allocates ECID `e` by inserting it into the radix tree and populating `EC[e]` via privileged writes to the EC table.
+- **Hardware** looks up `EC[e]` directly via `cme_ec_table_base + e × stride`. No tree traversal occurs in hardware.
+- **Forced destruction** (`ec.od`): hardware clears the `EC[e]` entries for the target ECID and all descendants, increments their generation counters, frees their banks, and revokes their Contracts. The kernel is then responsible for updating the radix tree to reflect the freed slots. Hardware guarantees that the `EC[e]` entries are invalidated and cannot be reached via stale references.
 
-## 9. DMA Spill/Fill (Slow Path)
-
-When no bank is available:
-
-* **Spill**: `ec.im` saves S to RAM via DMA; tagged bank freed for reuse.
-* **Fill**: `ec.om` restores from RAM into R, then into Live registers.
-* Banks remain locked until DMA completion.
-* ECID/group checks apply before DMA starts.
+This separation is intentional. The radix tree is a kernel policy structure — it enforces quotas, tracks ownership lineage, and supports fast subtree revocation. The `EC[e]` array is the architectural interface — indexed directly by ECID number, fast enough for the hardware fast path.
 
 ---
 
-## 10. Secure Vault Engine (Optional)
+## 10. DMA Spill/Fill (Slow Path)
 
-* Seal/unseal banks with `ec.iv`/`ec.ov`.
-* Encrypted contents stored in banks or RAM.
-* Lock bit prevents any access until unsealed by authorized ECID.
+When no bank is available for the requested ECID:
 
----
+- **Spill** (`ec.im`): saves staging bank S to RAM via DMA. The target ECS is located via `EC[e].ecs_ptr`. The bank is freed for reuse once the DMA completes.
+- **Fill** (`ec.om`): restores from the ECS in RAM (located via `EC[e].ecs_ptr`) into staging bank R via DMA, then R → live registers.
 
-## 11. Fast Context Switching Summary
-
-**NV (Option A)**: 3 cycles save, 3 cycles restore
-**VMT (Option A)**: 9 cycles save, 9 cycles restore (proportional to size)
-**Masked**: proportional speed-up depending on active register groups
-**VMT-ready**: allows scalar resume before vector restore finishes
+Banks remain locked (unavailable for reuse) until the DMA transfer completes. Ownership checks (§3) apply before DMA begins.
 
 ---
 
-## Placeholder: Diagram – CME Microarchitecture
+## 11. Secure Vault Engine (Optional)
 
-*Description*: Show:
+- **Seal** (`ec.iv`): encrypts a bank's contents and sets the lock bit. No access is permitted until the bank is unsealed.
+- **Unseal** (`ec.ov`): decrypts the bank for the authorized ECID and clears the lock bit.
 
-* Live register file
-* S/R staging banks
-* Wide bus to bank-select decoder
-* NV and VMT banks (with one-hot enables)
-* Group/ECID binding tables
-* DMA and Secure Vault engines
-* VMT-ready CSR flag
+Key derivation, attestation, and rotation are charter open items (charter §8.7) and are not specified here.
 
 ---
 
+## 12. Fast Context Switching Summary
 
+| Scenario                   | Save         | Restore                          |
+|----------------------------|--------------|----------------------------------|
+| NV, full (Option A)        | 3 cycles     | 3 cycles                         |
+| VMT, full (Option A)       | 9 cycles     | 9 cycles                         |
+| Masked (partial registers) | proportional | proportional                     |
+| VMT-ready: scalar resume   | —            | 3 cycles (VMT continues in background) |
+
+---
+
+## Placeholder: Diagram — CME Microarchitecture
+
+Show:
+
+- Live register file
+- S staging bank and R staging bank
+- Wide bus to bank-select decoder (one-hot, 6→64)
+- NV and VMT bank arrays with bank tags (owning ECID, dirty bits, lock bit)
+- EC[e] SRAM hot set and RAM-resident table, with `cme_ec_table_base` pointer
+- DMA engine path: S/R staging ↔ ECS in RAM via `EC[e].ecs_ptr`
+- VMT-ready CSR flag
+- Secure Vault engine (optional, labeled)
+
+---
