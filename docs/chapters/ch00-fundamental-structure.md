@@ -249,7 +249,7 @@ permitted.
 destroy a child.
 
 **Forced destruction.** Destroying an ECID and its entire subtree must always
-succeed. The instruction `ec.od` (§0.9) revokes all Contracts, frees all Banks,
+succeed. The instruction `ec.oe` (§0.9) revokes all Contracts, frees all Banks,
 marks the radix-tree subtree as free, and increments the generation counter for
 every freed `EC[e]` slot. A destroyed EC cannot stall its own reclamation.
 
@@ -257,9 +257,10 @@ every freed `EC[e]` slot. A destroyed EC cannot stall its own reclamation.
 
 ## 0.9 CME Instruction Operand Conventions
 
-All CME instructions follow the naming scheme `ec.{i,o}{verb}` where `i` =
-into (save/create/assign) and `o` = out of (restore/destroy/revoke). Verbs are
-drawn from `{b, m, s, g, t, v, d, r}`.
+All CME instructions follow the naming scheme `ec.{i,o}{target}` where `i` =
+into (save/create/assign) and `o` = out of (restore/destroy/revoke). Target
+letters name the target or kind and are drawn from `{b, m, s, g, t, v, e, r}`
+(charter §6.1).
 
 **ECID-first operands.** Any instruction that targets a context other than the
 currently running one takes an ECID number as its primary operand — never a raw
@@ -268,7 +269,7 @@ pointer, never a bank ID:
 ```text
 ec.ob rs1, rs2     # rs1 = target ECID number, rs2 = register mask
 ec.om rs1, rs2     # rs1 = target ECID number, rs2 = mask
-ec.od rs1          # rs1 = target ECID to destroy
+ec.oe rs1          # rs1 = target ECID to destroy
 ```
 
 Instructions operating on the current context consult `current_ecid`
@@ -295,12 +296,13 @@ documented failure code via `rd` or `cme_status`. Silent ignore is prohibited.
 | `ec.it` | Delegate resources to a child ECID |
 | `ec.ot` | Revoke all resources from a child ECID |
 | `ec.ir` | Allocate a new child ECID |
-| `ec.od` | Forced destroy of ECID and subtree (always succeeds) |
+| `ec.oe` | Forced destroy of ECID and subtree (always succeeds) |
 | `ec.iv` | Seal Bank under hardware encryption |
 | `ec.ov` | Unseal Bank for a secure enclave |
 
-Full instruction definitions are in Chapter 2. `ec.od` replaces the retired
-`ec.or`; any reference to `ec.or` in earlier drafts is incorrect (charter §2.1).
+Full instruction definitions are in Chapter 2. `ec.oe` replaces the retired
+`ec.od` (v0.8) and the earlier `ec.or`; any reference to either in earlier
+drafts is incorrect (charter §2.1, §6.5).
 
 ---
 
