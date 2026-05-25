@@ -1,145 +1,301 @@
-# Execution Context Model (CME)
+# Chapter 1 — Execution Context Model
 
-## Overview
+## 1.1 Why this architecture exists
 
-The Context Management Extension (CME) defines a hardware-accelerated model for execution context switching, delegation, migration, and isolation. It introduces the concept of *context banks*, *bank groups*, *execution contexts* (ECs), and *execution context identifiers* (ECIDs), providing efficient and secure support for multitasking, virtualization, secure enclaves, real-time threads, and interrupt handling.
+Modern SoCs run mixed workloads: real-time motor controllers, safety monitors,
+hypervisors, and general-purpose operating systems, often on the same die. The
+problem is that none of these workloads can give the others hard guarantees.
+Context switches take hundreds of cycles because register state must be
+flushed to RAM. Cache lines belonging to a latency-sensitive task get evicted
+by a batch job. DRAM arbitration is first-come-first-served, so worst-case
+memory latency is unbounded in the presence of even one greedy neighbor.
 
-## Core Concepts
+The CE Suite addresses this at the hardware level. It is a set of five
+coordinated RISC-V extensions:
 
-* **Context Bank**: A hardware-backed register file slice (non-vector or vector) that can store the full or partial state of an execution context.
-* **Bank Group**: A collection of banks, dynamically allocated and delegated to an EC.
-* **Execution Context (EC)**: Any schedulable or executable unit in the system, including:
+- **CME** (Context Management Extension) — hardware-resident register-state
+  containers per hart; 1–9 cycle context save/restore.
+- **CPE** (Cache Partitioning Extension) — per-ECID partitioning of L1 and
+  L2-private caches, so one context cannot evict another's hot lines.
+- **MSE** (Memory Scheduling Extension) — deterministic DRAM arbitration with
+  alternating best-effort and contract time slots; per-context bandwidth and
+  latency classes.
+- **QoS** (I/O Quality-of-Service Extension) — the same arbitration philosophy
+  applied to the NoC, DMA, and peripheral interconnect.
+- **The ECID and Group/Contract substrate** — the identity and ownership layer
+  that all four extensions hang off. Not a separately-numbered extension; it is
+  the shared foundation defined in Chapter 0 and explained in this chapter.
 
-  * OS process or thread
-  * Virtual machine thread (vCPU)
-  * Containerized task
-  * Secure enclave
-  * IRQ handler (hardware or virtualized)
-* **Execution Context Identifier (ECID)**: A compact identifier used by the hardware to track and associate context-related metadata (banks, cache partitions, QoS channels, memory slots, etc.) with the currently active EC on a hart.
+Together the goal is provable Worst-Case Execution Time and certifiability at
+ASIL D / DO-178C / FDA Class III levels, at an estimated 5–15% transistor
+overhead per core.
 
-## The ECID Model
-
-Each hart maintains a hardware register holding the **current ECID**. This ECID is local to the hart and, when combined with the hart ID (and SMT thread ID if applicable), forms a globally unique identifier for the active execution context.
-
-In software, this ECID is stored as part of the *Execution Context Structure* (ECS). The ECS contains the ECID, hart/thread ID, and other metadata required by the OS. The first kilobyte of the ECS is structured to be readable and writable by hardware using the `ec.im` and `ec.om` instructions, enabling efficient DMA-based context swapping.
-
-This design avoids requiring the OS to globally allocate and track ECIDs. Instead, ECIDs are scoped per hart, dramatically reducing complexity and avoiding cross-hart synchronization.
-
-All CE-related resource bindings (bank IDs, group IDs, cache partitions, QoS channels, memory scheduling slots) are implicitly or explicitly associated with the **current ECID**. The hardware consults internal tables to determine resource access permissions, isolation boundaries, and priority scheduling behaviors based on the ECID.
-
-## Context Bank Types
-
-* **Non-vector banks** (NV): \~1024 bytes per bank (includes GPR, FPR, PC, CSR, SATP)
-* **Vector banks** (VEC): 4 KiB per bank (for a 1024-bit vector register file with 32 vectors)
-
-Note: The vector bank size is implementation-dependent. Future extensions (matrices, tensors) may share or extend vector bits. *VMT* (Vector/Matrix/Tensor) banks are expected to be fewer in number than non-VMT banks due to size constraints.
-
-Each hart may be provisioned with a configurable number of NV and VEC banks, depending on the system profile.
-
-## Bank Group and Visibility Model
-
-* ECs may only access banks delegated to their root group, which is always group zero from the EC's point of view.
-* Guest ECs cannot observe physical bank or group IDs.
-* Group and bank mappings are enforced in hardware. Bank-to-group relationships are stored *in the bank itself*. Groups remember their parent group (group-in-group membership), while banks remember the group they belong to (bank-in-group membership). This avoids circular references and allows efficient hardware enforcement. Groups *contain the number of their parent group*, although only known to the hardware, not to the OS. If a group contains its own group number it means it is empty, and it is thus free to be assigned a bank to. This reversal in hardware (groups remember parent group and banks remember their own group membership) of the apparent semantics (groups seem to contain banks and groups), makes the system failsafe, O(1), and predictable.
-* Adding banks to groups is a privileged operation. Only the OS or hypervisor may perform it.
-* A group is created by assigning at least one bank into it. This occurs from the current EC's root group (group zero), and thus the new group is logically a child of the root group. This child group is logically nested, but always starts non-empty and is physically disjoint.
-* The first bank (EC-local bank 0) always remains with the EC and may never be assigned to a group.
-* Only free banks from the EC's group zero may be assigned to a group. Once assigned, a bank is no longer considered free in the EC's view, although the EC cannot directly query which banks are free. A CSR gives the total number of free banks.
-* A group cannot be reused if it still contains banks. It must be empty before it can be reallocated.
-* Removing the last bank from a group automatically dissolves that group.
-* Dissolving a group automatically dissolves any child groups delegated from it, recursively.
-* Groups *can contain other groups* as members, and banks as well. However, this is implemented with strict asymmetry: the group remembers its parent (for group-in-group membership), and the bank remembers its group (for bank-in-group membership). Empty groups may never be members of any group. This structure ensures robust enforcement of delegation semantics and avoids cycles, leaks, or inconsistencies.
-* Delegation forms a tree rooted in each execution context's group zero. Groups created by an EC always become child groups of the EC's root group, but only the bank knows its group assignment and the group knows its parent—both tracked in hardware. Execution contexts are unaware of actual group IDs beyond their delegated group zero and any child groups they create.
-* When a group is delegated to a tenant (e.g., VM or secure enclave), it is given as the tenant's group zero. The guest EC sees the delegated banks as banks 0..K-1, and the group ID as 0.
-* Guests cannot observe the host group ID, bank ID, or group hierarchy.
-* Delegation is rigid by design: destroying a group typically means destroying the VM or secure enclave to which it was delegated. It is the OS or hypervisor’s responsibility to tear down that VM context. Group revocation may raise exceptions, but often implies full termination.
-* VM migration across harts or systems requires coordinated group teardown and rebuild. Groups must be dissolved and reestablished during such transitions.
-
-These constraints are enforced to prevent hardware lockups, race conditions, delegation loops, or visibility leaks. Groups are ephemeral abstractions that exist only as long as they hold one or more banks.
-
-Groups form a hierarchy (tree), with parent-child delegation handled by instructions like `ec.ig`, `ec.it`, and `ec.ot`.
-
-This strict design supports hard real-time guarantees, even in complex systems with nested virtual machines or distributed hypervisors. While it introduces some rigidity in group management, it ensures deterministic execution and secure resource isolation—benefits highly valuable in latency-sensitive domains like high-frequency trading, embedded control, and secure computing.
-
-## Group Hierarchy
-
-* Groups are hierarchical, with up to 4 levels of nesting. This is a generous limit, as nesting VMs deeper than three levels relative to L0 has little practical use. The 4 levels allow an L1 hypervisor to run an L2 hypervisor that runs an L3 VM, all using context banks. This means a cloud provider can rent (virtual) hypervisor clusters to tenants, who may then explore nested virtualization within their (virtual) cluster. This is likely the maximum depth anyone will realistically require, and bounding it at 4 ensures architectural simplicity and safety.
-* Each group stores its *parent group ID* (hidden from guest ECs).
-* An EC executing `ec.ig` (create group) receives a software-visible group ID in `rd`, used to represent that group in OS/VM data structures.
-* Bank-level ownership is tracked in hardware; software cannot override or forge access.
-
-## CME Group Delegation
-
-Delegation is performed explicitly:
-
-* `ec.ig`: Create a new group (returns group ID in `rd`)
-* `ec.it`: Assign group to a tenant EC (e.g., VM or thread)
-* `ec.ot`: Revoke group (forced migration or interrupt)
-
-Groups are returned to the parent upon revocation.
-
-## Context Save/Restore Operations
-
-* `ec.ib` (in-bank): Save current context to a bank (partial/full, mask-controlled)
-* `ec.ob` (out-bank): Restore context from bank (mask-controlled, optional PC jump)
-* `ec.im`: Save bank to memory (DMA path)
-* `ec.om`: Restore bank from memory (DMA path)
-
-## Secure Enclave Support
-
-* `ec.iv`: Seal bank contents into secure vault (e.g., AES-GCM encryption)
-* `ec.ov`: Unseal bank back into usable state (secure mode only)
-
-## Masked Context Operations
-
-Operations accept a **register mask** (and possibly an *extended mask* for CSRs) to define which parts of the context to operate on:
-
-| Bit | Register Group | Description                                                   |
-| --- | -------------- | ------------------------------------------------------------- |
-| 0   | GPR            | Integer registers                                             |
-| 1   | FPR            | Floating-point registers                                      |
-| 2   | VEC            | Vector registers                                              |
-| 3   | MAT            | Future matrix/tensor registers                                |
-| 4   | PC             | Program counter                                               |
-| 5   | CSR            | Control/status registers (see note below for granularity)     |
-| 6   | SATP           | Supervisor address space register (triggers TLB reload/flush) |
-| 7   | Reserved       | Reserved for future use                                       |
-
-**CSR granularity:**
-
-* The `CSR` bit is an aggregate; advanced OSes may use an *extended mask field* for fine-grained CSR selection. This is implementation- and ABI-dependent.
-* Typical use: save all “critical” CSRs, or just those required for privilege level, timer, and interrupt state.
-
-**SATP and TLBs:**
-
-* The `SATP` bit saves/restores the supervisor address translation register.
-* When SATP is restored, hardware is required to reload/flush the TLB as necessary for the new address space context (standard RISC-V behavior).
-* No need to explicitly mask TLBs in context banks; they’re indirect.
-
-**The mask:**
-
-* The mask for context operations is always under OS/hypervisor control.
-* It is not saved/restored as part of the context, but passed with each save/restore instruction.
-
-## Placeholder: Diagram – CME Context Delegation and Group Isolation
-
-*Description*: This diagram should illustrate the hardware-enforced bank isolation model. It shows multiple execution contexts with their delegated banks, group hierarchy, and the hardware mapping table. Include:
-
-* ECs with bank views (0…N)
-* Hardware group-bank association
-* Parent group relationships
-
-## Placeholder: Diagram – CME Instruction Flow
-
-*Description*: Show instruction flow for saving, restoring, delegating, revoking, and sealing banks. Arrows should indicate which CSRs or hardware tables are updated.
-
-## Notes
-
-* Context banks are never shared between ECs simultaneously.
-* Delegated banks form a secure memory boundary.
-* Bank preloading allows instant activation of new VMs or threads.
+This chapter is the conceptual introduction. It explains what each core object
+is and why the design is shaped the way it is. Byte-level layouts are in
+Chapter 0. Instruction definitions are in Chapter 2.
 
 ---
 
-Next chapter: **CME Instruction Set Reference**
+## 1.2 Execution Contexts
 
+An **Execution Context (EC)** is any schedulable unit the OS dispatcher
+handles: a thread, a process, a vCPU, a containerized task, an interrupt
+handler, a secure enclave. CE treats all of these uniformly, because the
+hardware machinery for saving register state, partitioning cache, and
+arbitrating DRAM is the same regardless of what kind of work is running.
+Uniform treatment keeps the hardware story simple while allowing the OS to
+maintain whatever higher-level distinctions it needs.
+
+---
+
+## 1.3 The Execution Context Identifier (ECID)
+
+Every EC running on a hart is assigned an **Execution Context Identifier
+(ECID)**. The ECID is the token the hardware uses to enforce ownership,
+track resources, and drive the fast context-switch path.
+
+Four properties define what an ECID is:
+
+**Hart-local.** An ECID is meaningful only on the hart that issued it. The
+system-wide identity of a running EC is the tuple `(hart_id, ECID)`, but no
+hardware mechanism uses that tuple as a key — it is a software convention.
+Making ECIDs global would force cross-hart synchronization on every context
+switch, which would destroy the per-hart latency story.
+
+**Opaque to user code.** A process cannot read or write its own ECID. The OS
+may know it; the EC running as that ECID cannot. Opacity is what turns the
+ECID into an unforgeable capability: a user process that cannot observe its
+own ECID cannot forge a reference to another context's resources.
+
+**Privileged creation only.** Only M-mode firmware, an S-mode kernel, or an
+HS-mode hypervisor may create or destroy ECIDs. When CE is enabled at boot,
+M-mode firmware creates the first ECID and hands it to the kernel. The kernel
+may use it, delegate from it, or ignore CE entirely. User mode never creates
+or destroys ECIDs.
+
+**16-bit width, per hart.** ECID numbers are 16 bits, giving 65,536 ECIDs per
+hart. This is not the same as a process identifier. A PID names a long-lived
+OS abstraction that may be suspended, blocked on I/O, or checkpointed to disk.
+An ECID names a context *currently bound to a specific hart*. Most OS-level
+tasks at most moments are not hart-bound; a task acquires an ECID at dispatch
+and releases it when switched out. The OS multiplexes many PIDs through a
+small number of ECIDs, the same way it multiplexes many PIDs through a small
+number of harts. On a 256-hart server, 16 bits per hart × 256 harts gives
+16 million simultaneously hart-bound contexts — well past anything a real
+operating system runs concurrently.
+
+**No migration across harts.** When the scheduler moves an EC from one hart to
+another, the kernel does not move the ECID. It unbinds the ECID on the source
+hart, allocates a fresh ECID on the destination hart, and reuses the same
+in-memory execution context structure. Migration is rebinding, not literal
+ECID movement.
+
+**Generation counters and ABA safety.** When an ECID slot is freed and later
+reallocated, its generation counter is incremented. Software that holds a
+reference to a `(hart_id, ECID, generation)` triple can detect that the ECID
+it was tracking has been freed and a new context has taken the slot. Without
+generation counters, a queued delivery to ECID 42 could silently reach a
+brand-new context that happened to be assigned number 42 after the original
+was destroyed.
+
+---
+
+## 1.4 The EC Array: `EC[e]`
+
+Each hart has a conceptual array `EC[0..E_max]` indexed by ECID number. `EC[e]`
+is the canonical hardware descriptor for ECID `e` on that hart. It holds, at
+minimum, a pointer to the Execution Context Structure in RAM, the generation
+counter, the delegation level, and the parent ECID.
+
+The pointer to the Execution Context Structure is **always at offset 0** of
+`EC[e]`. This constraint means the most common hardware operation — fetching the
+ECS pointer for a given ECID — is a single load from a base address plus a
+stride:
+
+```text
+entry_addr(e) = cme_ec_table_base + e * stride
+ecs_ptr(e)    = *(entry_addr(e))        // offset 0
+```
+
+Why model it as an array? Because the lookup then reduces to a single addition,
+computable in the same cycle as the instruction issuing it. The physical storage
+may be hierarchical — a small SRAM holding the currently active entries, backed
+by a RAM-resident table for the rest — but the architectural view stays flat.
+The fast-path instructions (`ec.ib`, `ec.ob`) touch only SRAM-resident entries;
+the DMA-path instructions (`ec.im`, `ec.om`) may walk the RAM-resident table.
+
+The full structure of `EC[e]` and the `cme_ec_table_base` CSR are defined in
+Chapter 0, §0.2 and §0.3.
+
+---
+
+## 1.5 The Execution Context Structure (ECS)
+
+The **Execution Context Structure (ECS)** is a RAM-resident data structure
+reachable via `EC[e].ecs_ptr`. It holds the saved register state for contexts
+not currently in a bank, metadata (privilege level, flags, scheduling
+information), pointers to banks, contract descriptors, and OS bookkeeping
+fields.
+
+Why have both `EC[e]` and ECS? Because they serve different speeds. `EC[e]`
+is small — on the order of tens of bytes — and can live in SRAM. A context
+switch on the fast path touches `EC[e]` and the banks directly without ever
+reading ECS. ECS is larger and lives in RAM; it is read during the slower DMA
+path, during migration, and for OS-level bookkeeping. Keeping them separate
+lets the fast path stay fast.
+
+The ECS layout is a kernel software convention. The CME instruction set takes
+ECID numbers as operands, not pointers to ECS or any other structure. Chapter 5
+describes how Linux represents ECS as `struct execution_context` and how that
+address is stored in `EC[e].ecs_ptr`, but this is a Linux convention, not an
+architectural requirement.
+
+---
+
+## 1.6 Groups
+
+Every ECID `e` has exactly one **Group**, and the Group's identifier equals
+the ECID number: **GroupID = ECID**. The Group is the ECID's inventory of
+resources — the Banks, Contracts, and child ECIDs that belong to it.
+
+The Groups do not maintain explicit downward membership lists. Instead,
+resources carry **up-pointers** to their owning Group. When hardware needs to
+check "does the currently running ECID own this bank?" it reads the bank's
+up-pointer and compares it to `current_ecid`. That is one load and one
+comparison: O(1). If Groups held member lists, the hardware would have to
+search them: O(N). The reversal — resources point up, Groups do not point down
+— makes ownership enforcement constant-time.
+
+Why GroupID = ECID? Every ECID has exactly one Group; a separate Group ID space
+would add an indirection with no information gain.
+
+When an ECID delegates resources to a child ECID, the child receives its own
+Group. From the child's perspective, its Group appears as Group 0. The child
+cannot observe the host-level GroupID. This is the same isolation trick Linux
+namespaces use for PIDs inside containers: each delegation level renumbers its
+world to start at zero.
+
+---
+
+## 1.7 Banks
+
+A **Bank** is a hardware register-state container. There are two kinds:
+
+**Non-VMT banks** hold general-purpose registers, floating-point registers,
+selected CSRs, the supervisor address translation register (SATP), and cache
+partition configuration (CP). On RV64 a non-VMT bank is 1 KB; on RV32, 512 B.
+The exact field layout is in Chapter 0, §0.4.
+
+**VMT banks** hold vector, matrix, and tensor register files. Their size scales
+with the implementation's vector width and is typically much larger than a
+non-VMT bank. VMT banks are fewer in number than non-VMT banks for exactly
+this reason.
+
+Why have dedicated hardware banks at all? Because saving and restoring register
+state to RAM takes hundreds of cycles. With banks, the entire save/restore
+happens via on-chip SRAM over wide parallel buses, getting the operation down
+to 1–9 cycles. That is the foundation of CME's fast context-switch claim.
+
+Every Bank stores the GroupID of the Group it belongs to (equivalently, the
+ECID number of its owner). Banks are never shared between ECIDs simultaneously.
+The fast context-switch path (`ec.ib`, `ec.ob`) touches only banks and
+`current_ecid`; ECS is not involved.
+
+---
+
+## 1.8 Contracts
+
+A **Contract** is a slice of a global, multiplexed resource:
+
+- **MSE Contracts** allocate memory bandwidth and latency guarantees.
+- **QoS Contracts** allocate I/O and NoC bandwidth and latency guarantees.
+- **CPE Contracts** allocate cache ways or a fraction of cache capacity.
+
+Three properties define how Contracts work:
+
+**Single ownership.** A Contract has exactly one owning Group at any moment.
+Ownership can be transferred, but not duplicated. This is what makes guarantees
+binding: if bandwidth is allocated, no other context can use it.
+
+**Hierarchical splitting.** A privileged actor may split a Contract into child
+Contracts. Each child is a strict subset of its parent; the sum of all children
+never exceeds the parent's allocation. A cloud provider can hold a top-level
+Contract, carve off a sub-Contract for a tenant, and the tenant can carve off
+further sub-Contracts for its VMs.
+
+**Atomic admission.** Splitting or binding a Contract requires chip-global
+hardware arbitration that succeeds or fails atomically. On failure, no state
+is changed. Half-applied splits are a worse failure mode than outright
+rejection — atomic semantics prevent them.
+
+Why Contracts and not Pools? Earlier drafts placed a Pool layer between ECIDs
+and Contracts. Every Pool always pointed to exactly one Contract, making the
+Pool redundant. Removing Pools collapsed the model without losing anything.
+
+---
+
+## 1.9 Delegation
+
+Every ECID has a **delegation level** `L`, stored in `EC[e]`. The
+implementation exposes a cap `D` (at most 3) via a read-only CSR:
+
+- **`L < D`**: this ECID may create child ECIDs and delegate Banks and
+  Contracts to them.
+- **`L = D`**: this ECID may bind resources for its own use but may not
+  delegate further.
+
+The cap D ≤ 3 is not arbitrary. It matches the realistic depth of nested
+virtualization: L0 host kernel → L1 hypervisor → L2 nested hypervisor → L3
+guest. Deeper nesting exists in theory but not in production. Bounding D to 3
+also bounds the worst-case depth of a forced revocation tree walk.
+
+Forced revocation — destroying an ECID and all its descendants, reclaiming all
+their resources — must always succeed. A destroyed EC cannot stall its own
+reclamation. The instruction `ec.od` provides this guarantee; its semantics are
+defined in Chapter 2.
+
+ECID allocation uses a kernel-side radix tree that provides prefix ownership
+and per-prefix quotas. The architectural view of ECIDs is still `EC[e]`; the
+radix tree is a kernel data structure that populates it. The allocation and
+forced-revocation algorithms are in Appendix A.
+
+---
+
+## 1.10 CE is opt-in
+
+CE imposes no obligation on software.
+
+**Firmware disable.** The BIOS or M-mode firmware may disable CE entirely.
+When CE is disabled, all CE CSRs read as zero (or the implementation-defined
+"unimplemented" pattern) and all CE instructions trap as illegal. The system
+behaves as a standard RISC-V system. This is essential for isolating kernel
+bugs: if a bug is suspected to involve CE, boot with CE off and check whether
+it persists.
+
+**Privileged ignore.** Even when CE is enabled, any privilege level may choose
+to ignore it. An OS or hypervisor may run an entirely conventional kernel and
+userspace without issuing any CE instructions. The hardware enforces no
+obligation to use CE.
+
+**Boot sequence.** When CE is enabled, M-mode firmware creates the first ECID
+and passes it to the kernel. The kernel may use it, delegate from it, or ignore
+it. All are conforming behaviors.
+
+This opt-in property applies uniformly across all five extensions: CME, CPE,
+MSE, QoS, and the ECID substrate.
+
+---
+
+## 1.11 Where to go next
+
+**Chapter 0** contains the normative byte-level layouts: the `EC[e]` entry
+structure, the Bank field layouts for RV32 and RV64, the Context Restore Mask
+encoding, and the ECS header. Read Chapter 0 before working with instruction
+semantics.
+
+**Chapter 2** defines the CME instruction set: `ec.ib`, `ec.ob`, `ec.im`,
+`ec.om`, `ec.od`, and the rest. Instruction operands are ECID numbers and
+masks; the encoding follows Chapter 0 §0.9.
+
+**Appendix A** contains the radix-tree data structure and the ECID allocation,
+delegation, and forced-destruction algorithms.
