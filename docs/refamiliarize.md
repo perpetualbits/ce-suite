@@ -58,7 +58,7 @@ ownership layer that ties the other four together.
 | **Chapter 5** (Linux Kernel Integration) | Done — pointer idioms framed as Linux conventions, not architectural | — |
 | **Chapter 6** (CME Usage Examples) | Done — ECID-first operands, mnemonic scheme | — |
 | **Chapter 7** (CPE Instruction Set Reference) | Done — `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
-| **Chapter 8** (MSE) | Not drafted; rich material in `101-mse-scratchpad.md` and `102-mse-scratchpad2.md` | Write from scratch using the Contract model + alternating BE/contract slot scheme |
+| **Chapter 8** (MSE) | Done — BE/contract slot alternation, K nesting bound, ms.{ir,or,it,ot}, subset {r,t} | — |
 | **Chapter 9** (QoS) | Not drafted | Write after MSE; reuse arbitration philosophy |
 | **Appendix A** (ECID) | Not converted | Convert scratchpad to proper appendix with radix tree algorithms and diagrams |
 
