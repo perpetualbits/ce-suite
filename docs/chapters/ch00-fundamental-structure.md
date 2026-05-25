@@ -300,9 +300,7 @@ documented failure code via `rd` or `cme_status`. Silent ignore is prohibited.
 | `ec.iv` | Seal Bank under hardware encryption |
 | `ec.ov` | Unseal Bank for a secure enclave |
 
-Full instruction definitions are in Chapter 2. `ec.oe` replaces the retired
-`ec.od` (v0.8) and the earlier `ec.or`; any reference to either in earlier
-drafts is incorrect (charter §2.1, §6.5).
+Full instruction definitions are in Chapter 2.
 
 ---
 

@@ -173,9 +173,6 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 * **Privileged**: Yes. The caller must be a parent or privileged ancestor of `rs1`.
 * **Cycles**: O(log N) average; proportional to subtree size.
 
-> `ec.oe` replaces the retired `ec.od` (v0.8) and the earlier `ec.or`. Any
-> reference to either in earlier drafts is incorrect; see charter §2.1 and §6.5.
-
 ---
 
 ## 6. Secure Vault Operations
