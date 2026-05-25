@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.11
+**Version:** 0.12
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -378,9 +378,16 @@ All CE Suite instructions follow:
 | `e`    | existence |
 | `r`    | resource / region |
 
-CME (`ec`) uses: `b`, `m`, `s`, `v`, `e` (and possibly `g`).
-CPE, MSE, and QoS target-letter subsets are defined in their respective
-chapters.
+Per-extension subsets (authoritative):
+
+| Extension | Subset | Notes |
+|-----------|--------|-------|
+| CME (`ec`) | `b, m, g, t, r, e, v` | `s` removed — staging banks are hardware-internal to `ec.ib`/`ec.ob`; no software instruction targets them |
+| CPE (`cp`) | `r, t` | `r`=resource assign/revoke; `t`=tenant delegation (D3) |
+| MSE (`ms`) | `r, t` | `r`=resource assign/revoke; `t`=tenant delegation |
+| QoS (`qs`) | `r, t` | `r`=resource assign/revoke; `t`=tenant delegation |
+
+CPE, MSE, and QoS instruction details are in their respective chapters.
 
 Authors must not invent mnemonics outside this scheme. New letters or
 new extension prefixes require a charter change (with a version bump and
@@ -495,6 +502,21 @@ delegation rules or Group ownership, the implementation **must** either
 raise a defined trap or return a documented failure code in `rd` as
 above. Silent ignore is prohibited.
 
+### 6.7 QoS domain selector operand (D4)
+
+`qs.or` and `qs.ot` revoke QoS Contracts from an ECID. Because an ECID can
+hold Contracts on multiple QoS domains simultaneously, these instructions
+need a domain selector. The selector is passed in `rs2`:
+
+```text
+qs.or rd, rs1, rs2   # rs2 = domain_id (0 = revoke all domains)
+qs.ot rd, rs1, rs2   # rs2 = domain_id (0 = revoke all domains)
+```
+
+`rd` is a write-only destination register in RISC-V and cannot be read by
+hardware. Any encoding that reads from `rd` is architecturally illegal and
+must not appear in the spec.
+
 ---
 
 ## 7. Document alignment rules
@@ -560,7 +582,7 @@ changes, this charter changes, and vice versa.
 
 ## 8. Open items deferred to later versions
 
-These items are acknowledged but not resolved in v0.11. They do not block
+These items are acknowledged but not resolved in v0.12. They do not block
 the rest of the spec.
 
 1. **NUMA-aware Contract assignment.** Multi-socket / NUMA semantics for
@@ -586,7 +608,12 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.11 (this version).** D3 resolved — CPE Contracts are delegatable; `cp.it`
+- **v0.12 (this version).** B: CME subset corrected to `{b,m,g,t,r,e,v}` —
+  `s` removed (staging banks are hardware-internal; no software instructions);
+  `g`, `t`, `r` confirmed (already defined in ch02). Per-extension subset table
+  added to §6.1. D4 resolved: `qs.or`/`qs.ot` domain selector passed in `rs2`
+  (0 = all domains); reading from `rd` prohibited (§6.7 added).
+- **v0.11.** D3 resolved — CPE Contracts are delegatable; `cp.it`
   and `cp.ot` are required; CPE subset is `{r, t}`; §4.3 item 7 updated to confirm
   this. Full instruction semantics deferred to Chapter 7 (F1). This unblocks F1.
 - **v0.10.** D2 resolved — `ec.it` delegates Banks only, one per
@@ -618,4 +645,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.11.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.12.*
