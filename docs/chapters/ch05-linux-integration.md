@@ -128,12 +128,11 @@ Linux can use CPE to guarantee that frequently-accessed kernel data structures
 in partitioned L1 or L2-private cache ways.
 
 ```asm
-    # Assign cache partition to an ECID.
-    # rs1 = ECID, rs2 = cache-way mask or fraction selector.
-    cp.ip  rs1, rs2    # allocate cache partition for ECID rs1
+    # Assign cache partition to an ECID (rd discarded, rs1 = ECID, rs2 = descriptor).
+    cp.ir  x0, rs1, rs2    # allocate cache partition for ECID rs1
 ```
 
-The CPE instruction `cp.ip` follows the same ECID-operand convention as CME:
+The CPE instruction `cp.ir` follows the same ECID-operand convention as CME:
 `rs1` holds the ECID number, not a pointer to a task struct. The partition
 assignment is recorded in `EC[e]` and enforced by the L1/L2 controllers. See
 Chapter 7 for the full CPE instruction reference.

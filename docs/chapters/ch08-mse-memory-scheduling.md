@@ -234,14 +234,25 @@ opaque group ID (charter §6.2).
 
 * **Syntax**: `ms.it rd, rs1, rs2`
   * `rs1`: Parent ECID — the source whose Contract is being split.
-  * `rs2`: Child ECID — the recipient; must satisfy `EC[rs2].delegation_L < D`.
-  * `rd`: 0 on success; error code on failure.
+  * `rs2`: Delegation descriptor — child ECID plus delegation parameters, laid out as:
+    * `rd`: 0 on success; error code on failure.
+
+  **`rs2` bitfield layout:**
+
+  | Bits | Field | Meaning |
+  |---|---|---|
+  | 15:0 | `child_ecid` | Child ECID to receive the split Contract |
+  | 19:16 | `child_bw_class` | Bandwidth class to delegate (0 = inherit parent's full class) |
+  | 23:20 | `child_lat_class` | Latency class to delegate (0 = inherit parent's full class) |
+  | [XLEN-2]:24 | — | Reserved; must be zero |
+  | [XLEN-1] | `ptr` | If 1, rs2 bits [[XLEN-2]:0] are a pointer to an `MSE_Delegation_Params` struct instead |
+
+  The `child_ecid` must satisfy `EC[child_ecid].delegation_L < D`.
+
 * **Semantics**:
-  1. Verifies `rs2` is a child of `rs1` in the delegation tree.
-  2. Performs the split: transfers a portion of `rs1`'s `bw_class` to `rs2`. The
-     portion is encoded in the low bits of `rs2` if bit 62 is set; otherwise the
-     child inherits the parent's full class (useful when the parent relinquishes
-     its own participation).
+  1. Verifies `child_ecid` is a child of `rs1` in the delegation tree.
+  2. Performs the split: transfers `child_bw_class` and `child_lat_class` to the
+     child; if both are 0, the child inherits the parent's full class.
   3. Admission check: `bw_class(child) + existing_sum(subtree(rs1)) ≤ bw_cap(rs1)`.
      If the check fails, returns `MSE_ERR_CAP_EXCEEDED`; no state changes.
   4. Updates running sums atomically.
