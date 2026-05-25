@@ -10,9 +10,11 @@ every instruction in this chapter:
    pointer, never a bank ID. (Charter §6.2)
 2. **Implicit current ECID.** Instructions that operate on the currently running context
    consult `current_ecid` implicitly and omit the ECID operand. (Charter §6.2)
-3. **Silent ignore is prohibited.** Any illegal operation, privilege violation, or
-   generation mismatch must raise a defined trap or return a documented failure code
-   via `rd` or a status CSR. (Charter §6.6)
+3. **Unified error reporting via `rd`.** Every instruction that can fail writes 0
+   (success) or a non-zero error code in `rd`; pass `x0` to discard. Status CSRs
+   (`cme_status` etc.) are updated for diagnostics but are not the primary channel.
+   Two exceptions carry no `rd`: `ec.ib` (always succeeds or traps) and `ec.oe`
+   (always succeeds). Silent ignore is prohibited. (Charter §6.6)
 
 All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
 `ec.<dir><target>` (Charter §6.1), where `<dir>` ∈ `{i, o}` and `<target>` is
@@ -38,26 +40,27 @@ These instructions operate through SRAM-resident staging banks and constitute th
 
 ### `ec.ib` — Save current context into bank
 
-* **Syntax**: `ec.ib rd, rs1`
-  * `rd`: Implementation-defined result; use `x0` if unused.
+* **Syntax**: `ec.ib rs1`
   * `rs1`: Register mask — which register groups to save (see §7).
 * **Operand notes**: Operates on `current_ecid` implicitly. No explicit ECID argument.
+  No `rd`: `ec.ib` always succeeds or raises a trap; no soft failure is possible.
 * **Side effects**: Writes state from the active register file into the bank associated
   with `current_ecid`. Updates `cme_status`.
 * **Guaranteed cycles**: 1 cycle (full save), up to 3 with selective masking.
 
 ### `ec.ob` — Restore context from bank for target ECID
 
-* **Syntax**: `ec.ob rs1, rs2`
+* **Syntax**: `ec.ob rd, rs1, rs2`
+  * `rd`: 0 on success; error code if the target ECID is invalid or unbanked.
   * `rs1`: Target ECID number.
   * `rs2`: Register mask — which register groups to restore (see §7).
 * **Side effects**: Restores registers from the bank owned by ECID `rs1`. If the PC
   bit is set in the mask, execution jumps to the restored program counter on commit.
 * **Guaranteed cycles**: 1–3.
 
-> **Typical switch sequence**: `ec.ib x0, mask` (save current), then
-> `ec.ob next_ecid, mask` (restore next). The transition between `current_ecid`
-> and `next_ecid` is complete when `ec.ob` commits.
+> **Typical switch sequence**: `ec.ib mask` (save current), then
+> `ec.ob x0, next_ecid, mask` (restore next, discard result). The transition
+> between `current_ecid` and `next_ecid` is complete when `ec.ob` commits.
 
 ---
 
@@ -69,7 +72,8 @@ EC entry) — the instruction does not take a separate pointer operand.
 
 ### `ec.im` — Spill bank to memory
 
-* **Syntax**: `ec.im rs1, rs2`
+* **Syntax**: `ec.im rd, rs1, rs2`
+  * `rd`: 0 on success; error code on DMA fault or invalid ECID.
   * `rs1`: Target ECID number.
   * `rs2`: Register mask (which groups to spill).
 * **Address**: `EC[rs1].ecs_ptr`. The kernel is responsible for setting this field
@@ -80,7 +84,8 @@ EC entry) — the instruction does not take a separate pointer operand.
 
 ### `ec.om` — Fill bank from memory
 
-* **Syntax**: `ec.om rs1, rs2`
+* **Syntax**: `ec.om rd, rs1, rs2`
+  * `rd`: 0 on success; error code if no free bank is available or ECID is invalid.
   * `rs1`: Target ECID number.
   * `rs2`: Register mask.
 * **Address**: `EC[rs1].ecs_ptr`, same as `ec.im`.
@@ -127,7 +132,8 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 ### `ec.it` — Delegate resources to a child ECID
 
-* **Syntax**: `ec.it rs1, rs2`
+* **Syntax**: `ec.it rd, rs1, rs2`
+  * `rd`: 0 on success; error code on privilege violation or invalid ECID.
   * `rs1`: Source ECID — the parent whose Group resources are transferred.
   * `rs2`: Child ECID — the recipient.
 * **Side effects**: Selected resources from ECID `rs1`'s Group are transferred to
@@ -137,7 +143,8 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 ### `ec.ot` — Revoke resources from a child ECID
 
-* **Syntax**: `ec.ot rs1`
+* **Syntax**: `ec.ot rd, rs1`
+  * `rd`: 0 on success; error code on privilege violation or invalid ECID.
   * `rs1`: Child ECID from which all resources are revoked.
 * **Side effects**: All resources in ECID `rs1`'s Group (banks, contracts, child
   ECIDs) are recursively revoked and returned to the parent's Group. ECID `rs1` itself
@@ -182,7 +189,8 @@ derivation, attestation, and rotation are deferred open items (charter §8.7).
 
 ### `ec.iv` — Seal a bank (encrypt)
 
-* **Syntax**: `ec.iv rs1, rs2`
+* **Syntax**: `ec.iv rd, rs1, rs2`
+  * `rd`: 0 on success; error code if the bank is already sealed or ECID is invalid.
   * `rs1`: Target ECID whose bank is to be sealed.
   * `rs2`: Register mask.
 * **Side effects**: The bank associated with ECID `rs1` is encrypted. Contents are
@@ -190,7 +198,8 @@ derivation, attestation, and rotation are deferred open items (charter §8.7).
 
 ### `ec.ov` — Unseal a bank (decrypt)
 
-* **Syntax**: `ec.ov rs1, rs2`
+* **Syntax**: `ec.ov rd, rs1, rs2`
+  * `rd`: 0 on success; error code if the bank is not sealed or authentication fails.
   * `rs1`: Target ECID whose bank is to be unsealed.
   * `rs2`: Register mask.
 * **Side effects**: Decrypts and makes the bank's contents accessible to a secure
@@ -292,23 +301,31 @@ Full binary encoding is deferred to the formal opcode assignment stage.
 
 ## 12. Error and Exception Handling
 
-Any CME instruction that encounters an invalid or stale ECID reference (unallocated
-slot, generation mismatch, privilege violation, or Group ownership failure) must either:
+Every CME instruction that can fail writes its result in `rd`: **0** = success,
+**non-zero** = error code. Callers who do not need the result write `rd = x0`.
+`cme_status` is updated in parallel for diagnostic use (e.g., exception handlers
+logging the cause) but is not the primary error channel (charter §6.6).
+
+Any instruction that encounters an invalid ECID (unallocated slot, generation
+mismatch, privilege violation, or Group ownership failure) must either:
 
 * Raise a defined trap to the OS or hypervisor, or
-* Return a documented error code in `rd` or `cme_status`.
+* Return a documented error code in `rd`.
 
 Silent ignore is prohibited (charter §6.6).
 
-`ec.oe` is the sole exception to the "may fail" rule: it **always** succeeds and
-imposes no obligation on the target context's responsiveness.
+**Exceptions to the `rd` rule (no soft failure possible):**
+
+* **`ec.ib rs1`** — always succeeds or raises a trap; no `rd`.
+* **`ec.oe rs1`** — always succeeds; no `rd`. Forward progress is guaranteed;
+  zombies cannot stall reclamation.
 
 ---
 
 ## 13. Placeholder: Diagrams
 
 * **Context switch sequence**: `ec.ib` → `ec.ob`, showing `current_ecid` transition.
-* **ECID operand lookup**: how `ec.ob rs1` locates the bank via `EC[rs1]`.
+* **ECID operand lookup**: how `ec.ob rd, rs1, rs2` locates the bank via `EC[rs1]`.
 * **`ec.oe` subtree walk**: radix-tree traversal and generation-counter increments.
 
 ---
