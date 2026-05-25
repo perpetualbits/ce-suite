@@ -5,178 +5,327 @@
 
 ## 0.1 Scope
 
-This chapter defines the core objects and relationships in the Context Management Extension (CME) architecture.
-These definitions are normative: all instruction semantics, delegation rules, and OS integration details in later chapters reference them.
+This chapter defines the core objects and relationships in the CE Suite. Its
+definitions are normative: all instruction semantics, delegation rules, and OS
+integration details in later chapters reference this chapter.
+
+The CE Suite charter (`docs/charter/project_instructions.md`) is the
+authoritative source for architectural decisions. When a detail here conflicts
+with the charter, the charter wins. When a later chapter conflicts with this
+chapter, this chapter wins.
 
 ---
 
 ## 0.2 Execution Context Identifier (ECID)
 
-An **ECID** denotes a runnable execution context on a hart (thread, process, vCPU, interrupt handler, secure enclave, etc.).
-It is the unit the scheduler dispatches and the CME save/restore machinery operates on.
+An **Execution Context Identifier (ECID)** is a 16-bit, hart-local,
+hardware-managed token denoting one Execution Context (EC) currently bound to
+a hart. The EC may be a thread, process, vCPU, interrupt handler, secure
+enclave, or any other schedulable unit.
 
-**Identity and namespace.**
-An ECID number is a **hart-local** index. Software treats it as an opaque identifier within the hart’s EC namespace.
+**Width.** ECID numbers are 16 bits, giving 65,536 ECIDs per hart on RV32 and
+RV64 alike. The 16-bit number is treated as an opaque integer by hardware; the
+`prefix || index` decomposition used by the kernel's radix-tree allocator is a
+software convention.
 
-**Inventory group (1:1 default binding).**
-Every ECID E is bound to exactly one **inventory group** `G(E)`. In the caller’s view, `G(E)` appears as group 0. For convenience, the software-visible ID of G(E) equals the ECID number of E. (Types remain distinct: ECID ≠ Group.)
+**Hart-local.** An ECID has meaning only on the hart that issued it. The
+system-wide identity of a running EC is the tuple `(hart_id, ECID)`, but no
+hardware mechanism uses that tuple as a key.
 
-**Required/derived state.**
-The ECID record contains (unless noted otherwise, fields are hardware-private and not software-readable):
+**Opaque to user code.** A process cannot read or write its own ECID. The OS
+may know it; the EC running as that ECID cannot. Opacity is the mechanism that
+makes the ECID an unforgeable capability.
 
+**Privileged creation only.** Only M-mode firmware, S-mode kernel, or HS-mode
+hypervisor may create or destroy ECIDs. User mode may not.
 
-* **ECID number** (integer, hart-local, NOTE: *not* separately kept in its data set, because it is the index of the ECID array this ECID)
-* **Pointer to Execution Context Structure (ECS)** (RV32: 32b, RV64: 64b).
-* **Delegation Level L** (2 bits, 0 ≤ L ≤ D ≤ 3, where D is hardware delegation limit, unchangeble by E, L < D implies delegation instructions available, L = D implies delegation instructions not available. See §0.7)
-* **Parent_ECID_Cached** (the ECID that owns G(E)'s parent group. Set/updated by hardware on delegation/revocation. Not software-readable)
-* **Group ID** (identifier for the bound group which we call its Inventory, NOTE: *not* separately kept in its data set because exactly one group is always bound to an ECID. So Group ID == ECID number)
-Explicitly:
-* **Up-pointer** (to parent group that owns this ECID; ECID 0 points to group 0; not accessible to E, only to E's parent)
-* **Primary non-VMT Bank ID** (optional; set if at least one non-VMT bank is in its Inventory Group)
-* **Primary VMT Bank ID** (optional; set if at least one VMT bank is in its Inventory Group)
-* **Contracts** (MSE, QoS, CPE) directly bound to the ECID
+**No migration across harts.** When the scheduler moves an EC from one hart to
+another, the kernel unbinds the source ECID and allocates a fresh ECID on the
+destination hart, reusing the same in-memory ECS. Migration is rebinding, not
+literal ECID transfer.
 
----
+**Generation counters.** Each `EC[e]` slot holds a generation counter
+incremented on every slot reuse. A software reference to a
+`(hart_id, ECID, generation)` triple is stale when the counter in `EC[e]` no
+longer matches. This prevents ABA hazards when a slot is freed and reallocated.
 
-## 0.3 Group
+**ECID allocation — radix tree.** ECIDs are allocated by the kernel from a
+radix tree organized as `prefix || index`. Each subtree is owned by one tenant
+or privileged context; allocations within a prefix require no global
+coordination. Privileged actors may set per-prefix quotas on resourced ECIDs
+(those holding Banks or Contracts). Destroying an ECID destroys its entire
+subtree and reclaims all resources. The radix tree is a kernel data structure;
+the architectural view is the `EC[e]` array (§0.3). Algorithms are in
+Appendix A.
 
-A **Group** is a logical container for resources owned by an ECID.
-
-Resources in a Group:
-
-* **ECIDs** (to bind or delegate resources to, stored in up-pointer 
-* **Banks** (context state storage units)
-* **Contracts**:
-
-  * **CPE** — Cache Partitioning Extension
-  * **MSE** — Memory Scheduling Extension
-  * **QoS** — I/O Quality of Service Extension
-* Possibly other CME-compatible resources in future revisions
-
-**Up-pointer**:
-Each Bank or Contract has a pointer to the Group it belongs to.
-
----
-
-## 0.4 Banks
-
-A **Bank** is a hardware-resident storage area for a complete or partial set of architectural state.
-
-There are non-VMT and VMT banks. There are typically more non-VMT than VMT banks.
-
-Non-VMT Bank contents include:
-
-* General-purpose registers (GPRs)
-* Floating-point registers (FPRs)
-* Control and status registers (CSRs)
-* Cache Partition configuration (CP)
-* Supervisor Address Translation and Protection register (SATP)
-Note:
-  For RV64 a Non-VMT bank is 1KB:
-  * ECID nr and ECID reserved space: 8 bytes (takes spot of x0)
-  * GPRs = 31x64 bits = 248 bytes (x1..x31); slot for x0 used by ECID nr and reserved space
-  * FPRs = 32x64 bits = 256 bytes
-  * CP   = 8 bytes
-  * SATP = 8 bytes
-  * CSRs and Bank reserved space = 1024 - 2x256 - 2x8 = 496 bytes
-
-  For RV32 a Non-VMT bank is 512 bytes:
-  * ECID nr and ECID reserved space: 4 bytes (takes spot of x0)
-  * GPRS = 31x32 bits = 124 bytes (x1..x31); slot for x0 used by ECID nr and other
-  * FPRs = 32x32 bits = 128 bytes
-  * CP   = 4 bytes
-  * SATP = 4 bytes
-  * CSRs and Bank reserved space = 512 - 2x128 - 2x4 = 248 bytes
-
-VMT Bank contents include: 
-
-* Vector/Matrix/Tensor register files (VMT)
-* If not shared between VMT instructions, any Vector, Matrix and Tensor banks are separate
-* Size perspective: For 256-bit vector registers, a bank is 1KB like RV64 non-VMT banks, each doubling in bit-size doubles the bank size
-
-The first Bank in an ECID’s Group is bound to that ECID (Primary Bank).
-Bank masks are used by the OS in saving and restoring 
+**CE disable and ignore.** Firmware may disable CE entirely; when disabled, all
+CE CSRs read as zero and all CE instructions trap as illegal. Even when CE is
+enabled, any privilege level may choose to ignore it and run a conventional
+kernel or userspace. This opt-in property applies uniformly to all five
+extensions: CME, CPE, MSE, QoS, and the ECID substrate.
 
 ---
 
-## 0.5 Contracts
+## 0.3 The EC[e] Array
 
-Purpose of Contract:
+Each hart has a conceptual array `EC[0..E_max]` indexed by ECID number. The
+architectural structure of each entry is:
 
-* A contract is a formal allocation of a slice of a global resource — either:
-  * MSE: memory bandwidth/latency
-  * QoS: I/O or NoC bandwidth, latency, priority
-* Contracts are for CPU-wide resources, not local per-hart such as context banks and cache partitions
+```c
+struct EC_entry {
+    void     *ecs_ptr;        /* canonical ECS pointer — always at offset 0 */
+    uint8_t   generation;     /* incremented on every slot reuse             */
+    uint8_t   delegation_L;   /* delegation level, 0 ≤ L ≤ D                */
+    uint16_t  parent_ecid;    /* ECID of the parent in the delegation tree   */
+    /* implementation-defined: cached bank/contract refs, flags, etc.        */
+};
+```
 
----
+`ecs_ptr` **must** be at offset 0. The most common hardware operation —
+fetching the ECS pointer for a given ECID — is therefore a single load:
 
-## 0.6 Execution Context Structure (ECS)
+```text
+entry_addr(e) = cme_ec_table_base + e × stride
+ecs_ptr(e)    = *entry_addr(e)              // offset 0
+```
 
-The **ECS** is a memory-resident data structure describing an ECID’s execution context.
-It contains:
+`cme_ec_table_base` is a per-hart CSR. `stride` is implementation-defined but
+fixed per hart.
 
-1. **Header** (first 4–8 bytes): ECID number (for use in CME instructions)
-2. ECS metadata (privilege level, flags, scheduling info)
-3. Pointers to saved state in banks or memory
-4. Contract descriptors
-5. OS/hypervisor-private fields
-
----
-
-## 0.7 Delegation Rules (WITH Groups)
-
-### L < D (can delegate)
-
-* ECID may place resources from its Group into a new Group and bind that Group to a child ECID.
-* ECID may bind individual resources directly to child ECIDs.
-* Can split contracts and pass derived contracts to child ECIDs.
-
-### L = D (cannot delegate)
-
-* ECID may bind unbound banks directly to ECIDs in its Group (max 1 per target ECID).
-* Can split contracts, but derived contracts are bound for self-use only.
+**SRAM-vs-RAM residency.** `EC[e]` is conceptually RAM-resident. Implementations
+are expected to keep SRAM copies of the entries for currently active ECIDs. The
+fast-path instructions (`ec.ib`, `ec.ob`) touch only SRAM-resident entries; the
+DMA-path instructions (`ec.im`, `ec.om`) may walk the RAM-resident table.
 
 ---
 
-## 0.8 CME Instruction Operand Conventions
+## 0.4 Execution Context Structure (ECS)
 
-* **ec.ob** / **ec.om**:
+The **Execution Context Structure (ECS)** is a RAM-resident data structure
+reachable via `EC[e].ecs_ptr`. It holds:
 
-  * `rs1` = ECID number (target ECID. rs1 is a child ECID in the caller's namespace. Hardware must check current_ecid == rs1.Parent_ECID_Cached; otherwise trap. On success, hardware restores from rs1.primary_nonvmt_bank_id according to the mask; if PC bit is set, it jumps. ec.ob with rs1 == current_ecid is a NOP)
-  * `rs2` = context restore mask (bits for FPR, CP, SATP, VMT, GPR subsets)
-  **ec.ob**: If the target ECID has no Primary non-VMT bank, the instruction traps.
-  **ec.om**: Because this is DMA-latency bound, hardware may perform additional validation (e.g., prefix/parent checks via group tables) before accepting the operation.
-* **ec.ib** / **ec.im**:
+1. ECS metadata: privilege level, scheduling flags, and similar OS bookkeeping.
+2. Saved register state for contexts not currently resident in a Bank, or for
+   slow-path spills.
+3. Pointers to Banks and Contract descriptors owned by this EC.
+4. OS/hypervisor-private fields.
 
-  * ECID number implicit (current ECID)
-  * ECS pointer known from ECID
-  * If bound to a bank, Primary Bank ID is implicit
-  * `rs1`/`rs2` unused unless future revisions assign meaning
+The ECS layout is a kernel software convention, not an architectural mandate.
+CME instructions take ECID numbers as operands and locate the ECS indirectly
+via `EC[e].ecs_ptr`. Chapter 5 describes the Linux kernel representation.
 
----
-
-## 0.9 Context Restore Mask
-
-`rs2` is a 64-bit mask; proposed allocation:
-
-* Bits 0–31: individual GPR subsets
-* Bits 32–47: FPR subsets
-* Bits 48–51: CP, SATP, and other CSRs
-* Bits 52–59: VMT subsets
-* Bits 60–63: Reserved for future expansion
-
-Exact bit meanings to be finalized in Chapter 2.
+A fast-path context switch (`ec.ib` → `ec.ob`) does not touch the ECS at all.
+ECS is accessed only on the DMA path (`ec.im`, `ec.om`), during migration, and
+for OS-level bookkeeping.
 
 ---
 
-## 0.10 OS Integration Note
+## 0.5 Group
 
-Linux (and other OSes) must set `rs2` bits according to which state must be valid immediately after context restore.
-Cases requiring CP restore should be enumerated in Chapter 5, e.g.:
+Every ECID `e` has exactly one **Group**. The Group's identifier equals the
+ECID number: **GroupID = ECID = `e`**.
 
-* After context migration between harts
-* After delegation/revocation events affecting cache partitioning
+The Group is the ECID's inventory of resources — the Banks, Contracts, and
+child ECIDs that belong to it.
+
+**Up-pointers (the reversal trick).** Groups do not maintain explicit downward
+membership lists. Instead, each Bank and Contract carries an **up-pointer** to
+the Group that owns it. Ownership is checked at the resource:
+
+```text
+owns(current_ecid, bank) ≡ bank.group_id == current_ecid    // one load, one compare
+```
+
+This makes hardware ownership enforcement O(1), regardless of how many
+resources a Group holds.
+
+**Child renaming.** When an ECID delegates resources to a child ECID, the child
+receives its own Group. From the child's perspective, its Group appears as
+Group 0. The child cannot observe parent-level GroupIDs. This is the same
+isolation that Linux namespaces apply to PIDs in containers: each delegation
+level renumbers its world to start at zero.
 
 ---
 
+## 0.6 Banks
 
+A **Bank** is a hardware register-state container owned by exactly one Group.
+Banks are never shared between ECIDs simultaneously. A Bank stores the GroupID
+of its owning Group (equivalently, the ECID number of its owner). Implementations
+may additionally cache delegation level, dirty flags, or other state in
+implementation-defined fields.
+
+### Non-VMT banks
+
+Non-VMT banks hold GPRs, FPRs, selected CSRs, SATP, and cache partition
+configuration (CP).
+
+**RV64 non-VMT bank — 1 KB:**
+
+| Field | Size |
+|---|---|
+| Group ID and reserved (in x0 slot) | 8 B |
+| GPRs x1–x31 | 248 B |
+| FPRs f0–f31 | 256 B |
+| Cache partition config (CP) | 8 B |
+| SATP | 8 B |
+| CSRs and reserved | 496 B |
+| **Total** | **1024 B** |
+
+**RV32 non-VMT bank — 512 B:**
+
+| Field | Size |
+|---|---|
+| Group ID and reserved (in x0 slot) | 4 B |
+| GPRs x1–x31 | 124 B |
+| FPRs f0–f31 | 128 B |
+| Cache partition config (CP) | 4 B |
+| SATP | 4 B |
+| CSRs and reserved | 248 B |
+| **Total** | **512 B** |
+
+The Group ID occupies the slot where x0 would otherwise appear. x0 is
+architecturally always zero and carries no register state; reusing its slot for
+the Group ID wastes nothing.
+
+### VMT banks
+
+VMT banks hold vector, matrix, and tensor register files. Their size scales
+with the implementation's vector width: for 256-bit vector registers a VMT bank
+is approximately 1 KB; each doubling of the vector width doubles the bank size.
+VMT banks are allocated and managed separately from non-VMT banks.
+
+---
+
+## 0.7 Contracts
+
+A **Contract** is a slice of a global, multiplexed resource:
+
+- **MSE Contracts** — memory bandwidth and latency guarantees.
+- **QoS Contracts** — I/O and NoC bandwidth and latency guarantees.
+- **CPE Contracts** — cache ways or a fraction of cache capacity.
+
+Four invariants govern all Contracts:
+
+1. **Single ownership.** A Contract has exactly one owning Group at any moment.
+   Ownership can be transferred but not duplicated.
+2. **Hierarchical splitting.** A privileged actor may split a Contract into
+   child Contracts. Each child is a strict subset of its parent; the sum of all
+   children's allocations never exceeds the parent's.
+3. **Atomic admission.** Splitting or binding a Contract requires chip-global
+   arbitration that succeeds or fails atomically. On failure, no state changes.
+4. **Dissolution.** When the owning Group is destroyed, the Contract dissolves
+   and its resources return to the parent Contract. Contract trees are bounded
+   by the same delegation depth D as ECID trees.
+
+---
+
+## 0.8 Delegation
+
+Every ECID has a **delegation level** `L`, stored in `EC[e].delegation_L`. The
+implementation exposes a read-only cap `D` via a CSR, where **D ≤ 3**:
+
+- **`L < D`**: this ECID may create child ECIDs and delegate Banks and
+  Contracts to them.
+- **`L = D`**: this ECID may bind resources for its own use but may not
+  delegate further.
+
+Root ECIDs (created by firmware or the kernel) have `L = 0`. Each delegation
+step increments `L` by 1 in the child. The cap D ≤ 3 matches the realistic
+depth of nested virtualization:
+
+```
+L0 — host kernel
+L1 — hypervisor
+L2 — nested hypervisor
+L3 — guest
+```
+
+Implementations may expose a smaller cap (D = 0, 1, 2, or 3); D > 3 is not
+permitted.
+
+**Parent/child relationship.** Every non-root ECID has a parent ECID stored in
+`EC[e].parent_ecid`. Only the parent or a privileged ancestor may revoke or
+destroy a child.
+
+**Forced destruction.** Destroying an ECID and its entire subtree must always
+succeed. The instruction `ec.od` (§0.9) revokes all Contracts, frees all Banks,
+marks the radix-tree subtree as free, and increments the generation counter for
+every freed `EC[e]` slot. A destroyed EC cannot stall its own reclamation.
+
+---
+
+## 0.9 CME Instruction Operand Conventions
+
+All CME instructions follow the naming scheme `ec.{i,o}{verb}` where `i` =
+into (save/create/assign) and `o` = out of (restore/destroy/revoke). Verbs are
+drawn from `{b, m, s, g, t, v, d, r}`.
+
+**ECID-first operands.** Any instruction that targets a context other than the
+currently running one takes an ECID number as its primary operand — never a raw
+pointer, never a bank ID:
+
+```text
+ec.ob rs1, rs2     # rs1 = target ECID number, rs2 = register mask
+ec.om rs1, rs2     # rs1 = target ECID number, rs2 = mask
+ec.od rs1          # rs1 = target ECID to destroy
+```
+
+Instructions operating on the current context consult `current_ecid`
+implicitly and omit the ECID operand:
+
+```text
+ec.ib rd, rs1      # save current context; rd = result, rs1 = mask
+```
+
+**Error handling.** Any instruction referencing an unallocated slot, a stale
+generation, or a privilege violation must raise a defined trap or return a
+documented failure code via `rd` or `cme_status`. Silent ignore is prohibited.
+
+**Instruction summary:**
+
+| Instruction | Description |
+|---|---|
+| `ec.ib` | Save current context to Bank (fast path) |
+| `ec.ob` | Restore target ECID's context from Bank (fast path) |
+| `ec.im` | Spill Bank to ECS in RAM (DMA path) |
+| `ec.om` | Fill Bank from ECS in RAM (DMA path) |
+| `ec.ig` | Assign a free Bank to an ECID's Group |
+| `ec.og` | Release a Bank from an ECID's Group |
+| `ec.it` | Delegate resources to a child ECID |
+| `ec.ot` | Revoke all resources from a child ECID |
+| `ec.ir` | Allocate a new child ECID |
+| `ec.od` | Forced destroy of ECID and subtree (always succeeds) |
+| `ec.iv` | Seal Bank under hardware encryption |
+| `ec.ov` | Unseal Bank for a secure enclave |
+
+Full instruction definitions are in Chapter 2. `ec.od` replaces the retired
+`ec.or`; any reference to `ec.or` in earlier drafts is incorrect (charter §2.1).
+
+---
+
+## 0.10 Context Restore Mask
+
+The register mask passed as `rs2` to `ec.ib`, `ec.ob`, `ec.im`, and `ec.om`
+is a 64-bit value selecting which register groups participate in the operation:
+
+| Bits | Register group | Notes |
+|---|---|---|
+| 0 | GPR | Integer registers |
+| 1 | FPR | Floating-point registers |
+| 2 | VEC | Vector registers (RVV) |
+| 3 | MAT | Matrix/tensor (future) |
+| 4 | PC | Program counter |
+| 5 | CSR | Control/status registers |
+| 6 | SATP | Address translation register |
+| 7 | — | Reserved |
+| 8–31 | — | Reserved for GPR subsets |
+| 32–47 | — | Reserved for FPR subsets |
+| 48–51 | — | CP and other CSR subsets |
+| 52–59 | — | VMT register subsets |
+| 60–63 | — | Reserved |
+
+If bit 4 (PC) is set in an `ec.ob` mask, execution jumps to the restored
+program counter immediately on commit of the instruction.
+
+Bits not assigned above are reserved and must be zero.
