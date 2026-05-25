@@ -72,7 +72,8 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 4. **D ≤ 3.** Implementations may pick smaller (1, 2, or 3); zero means
    no delegation; D = 3 is the maximum allowed.
 5. **No pools.** Anywhere. Resource scheduling uses Contracts directly.
-6. **`ec.od` is the forced-destroy instruction.** `ec.or` is retired.
+6. **`ec.oe` is the forced-destroy instruction.** `ec.or` and `ec.od` are
+   retired. The trailing `e`=existence: "take this EC out of existence."
 7. **Generation counters** in `EC[e]` for ABA safety on slot reuse.
 8. **No ECID migration across harts** — kernel rebinds, reusing ECS.
 9. **ECID allocation via radix tree** with prefix ownership and per-prefix
@@ -88,16 +89,14 @@ These are real questions you have not yet decided. They do not block work
 on the rest of the spec. If a writing session tries to "resolve" one of
 these, stop — that's a charter-level change.
 
-1. The precise rationale for `ec.od` over `ec.or` (rename is locked, the
-   *why* is to be re-reasoned).
-2. NUMA-aware Contract assignment.
-3. Whether a Contract can span multiple resource classes.
-4. The software slow-path when hardware Contract slots are exhausted.
-5. Cross-hart ECS sharing during migration handover.
-6. UCS (Unified Context Structure) — kernel-side abstraction, not
+1. NUMA-aware Contract assignment.
+2. Whether a Contract can span multiple resource classes.
+3. The software slow-path when hardware Contract slots are exhausted.
+4. Cross-hart ECS sharing during migration handover.
+5. UCS (Unified Context Structure) — kernel-side abstraction, not
    architectural; may become an optional appendix.
-7. Secure Vault key derivation, attestation, rotation.
-8. The CE-disable CSR name, bit layout, reset defaults, per-extension
+6. Secure Vault key derivation, attestation, rotation.
+7. The CE-disable CSR name, bit layout, reset defaults, per-extension
    granularity.
 
 ### A.6 What's *next* (the suggested work order)

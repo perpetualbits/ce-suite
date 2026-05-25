@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.7
+**Version:** 0.8
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -90,9 +90,12 @@ refactor.
   Bank and cache-partition assignment is always explicit and kernel-driven.
 - **Resource-attached flag** — Replaced by the presence or absence of a
   Contract binding in `EC[e]`.
-- **`ec.or`** — Renamed to `ec.od` (see §6.5). The earlier mnemonic is
-  retired to avoid visual collision with boolean operations and to make
-  the finality of destruction explicit.
+- **`ec.or`** — Renamed to `ec.od` (v0.7), then to `ec.oe` (v0.8, see §6.5).
+  The original mnemonic is retired to avoid visual collision with boolean
+  operations.
+- **`ec.od`** — Renamed to `ec.oe` (see §6.5, v0.8). The trailing letter
+  `d`=destroy was the one exception to the rule that trailing letters name
+  target objects or kinds; `e`=existence restores full consistency.
 
 ---
 
@@ -345,7 +348,7 @@ must obey.
 All CE Suite instructions follow:
 
 ```text
-{ec, cp, ms, qs}.{i, o}{b, m, s, g, t, v, d, r}
+{ec, cp, ms, qs}.{i, o}{b, m, s, g, t, v, e, r}
 ```
 
 - The two-letter prefix names the extension:
@@ -353,7 +356,7 @@ All CE Suite instructions follow:
 - The middle letter is direction: `i` = "into" (save/seal/create/assign-in),
   `o` = "out of" (restore/unseal/destroy/revoke).
 - The trailing letter names the target or kind: `b`=bank, `m`=memory,
-  `s`=stream/staging, `g`=group, `t`=tenant, `v`=vault, `d`=destroy,
+  `s`=stream/staging, `g`=group, `t`=tenant, `v`=vault, `e`=existence,
   `r`=resource/region.
 
 Authors must not invent mnemonics outside this scheme. New verbs require
@@ -408,13 +411,13 @@ idioms (e.g., "load `ctx->ecid` into rs1, then issue `ec.ob`") are
 described in Chapter 5 as Linux conventions, not as architectural
 semantics.
 
-### 6.5 Required forced-destroy instruction: `ec.od`
+### 6.5 Required forced-destroy instruction: `ec.oe`
 
-The CME instruction set **must include** `ec.od` (Execution Context:
-Destroy):
+The CME instruction set **must include** `ec.oe` (Execution Context:
+out of existence):
 
 ```text
-ec.od rs1     # rs1 = ECID to destroy
+ec.oe rs1     # rs1 = ECID to destroy
 ```
 
 Semantics:
@@ -427,9 +430,12 @@ Semantics:
 5. **Always succeeds.** Forward progress is guaranteed; zombies cannot
    stall reclamation.
 
-`ec.od` is privileged. The mnemonic replaces an earlier `ec.or` from
-pre-hiatus drafts; `ec.or` is retired (see §2.1). The precise rationale
-for `od` over `or` is parked in §8 for re-reasoning.
+`ec.oe` is privileged. The mnemonic replaces `ec.od` (v0.7) and the
+earlier `ec.or` (pre-hiatus); both are retired (see §2.1). The trailing
+letter `e`=existence: the instruction takes an ECID *out of existence*,
+recursively destroying the target EC and its entire delegation subtree.
+This is consistent with the trailing-letter rule: `e` names the target
+kind (existence), not the operation.
 
 ### 6.6 Errors and traps
 
@@ -470,8 +476,8 @@ IDs without an ECID mapping are incomplete and not architectural.
 - **Chapter 1 (Execution Context Model).** Lead with the ECID and `EC[e]`
   model. The old "context bank-centric" framing is obsolete.
 - **Chapter 2 (Instruction Set Reference).** Operands are ECID numbers
-  and masks (per §6.2). Include `ec.od`. Retire `ec.or`. The instruction
-  mask encoding follows Chapter 0 §0.9.
+  and masks (per §6.2). Include `ec.oe`. Retire `ec.or` and `ec.od`. The
+  instruction mask encoding follows Chapter 0 §0.9.
 - **Chapter 3 (Bank/Group/Delegation Semantics).** Tie all delegation
   to the ECID radix tree (§3.5). Drop the separate 6-bit group ID
   numbering; GroupID = ECID throughout.
@@ -507,30 +513,24 @@ changes, this charter changes, and vice versa.
 
 ## 8. Open items deferred to later versions
 
-These items are acknowledged but not resolved in v0.7. They do not block
+These items are acknowledged but not resolved in v0.8. They do not block
 the rest of the spec.
 
-1. **`ec.od` vs `ec.or` rationale.** The rename is locked in (see §6.5
-   and §2.1), but the precise reasoning for `od` over `or` is to be
-   re-reasoned. Candidate motivations include: visual collision with
-   boolean `or`; clearer finality of "destroy" vs "revoke" (which is
-   already used for resource revocation); and consistency with
-   `i/o + verb-letter` scheme where `d` = destroy.
-2. **NUMA-aware Contract assignment.** Multi-socket / NUMA semantics for
+1. **NUMA-aware Contract assignment.** Multi-socket / NUMA semantics for
    MSE Contracts are not yet specified.
-3. **Multi-resource Contracts.** Whether a single Contract can span
+2. **Multi-resource Contracts.** Whether a single Contract can span
    multiple resource classes (e.g., memory + I/O) is open.
-4. **Software-overflow Contracts.** When hardware Contract slots are
+3. **Software-overflow Contracts.** When hardware Contract slots are
    exhausted, what the slow-path looks like.
-5. **Cross-hart ECS sharing for migration.** Migration currently rebinds
+4. **Cross-hart ECS sharing for migration.** Migration currently rebinds
    ECIDs (§3.1.4); whether ECS objects can be referenced by `EC[e]` on
    multiple harts simultaneously during the handover window is open.
-6. **UCS (Unified Context Structure).** A kernel-side abstraction over
+5. **UCS (Unified Context Structure).** A kernel-side abstraction over
    ECS for unified scheduling. Currently kernel-design guidance only,
    not architectural. May be promoted to an optional appendix.
-7. **Secure Vault key management.** `ec.iv`/`ec.ov` semantics for sealed
+6. **Secure Vault key management.** `ec.iv`/`ec.ov` semantics for sealed
    banks are specified; key derivation, attestation, and rotation are not.
-8. **CE-disable CSR naming and bit layout.** §3.7 establishes that CE
+7. **CE-disable CSR naming and bit layout.** §3.7 establishes that CE
    may be disabled at firmware level, but the specific CSR(s), reset
    defaults, and per-extension granularity (can CME be enabled while
    MSE is disabled?) are not yet pinned.
@@ -539,13 +539,16 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.7 (this version).** Locked: `ecs_ptr` mandated at offset 0 (§3.2,
-  §3.3); ECID width = 16 bits, with PID-vs-ECID note (§3.6); D ≤ 3 as
-  architectural maximum, implementations may pick smaller (§5.1);
-  instruction naming uses two-letter extension prefixes
-  `{ec, cp, ms, qs}` (§6.1); §3.7 added covering CE disable and ignore
-  semantics at firmware and per-privilege-level granularity; `ec.or` →
-  `ec.od` rename confirmed, rationale parked in §8 for re-reasoning.
+- **v0.8 (this version).** `ec.od` → `ec.oe`: trailing letter `e`=existence
+  restores full consistency of the "trailing letter names the target or kind"
+  rule; `ec.od` retired (§2.1); `d`=destroy removed from letter table,
+  `e`=existence added (§6.1); §6.5 updated; §8 item 1 resolved and removed.
+- **v0.7.** Locked: `ecs_ptr` mandated at offset 0 (§3.2, §3.3); ECID width
+  = 16 bits, with PID-vs-ECID note (§3.6); D ≤ 3 as architectural maximum,
+  implementations may pick smaller (§5.1); instruction naming uses two-letter
+  extension prefixes `{ec, cp, ms, qs}` (§6.1); §3.7 added covering CE
+  disable and ignore semantics at firmware and per-privilege-level granularity;
+  `ec.or` → `ec.od` rename confirmed, rationale parked in §8.
 - **v0.6.** Strawman rewrite after the late-2025 / mid-2026 hiatus. Added
   glossary with retired terms, proposed ECID width, D value, `ec.od`,
   generation counters, chapter-by-chapter alignment, and separation of
