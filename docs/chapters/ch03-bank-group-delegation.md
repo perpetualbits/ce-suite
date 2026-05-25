@@ -11,7 +11,7 @@ Contracts, and delegation in the CE Suite. It specifies:
 - Contracts: their structure, hierarchy, and admission rules.
 - Delegation: how resources move from parent to child ECID, and what
   invariants hold at each step.
-- Revocation: cooperative (`ec.ot`) and forced (`ec.od`) paths.
+- Revocation: cooperative (`ec.ot`) and forced (`ec.oe`) paths.
 
 Byte-level layouts are in Chapter 0. Instruction operand encodings are in
 Chapter 2. The radix-tree allocation algorithms are in Appendix A. This
@@ -80,7 +80,7 @@ ambiguity about who owns what.
 Every Bank has an owner field: the ECID number of the Group that currently
 owns the Bank. The owner field is set when a Bank is assigned to an ECID's
 Group (via `ec.ig`) and cleared when the Bank is returned to the free pool
-(via `ec.og` or `ec.od`). The owner field is maintained by the hardware;
+(via `ec.og` or `ec.oe`). The owner field is maintained by the hardware;
 software cannot forge or overwrite it.
 
 ### 3.2.2 Bank states
@@ -96,7 +96,7 @@ A Bank is always in exactly one of four states:
 
 A Bank in the Free state has an undefined owner field. A Bank transitions
 from Free to Owned via `ec.ig`. A Bank transitions from Owned to Free via
-`ec.og` or as part of `ec.od`. A Bank transitions to Sealed via `ec.iv`
+`ec.og` or as part of `ec.oe`. A Bank transitions to Sealed via `ec.iv`
 and back to Owned via `ec.ov`.
 
 ### 3.2.3 Bank types
@@ -176,7 +176,7 @@ together exceeding the parent's allocation.
 
 ### 3.3.4 Dissolution
 
-When an ECID's Group is destroyed (via `ec.od`), all Contracts held by
+When an ECID's Group is destroyed (via `ec.oe`), all Contracts held by
 that Group are dissolved:
 
 1. All child Contracts of the dissolved Contracts are themselves dissolved
@@ -275,34 +275,34 @@ the parent's Group. After `ec.ot`:
 - Any grandchild ECIDs (descendants of `rs1`) have their resources
   recursively revoked and returned up the hierarchy.
 - ECID `rs1` itself remains valid in `EC[e]` — it is now an ECID with
-  no resources. The kernel may destroy it with `ec.od` or reassign
+  no resources. The kernel may destroy it with `ec.oe` or reassign
   resources to it.
 
 Cooperative revocation is the normal teardown path: the parent decides
 the child is done, revokes its resources, and then destroys the child ECID
-via `ec.od`.
+via `ec.oe`.
 
-### 3.5.2 Forced destruction: `ec.od`
+### 3.5.2 Forced destruction: `ec.oe`
 
-`ec.od rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
+`ec.oe rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
 resources. This instruction always succeeds. The target context cannot
 stall, block, or defend against it. See Chapter 2 §5 for the step-by-step
 semantics.
 
-`ec.od` is the path for:
+`ec.oe` is the path for:
 
 - Hostile or zombie contexts that will not cooperate with `ec.ot`.
 - Fast teardown of an entire tenant subtree in one operation.
 - Error recovery when a context has reached an unrecoverable state.
 
-After `ec.od`, all `EC[e]` slots in the destroyed subtree have their
+After `ec.oe`, all `EC[e]` slots in the destroyed subtree have their
 generation counters incremented. Any software holding references to
 `(hart_id, ECID, generation)` triples in the destroyed subtree will detect
 the stale references on next use.
 
 ### 3.5.3 Resource reclamation path
 
-After `ec.od`:
+After `ec.oe`:
 
 1. All Banks formerly owned by the destroyed subtree are returned to the
    **free pool** if they were leaf resources, or to the nearest surviving
@@ -323,7 +323,7 @@ radix-tree bookkeeping in RAM).
 
 The following invariants must hold at all times in a conforming
 implementation. They are checked at the time of each `ec.ig`, `ec.og`,
-`ec.it`, `ec.ot`, `ec.od`, and `ec.ir` operation. Violations raise a
+`ec.it`, `ec.ot`, `ec.oe`, and `ec.ir` operation. Violations raise a
 defined trap or return a documented failure code; silent ignore is
 prohibited (charter §6.6).
 
@@ -337,11 +337,11 @@ prohibited (charter §6.6).
    level.
 5. **Leaf cannot delegate.** An ECID at level `L = D` may not issue
    `ec.ir` or `ec.it`.
-6. **Forced destroy always succeeds.** `ec.od` raises no failure trap
-   and is never blocked by the target's state. `ec.od` of an already-
+6. **Forced destroy always succeeds.** `ec.oe` raises no failure trap
+   and is never blocked by the target's state. `ec.oe` of an already-
    destroyed ECID is a no-op (not an error).
 7. **Parent-only modification.** Only the parent (or a privileged
-   ancestor) may issue `ec.it`, `ec.ot`, or `ec.od` targeting a given
+   ancestor) may issue `ec.it`, `ec.ot`, or `ec.oe` targeting a given
    child ECID. An unprivileged ECID cannot modify resources in a sibling's
    or ancestor's Group.
 
@@ -359,7 +359,7 @@ one of:
 Silent ignore is prohibited. The specific trap codes and `cme_status`
 encodings are defined in Chapter 0 §0.8.
 
-The one exception is `ec.od` applied to an already-destroyed ECID: this
+The one exception is `ec.oe` applied to an already-destroyed ECID: this
 is a no-op and not an error. The generation counter of a destroyed slot
 already reflects the destruction; there is nothing to undo.
 
