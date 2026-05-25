@@ -251,7 +251,7 @@ also bounds the worst-case depth of a forced revocation tree walk.
 
 Forced revocation — destroying an ECID and all its descendants, reclaiming all
 their resources — must always succeed. A destroyed EC cannot stall its own
-reclamation. The instruction `ec.od` provides this guarantee; its semantics are
+reclamation. The instruction `ec.oe` provides this guarantee; its semantics are
 defined in Chapter 2.
 
 ECID allocation uses a kernel-side radix tree that provides prefix ownership
@@ -294,7 +294,7 @@ encoding, and the ECS header. Read Chapter 0 before working with instruction
 semantics.
 
 **Chapter 2** defines the CME instruction set: `ec.ib`, `ec.ob`, `ec.im`,
-`ec.om`, `ec.od`, and the rest. Instruction operands are ECID numbers and
+`ec.om`, `ec.oe`, and the rest. Instruction operands are ECID numbers and
 masks; the encoding follows Chapter 0 §0.9.
 
 **Appendix A** contains the radix-tree data structure and the ECID allocation,
