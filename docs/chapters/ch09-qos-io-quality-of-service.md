@@ -322,11 +322,10 @@ opaque domain handle (charter §6.2).
 
 ### `qs.or` — Revoke the I/O Contract from an ECID
 
-* **Syntax**: `qs.or rd, rs1`
-  * `rs1`: Target ECID. The domain is inferred from the Contract currently held by `rs1`.
-    If `rs1` holds Contracts on multiple domains, the `domain_id` must be specified in
-    the low bits of `rd` on input (bits 15:0), with bit 16 set as a selector flag; if
-    bit 16 is clear, all domains are revoked.
+* **Syntax**: `qs.or rd, rs1, rs2`
+  * `rs1`: Target ECID.
+  * `rs2`: Domain selector — `domain_id` of the Contract to revoke, or 0 to revoke
+    all domains simultaneously. (charter §6.7)
   * `rd`: 0 on success; error code on failure.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class[domain] = 0` and `EC[rs1].lat_class[domain] = 0` for the
@@ -366,9 +365,10 @@ opaque domain handle (charter §6.2).
 
 ### `qs.ot` — Revoke a child I/O Contract back to the parent
 
-* **Syntax**: `qs.ot rd, rs1`
-  * `rs1`: Child ECID whose Contract is being revoked. Domain inferred from `rs1`'s
-    current Contract binding; multiple-domain semantics same as `qs.or`.
+* **Syntax**: `qs.ot rd, rs1, rs2`
+  * `rs1`: Child ECID whose Contract is being revoked.
+  * `rs2`: Domain selector — `domain_id` of the Contract to revoke, or 0 to revoke
+    all domains simultaneously. (charter §6.7)
   * `rd`: 0 on success; error code on failure.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class[domain] = 0` and `EC[rs1].lat_class[domain] = 0`.
