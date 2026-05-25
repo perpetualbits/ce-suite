@@ -59,7 +59,7 @@ ownership layer that ties the other four together.
 | **Chapter 6** (CME Usage Examples) | Done — ECID-first operands, mnemonic scheme | — |
 | **Chapter 7** (CPE Instruction Set Reference) | Done — `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
 | **Chapter 8** (MSE) | Done — BE/contract slot alternation, K nesting bound, ms.{ir,or,it,ot}, subset {r,t} | — |
-| **Chapter 9** (QoS) | Not drafted | Write after MSE; reuse arbitration philosophy |
+| **Chapter 9** (QoS) | Done — BE/contract slot alternation per domain, DMA attribution, qs.{ir,or,it,ot}, subset {r,t} | — |
 | **Appendix A** (ECID) | Not converted | Convert scratchpad to proper appendix with radix tree algorithms and diagrams |
 
 ### A.4 What's been *decided* (locked in v0.7)
