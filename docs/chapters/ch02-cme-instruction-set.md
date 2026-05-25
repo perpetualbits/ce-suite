@@ -1,272 +1,308 @@
-# CME Instruction Set Reference
+# Chapter 2 — CME Instruction Set Reference
 
 ## Overview
 
-This chapter describes the complete instruction set for the Context Management Extension (CME), including all supported context, group, ECID, migration, and sealing operations. It includes syntax, operand types, cycle estimates, and side effects. All CME instructions are privileged unless noted otherwise.
+This chapter is the normative reference for all CME instructions. Three rules govern
+every instruction in this chapter:
+
+1. **ECID-first operands.** Any instruction that targets a context other than the
+   currently running one takes an **ECID number** as its primary operand — never a raw
+   pointer, never a bank ID. (Charter §6.2)
+2. **Implicit current ECID.** Instructions that operate on the currently running context
+   consult `current_ecid` implicitly and omit the ECID operand. (Charter §6.2)
+3. **Silent ignore is prohibited.** Any illegal operation, privilege violation, or
+   generation mismatch must raise a defined trap or return a documented failure code
+   via `rd` or a status CSR. (Charter §6.6)
+
+All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
+`ec.{i,o}{verb}` where `i` = into (save/create/assign) and `o` = out of
+(restore/destroy/revoke). (Charter §6.1)
 
 ---
 
-## 1. Context Bank Operations
+## 1. Fast-Path Bank Operations
 
-### `ec.ib` — Save current execution context into context bank
+These instructions operate through SRAM-resident staging banks and constitute the
+1–9 cycle context-switch path. They never touch ECS.
 
-* **Type**: System, user/privileged (configurable)
+### `ec.ib` — Save current context into bank
+
 * **Syntax**: `ec.ib rd, rs1`
+  * `rd`: Implementation-defined result; use `x0` if unused.
+  * `rs1`: Register mask — which register groups to save (see §7).
+* **Operand notes**: Operates on `current_ecid` implicitly. No explicit ECID argument.
+* **Side effects**: Writes state from the active register file into the bank associated
+  with `current_ecid`. Updates `cme_status`.
+* **Guaranteed cycles**: 1 cycle (full save), up to 3 with selective masking.
 
-  * `rd`: Destination register for bank ID
-  * `rs1`: Mask specifying which register groups to save
-* **Side Effects**:
+### `ec.ob` — Restore context from bank for target ECID
 
-  * Overwrites bank contents
-  * Updates CSRs: `cme_status`, `cme_last_bank`, `cme_reg_mask`
-* **Guaranteed Cycles**:
+* **Syntax**: `ec.ob rs1, rs2`
+  * `rs1`: Target ECID number.
+  * `rs2`: Register mask — which register groups to restore (see §7).
+* **Side effects**: Restores registers from the bank owned by ECID `rs1`. If the PC
+  bit is set in the mask, execution jumps to the restored program counter on commit.
+* **Guaranteed cycles**: 1–3.
 
-  * 1 cycle (banked), up to 3 if selective masking
-
-### `ec.ob` — Restore execution context from bank
-
-* **Type**: System, user/privileged (configurable)
-* **Syntax**: `ec.ob rd, rs1`
-
-  * `rd`: Bank ID to restore from
-  * `rs1`: Mask (which register groups to restore)
-* **Side Effects**:
-
-  * Restores registers (selective if masked)
-  * May jump if PC bit is set in mask
+> **Typical switch sequence**: `ec.ib x0, mask` (save current), then
+> `ec.ob next_ecid, mask` (restore next). The transition between `current_ecid`
+> and `next_ecid` is complete when `ec.ob` commits.
 
 ---
 
-## 2. DMA (Memory) Spill/Fill Operations
+## 2. DMA Spill/Fill Operations
 
-### `ec.im` — Save bank contents to memory
+These instructions transfer state between a bank and the ECS in RAM. The memory
+address is derived architecturally from `EC[rs1].ecs_ptr` (at offset 0 of the
+EC entry) — the instruction does not take a separate pointer operand.
 
-* **Type**: System, privileged
-* **Syntax**: `ec.im rs1, rs2, imm`
+### `ec.im` — Spill bank to memory
 
-  * `rs1`: Bank ID
-  * `rs2`: Memory pointer
-  * `imm`: Mask
-* **Side Effects**:
+* **Syntax**: `ec.im rs1, rs2`
+  * `rs1`: Target ECID number.
+  * `rs2`: Register mask (which groups to spill).
+* **Address**: `EC[rs1].ecs_ptr`. The kernel is responsible for setting this field
+  before invoking `ec.im`; it is a software-managed pointer, not an instruction operand.
+* **Side effects**: Bank → ECS DMA transfer. The bank may be freed by the kernel
+  after completion.
+* **Cycles**: 10–128 (DMA bus width dependent).
 
-  * Bank → memory transfer
-  * Bank can be freed afterward
-* **Cycles**: Depends on size and DMA bus width (≤ 128 cycles typical)
+### `ec.om` — Fill bank from memory
 
-### `ec.om` — Load context from memory into bank
-
-* **Type**: System, privileged
-* **Syntax**: `ec.om rd, rs1, imm`
-
-  * `rd`: Destination bank
-  * `rs1`: Memory pointer
-  * `imm`: Mask
-* **Side Effects**:
-
-  * Memory → bank transfer
-  * May fault if no bank available
+* **Syntax**: `ec.om rs1, rs2`
+  * `rs1`: Target ECID number.
+  * `rs2`: Register mask.
+* **Address**: `EC[rs1].ecs_ptr`, same as `ec.im`.
+* **Side effects**: ECS → bank DMA transfer. Faults if no free bank is available for
+  ECID `rs1`.
+* **Cycles**: 10–128.
 
 ---
 
-## 3. Group Management
+## 3. Bank–Group Assignment
 
-### `ec.ig` — Create or extend group
+Banks belong to Groups; GroupID equals the owning ECID number (charter §4.1). These
+instructions assign or release banks from a given ECID's Group without touching the
+ECID itself. The Group maintains no explicit member list; ownership is encoded in each
+bank's up-pointer and checked at the bank (the reversal trick).
+
+### `ec.ig` — Assign a free bank to an ECID's Group
 
 * **Syntax**: `ec.ig rd, rs1`
+  * `rs1`: Target ECID (GroupID = `rs1`).
+  * `rd`: Assigned bank selector, or error code if no bank is available.
+* **Side effects**: A bank from the free pool is claimed for ECID `rs1`'s Group.
+  The bank's owner field is set to `rs1`. Group has no member list to update.
+* **Cycles**: 1–4.
 
-  * `rd`: Returns new group ID (as seen from current context)
-  * `rs1`:
-
-    * `0` (x0): Create a new group using the first free EC-local bank from group 0
-    * `<existing group ID>`: Add the next free EC-local bank from group 0 to the given group
-* **Side Effects**:
-
-  * Moves the selected EC-local bank to the group
-  * Returns group ID in `rd`
-  * Updates group/bank mapping
-  * If no free banks, returns error code in `rd`
-
-### `ec.og` — Remove bank from group
+### `ec.og` — Release a bank from an ECID's Group
 
 * **Syntax**: `ec.og rd, rs1`
+  * `rs1`: Target ECID (GroupID = `rs1`).
+  * `rd`: Count of banks remaining in ECID `rs1`'s Group after release, or error code.
+* **Side effects**: One bank is removed from ECID `rs1`'s Group and returned to the
+  free pool. Its owner field is cleared.
+* **Warning**: Do not release banks from an ECID whose context is currently running or
+  actively scheduled. To safely reclaim resources from a tenant, use `ec.ot` or `ec.od`.
+* **Cycles**: 1–4.
 
-  * `rd`: Returns the number of banks left in the group after removal
-  * `rs1`: Group ID (from EC-local perspective)
-* **Side Effects**:
+---
 
-  * Removes the *last-added* EC-local bank from the group and returns it to group 0
-  * If `rd` is 0, the group is now disbanded (no members remain)
-  * Hardware updates mapping and invalidates group if empty
+## 4. Resource Delegation
 
-**Group membership and visibility:**
+These instructions delegate Group resources (banks, contracts, child ECIDs) from a
+parent ECID to a child, or revoke them. The delegation tree is bounded by depth D ≤ 3
+(charter §5).
 
-* When an EC puts one of its banks into a group, it knows exactly which EC-local bank was moved, as *only EC-local group 0* banks may be added.
-* The OS is responsible for tracking which EC-local bank numbers have been assigned to each group (local bookkeeping).
-* Hardware maintains only the bank→group mapping; groups do not keep member lists.
-
-**Warning:**
-
-* OS/hypervisor developers: Do not remove banks from groups actively in use by tenants! This may disrupt VMs, processes, or enclaves using that group. To safely evict tenants, use `ec.ot` (revoke group) or `ec.or` (revoke ECID).
-
-### `ec.it` — Assign group to tenant (ECID)
+### `ec.it` — Delegate resources to a child ECID
 
 * **Syntax**: `ec.it rs1, rs2`
+  * `rs1`: Source ECID — the parent whose Group resources are transferred.
+  * `rs2`: Child ECID — the recipient.
+* **Side effects**: Selected resources from ECID `rs1`'s Group are transferred to
+  ECID `rs2`'s Group. Updates owner up-pointers on all affected resources. Requires
+  `rs2` to have delegation level `L < D` for the child to be able to re-delegate.
+* **Cycles**: 1–4.
 
-  * `rs1`: Group ID
-  * `rs2`: Tenant ECID
-* **Side Effects**:
-
-  * Transfers group to tenant, updates group visibility and group/bank mappings
-
-### `ec.ot` — Revoke group from tenant (ECID)
+### `ec.ot` — Revoke resources from a child ECID
 
 * **Syntax**: `ec.ot rs1`
-
-  * `rs1`: Group ID
-* **Side Effects**:
-
-  * Recursively revokes group and all banks/subgroups from tenant
-  * Triggers forced cleanup and group removal
-
----
-
-## 4. ECID Lifecycle Operations
-
-### `ec.ir` — Allocate/request new ECID (prefix delegation)
-
-* **Syntax**: `ec.ir rd, rs1, rs2`
-
-  * `rd`: New ECID (or 0 if none available)
-  * `rs1`: Pointer to ECS in RAM
-  * `rs2`: Prefix length (relative to parent ECID)
-* **Semantics**:
-
-  * Allocates child ECID; subdelegation possible if prefix >1; hardware enforces limits
-
-### `ec.or` — Revoke/destroy ECID
-
-* **Syntax**: `ec.or rs1`
-
-  * `rs1`: ECID to revoke (must be child/prefix of caller)
-* **Semantics**:
-
-  * Recursively reclaims all contracts, groups, banks, subordinate ECIDs/resources
+  * `rs1`: Child ECID from which all resources are revoked.
+* **Side effects**: All resources in ECID `rs1`'s Group (banks, contracts, child
+  ECIDs) are recursively revoked and returned to the parent's Group. ECID `rs1` itself
+  remains valid but holds no resources.
+* **Cycles**: 1–8 (proportional to subtree size).
 
 ---
 
-## 5. Secure Enclave / Vault Ops
+## 5. ECID Lifecycle
 
-### `ec.iv` — Seal context (encrypt/lock)
+### `ec.ir` — Allocate a child ECID
+
+* **Syntax**: `ec.ir rd, rs1`
+  * `rd`: New child ECID number, or 0 if allocation failed.
+  * `rs1`: Maximum delegation depth permitted for the child (must satisfy
+    `child_L = parent_L + 1 ≤ D`; pass 0 to prevent further delegation).
+* **Side effects**: Allocates a new ECID slot in the calling context's radix-tree
+  prefix. Increments the generation counter for the new slot. The kernel subsequently
+  writes `EC[new_ecid].ecs_ptr` and any ECS fields in software — these are not
+  instruction operands.
+* **Cycles**: 1–8 (log of radix tree depth).
+
+### `ec.od` — Forced destroy of ECID and subtree
+
+* **Syntax**: `ec.od rs1`
+  * `rs1`: Target ECID to destroy.
+* **Semantics** (per charter §6.5):
+  1. Revokes all Contracts held by `rs1` and every descendant in its subtree.
+  2. Frees all Banks owned by `rs1` and descendants; returns them to the parent Group.
+  3. Marks the radix-tree subtree rooted at `rs1` as free.
+  4. Increments the generation counter for every freed `EC[e]` slot.
+  5. **Always succeeds.** Zombies and hostile contexts cannot stall reclamation.
+* **Privileged**: Yes. The caller must be a parent or privileged ancestor of `rs1`.
+* **Cycles**: O(log N) average; proportional to subtree size.
+
+> `ec.od` replaces the retired `ec.or`. Any reference to `ec.or` in earlier drafts
+> is incorrect; see charter §2.1.
+
+---
+
+## 6. Secure Vault Operations
+
+These operations seal and unseal banks under hardware-managed encryption. Key
+derivation, attestation, and rotation are deferred open items (charter §8.7).
+
+### `ec.iv` — Seal a bank (encrypt)
 
 * **Syntax**: `ec.iv rs1, rs2`
+  * `rs1`: Target ECID whose bank is to be sealed.
+  * `rs2`: Register mask.
+* **Side effects**: The bank associated with ECID `rs1` is encrypted. Contents are
+  inaccessible except in a secure mode that can present the appropriate key.
 
-  * `rs1`: Bank ID
-  * `rs2`: Mask
-* **Side Effects**:
+### `ec.ov` — Unseal a bank (decrypt)
 
-  * Encrypts contents, accessible only in secure mode
-
-### `ec.ov` — Unseal context
-
-* **Syntax**: `ec.ov rd, rs1`
-
-  * `rd`: Destination bank
-  * `rs1`: Mask
-* **Side Effects**:
-
-  * Decrypts/unlocks for secure enclave
+* **Syntax**: `ec.ov rs1, rs2`
+  * `rs1`: Target ECID whose bank is to be unsealed.
+  * `rs2`: Register mask.
+* **Side effects**: Decrypts and makes the bank's contents accessible to a secure
+  enclave executing as ECID `rs1`.
 
 ---
 
-## 6. Register Mask Encoding
+## 7. Register Mask Encoding
 
-| Bit | Register Group | Description              |
-| --- | -------------- | ------------------------ |
-| 0   | GPR            | Integer registers        |
-| 1   | FPR            | Floating-point registers |
-| 2   | VEC            | Vector registers (RVV)   |
-| 3   | MAT            | Matrix/tensor (future)   |
-| 4   | PC             | Program counter          |
-| 5   | CSR            | Control/status registers |
-| 6   | SATP           | Address translation      |
-| 7   | Reserved       |                          |
+| Bit | Register Group | Notes                    |
+|-----|----------------|--------------------------|
+| 0   | GPR            | Integer registers         |
+| 1   | FPR            | Floating-point registers  |
+| 2   | VEC            | Vector registers (RVV)    |
+| 3   | MAT            | Matrix/tensor (future)    |
+| 4   | PC             | Program counter           |
+| 5   | CSR            | Control/status registers  |
+| 6   | SATP           | Address translation       |
+| 7   | —              | Reserved                  |
 
----
-
-## 7. CSRs
-
-| CSR Name         | Purpose                      |
-| ---------------- | ---------------------------- |
-| cme\_bank\_count | Number of banks (readonly)   |
-| cme\_next\_free  | Next available bank          |
-| cme\_status      | Last operation status/error  |
-| cme\_reg\_mask   | Mask used in last operation  |
-| cme\_group\_map  | Group and ECID mapping table |
-| cme\_dma\_addr   | DMA pointer                  |
-| cme\_seal\_key   | Vault encryption key         |
+If bit 4 (PC) is set in an `ec.ob` mask, execution jumps to the restored program
+counter immediately on commit of the instruction.
 
 ---
 
-## 8. Instruction Timing Summary
+## 8. CSRs
 
-| Instruction | Cycles (banked) | DMA Path | Secure Path |
-| ----------- | --------------- | -------- | ----------- |
-| ec.ib/ob    | 1–3             | –        | –           |
-| ec.im/om    | –               | 10–128   | –           |
-| ec.ig/og    | 1–4             | –        | –           |
-| ec.it/ot    | 1–4 (recursive) | –        | –           |
-| ec.iv/ov    | –               | –        | 8–16        |
-| ec.ir/or    | 1–8 (log tree)  | –        | –           |
+| CSR Name            | Purpose                                                         |
+|---------------------|-----------------------------------------------------------------|
+| `current_ecid`      | ECID of the currently executing context (read-only to user mode). |
+| `cme_ec_table_base` | Base address of the `EC[e]` array for this hart.                |
+| `cme_bank_count`    | Number of banks on this hart (read-only).                       |
+| `cme_next_free`     | Implementation hint: next available bank slot.                  |
+| `cme_status`        | Result code from the last CME operation.                        |
+| `cme_reg_mask`      | Register mask used in the last operation.                       |
+| `cme_dma_addr`      | DMA progress address (implementation-defined).                  |
+| `cme_seal_key`      | Vault encryption key (privileged).                              |
+
+`EC[e]` entries are located via `cme_ec_table_base + e * stride`, where `stride` is
+implementation-defined but fixed per hart. The `ecs_ptr` field is at offset 0 within
+each entry (charter §3.2).
 
 ---
 
-## 9. Instruction Encoding Sketch
+## 9. Instruction Timing Summary
 
-* **Opcode**: 8 bits (e.g., `1101_xxxx`)
-* **Function**: 4 bits (operation category)
+| Instruction | Fast path (banked) | DMA path | Vault path |
+|-------------|-------------------|----------|------------|
+| `ec.ib`     | 1–3               | —        | —          |
+| `ec.ob`     | 1–3               | —        | —          |
+| `ec.im`     | —                 | 10–128   | —          |
+| `ec.om`     | —                 | 10–128   | —          |
+| `ec.ig`     | 1–4               | —        | —          |
+| `ec.og`     | 1–4               | —        | —          |
+| `ec.it`     | 1–4               | —        | —          |
+| `ec.ot`     | 1–8               | —        | —          |
+| `ec.ir`     | 1–8               | —        | —          |
+| `ec.od`     | 1–8               | —        | —          |
+| `ec.iv`     | —                 | —        | 8–16       |
+| `ec.ov`     | —                 | —        | 8–16       |
+
+---
+
+## 10. Instruction Encoding Sketch
+
+* **Opcode**: 8 bits
+* **Function**: 4 bits (operation category per §6.1 naming scheme)
 * **Operands**: rd, rs1, rs2
 * **Mask/Imm**: 8 bits
-* **Address**: 32–64 bits
+
+Full binary encoding is deferred to the formal opcode assignment stage.
 
 ---
 
-## 10. Instruction Orthogonality and Relationships
+## 11. Instruction Relationships
 
-CME’s hierarchical resource management results in **overlapping but orthogonal** effects for group and ECID instructions:
+| To accomplish…                                        | Use      |
+|-------------------------------------------------------|----------|
+| Save running context to bank                          | `ec.ib`  |
+| Restore a context from its bank (fast switch)         | `ec.ob`  |
+| Spill bank state to ECS in RAM                        | `ec.im`  |
+| Fill bank state from ECS in RAM                       | `ec.om`  |
+| Add a free bank to an ECID's Group                    | `ec.ig`  |
+| Return a bank from an ECID's Group to the free pool   | `ec.og`  |
+| Delegate Group resources to a child ECID              | `ec.it`  |
+| Revoke all resources from a child ECID                | `ec.ot`  |
+| Allocate a new child ECID                             | `ec.ir`  |
+| Destroy an ECID and its entire subtree (forced)       | `ec.od`  |
+| Seal a bank under hardware encryption                 | `ec.iv`  |
+| Unseal a bank for a secure enclave                    | `ec.ov`  |
 
-* **`ec.ig`**: Adds EC-local banks to a group (creates group if new). Only EC-local group 0 banks can be added; group is created by first addition. Cannot add banks to tenant-owned groups.
-* **`ec.og`**: Removes the *last-added* EC-local bank from a group, returns to group 0. If group is emptied, group is disbanded. Cannot remove banks from tenant-owned groups (unless forcibly revoked).
-* **`ec.it`**: Assigns group to a tenant (new ECID).
-* **`ec.ot`**: Revokes group from tenant (recursively removes all banks/subgroups; group may be deleted if emptied).
-* **`ec.ir`**: Allocates new ECID with prefix; allows delegation and hierarchical contracts.
-* **`ec.or`**: Revokes/destroys ECID and all subordinate resources (includes groups, banks, subordinate ECIDs).
-* **`ec.iv/ov`**: Secure enclave/vault seal/unseal.
+**Cooperative teardown vs. forced teardown:**
 
-**Best practice:**
-
-* Use `ec.ig`/`ec.og` for resource setup and teardown in cooperative (non-tenant) code.
-* Use `ec.it`/`ec.ot` for tenant management (VMs, enclaves).
-* Use `ec.or` for full forced cleanup (zombies, hostile or failed guests).
-
----
-
-## 11. Error and Exception Handling
-
-* All illegal or privilege-violating operations trap to the OS/hypervisor.
-* Forced destruction (`ec.or`) always succeeds for the parent; OS must handle cleanup.
-* Error codes returned in rd or status CSRs.
+* Cooperative (tenant responsive): `ec.ot` to reclaim resources, then release the ECID
+  with the parent's bookkeeping.
+* Forced (zombie, hostile, or failed context): `ec.od` — always succeeds, full subtree.
 
 ---
 
-## 12. Placeholder: Diagrams
+## 12. Error and Exception Handling
 
-* **Instruction Flow Diagram:**
-  ECID creation/delegation, forced destruction, group and resource mapping.
-* **Radix Tree Example:**
-  Visual of ECID prefixes, delegation, and recursive cleanup.
+Any CME instruction that encounters an invalid or stale ECID reference (unallocated
+slot, generation mismatch, privilege violation, or Group ownership failure) must either:
+
+* Raise a defined trap to the OS or hypervisor, or
+* Return a documented error code in `rd` or `cme_status`.
+
+Silent ignore is prohibited (charter §6.6).
+
+`ec.od` is the sole exception to the "may fail" rule: it **always** succeeds and
+imposes no obligation on the target context's responsiveness.
 
 ---
 
-[Next: Hardware Microarchitecture Overview](Chapter3-Bank_Group_and_Delegation_Semantics.md)
+## 13. Placeholder: Diagrams
 
+* **Context switch sequence**: `ec.ib` → `ec.ob`, showing `current_ecid` transition.
+* **ECID operand lookup**: how `ec.ob rs1` locates the bank via `EC[rs1]`.
+* **`ec.od` subtree walk**: radix-tree traversal and generation-counter increments.
 
+---
+
+[Next: Chapter 3 — Bank, Group, and Delegation Semantics](ch03-bank-group-delegation.md)
