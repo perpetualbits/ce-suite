@@ -69,7 +69,7 @@ reaches it only through `EC[e].ecs_ptr`, which the kernel sets after calling
 5. On context switch, kernel loads execution_context->ecid and passes it
    as the ECID operand to CME instructions.
 
-6. On context teardown, kernel calls ec.od to destroy the ECID and
+6. On context teardown, kernel calls ec.oe to destroy the ECID and
    reclaim resources. EC[e]'s generation counter is incremented;
    any stale (ecid, generation) references held elsewhere are detectable.
 ```
@@ -153,7 +153,7 @@ four extensions:
 
 All of these are driven by the ECID: the kernel sets up the ECID first, then
 binds CPE partitions, MSE Contracts, and QoS Contracts to it. Tearing down an
-ECID via `ec.od` cascades: all bound Contracts dissolve and return their
+ECID via `ec.oe` cascades: all bound Contracts dissolve and return their
 resources to the parent Contract; all assigned banks are freed.
 
 ### 4.1 MSE Contract binding
@@ -167,7 +167,7 @@ ms.ir  rd, rs1    # allocate child MSE Contract; rs1 = parent ECID; rd = Contrac
 ms.it  rs1, rs2   # delegate Contract rs1 to ECID rs2
 ```
 
-When the task is destroyed, `ec.od` dissolves its MSE Contract automatically.
+When the task is destroyed, `ec.oe` dissolves its MSE Contract automatically.
 If the task is demoted (e.g., moved from SCHED_DEADLINE to SCHED_OTHER), the
 kernel explicitly revokes the Contract with `ms.ot` before the ECID continues
 running without it.
@@ -179,7 +179,7 @@ When Linux runs a guest VM, the hypervisor kernel:
 1. Allocates a child ECID for each vCPU at delegation level L+1.
 2. Delegates a subset of its own MSE, QoS, and CPE Contracts to those child ECIDs.
 3. Sets `EC[child].parent_ecid = hypervisor_ecid`.
-4. On VM teardown, calls `ec.od hypervisor_ecid` — or individually `ec.od
+4. On VM teardown, calls `ec.oe hypervisor_ecid` — or individually `ec.oe
    vcpu_ecid` per vCPU — which recursively reclaims all delegated resources.
 
 The guest OS is unaware of the host-level ECID numbers. From its perspective,
