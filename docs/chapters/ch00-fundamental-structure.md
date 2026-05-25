@@ -267,21 +267,26 @@ currently running one takes an ECID number as its primary operand — never a ra
 pointer, never a bank ID:
 
 ```text
-ec.ob rs1, rs2     # rs1 = target ECID number, rs2 = register mask
-ec.om rs1, rs2     # rs1 = target ECID number, rs2 = mask
-ec.oe rs1          # rs1 = target ECID to destroy
+ec.ob rd, rs1, rs2 # rd = result, rs1 = target ECID number, rs2 = register mask
+ec.om rd, rs1, rs2 # rd = result, rs1 = target ECID number, rs2 = mask
+ec.oe rs1          # rs1 = target ECID to destroy (no rd — always succeeds)
 ```
 
 Instructions operating on the current context consult `current_ecid`
 implicitly and omit the ECID operand:
 
 ```text
-ec.ib rd, rs1      # save current context; rd = result, rs1 = mask
+ec.ib rs1          # save current context; rs1 = mask (no rd — always succeeds or traps)
 ```
 
-**Error handling.** Any instruction referencing an unallocated slot, a stale
-generation, or a privilege violation must raise a defined trap or return a
-documented failure code via `rd` or `cme_status`. Silent ignore is prohibited.
+**Error handling.** Every CE Suite instruction that can return a failure code
+writes 0 (success) or a non-zero error code in `rd`. Callers pass `x0` to
+discard the result. Status CSRs (`cme_status`, etc.) are updated for
+diagnostic use but are not the primary error channel. Two exceptions carry no
+`rd`: `ec.ib` (always succeeds or traps) and `ec.oe` (always succeeds).
+Any instruction referencing an unallocated slot, a stale generation, or a
+privilege violation must raise a defined trap or return a documented failure
+code in `rd`. Silent ignore is prohibited.
 
 **Instruction summary:**
 
@@ -306,7 +311,7 @@ Full instruction definitions are in Chapter 2.
 
 ## 0.10 Context Restore Mask
 
-The register mask passed as `rs2` to `ec.ib`, `ec.ob`, `ec.im`, and `ec.om`
+The register mask passed as `rs1` to `ec.ib` and as `rs2` to `ec.ob`, `ec.im`, and `ec.om`
 is a 64-bit value selecting which register groups participate in the operation:
 
 | Bits | Register group | Notes |
