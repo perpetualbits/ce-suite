@@ -164,12 +164,18 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 * **Syntax**: `ec.ir rd, rs1`
   * `rd`: New child ECID number, or 0 if allocation failed.
-  * `rs1`: Maximum delegation depth permitted for the child (must satisfy
-    `child_L = parent_L + 1 ≤ D`; pass 0 to prevent further delegation).
+  * `rs1`:
+    * `rs1 = 0` — allocate a **leaf** child: `EC[child].delegation_L = D` (the child
+      cannot create further children or delegate resources).
+    * `rs1 = 1` — allocate a **delegating** child: `EC[child].delegation_L = parent_L + 1`.
+      Fails (rd = error) if `parent_L ≥ D` (parent is already at the cap).
+    * `rs1 > 1` — reserved; returns error code `ILLEGAL_FIELD`.
 * **Side effects**: Allocates a new ECID slot in the calling context's radix-tree
   prefix. Increments the generation counter for the new slot. The kernel subsequently
   writes `EC[new_ecid].ecs_ptr` and any ECS fields in software — these are not
   instruction operands.
+* **Note**: The child's delegation level is always hardware-derived from the parent's
+  level and the leaf flag. Software cannot request an arbitrary `L` value.
 * **Cycles**: 1–8 (log of radix tree depth).
 
 ### `ec.oe` — Forced destroy of ECID and subtree
@@ -189,8 +195,14 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 ## 6. Secure Vault Operations
 
-These operations seal and unseal banks under hardware-managed encryption. Key
-derivation, attestation, and rotation are deferred open items (charter §8.7).
+> **Status — instruction shells only.** `ec.iv` and `ec.ov` are defined as
+> instruction placeholders. The cryptographic semantics — key derivation, key
+> rotation, attestation, sealed-bank representation, and unsealing authentication
+> — are **not yet normative** (charter §8, open item 6). An implementer cannot
+> build a secure vault from this chapter alone. Do not rely on vault instruction
+> semantics for any security-critical design until they are fully specified.
+
+These operations seal and unseal banks under hardware-managed encryption.
 
 ### `ec.iv` — Seal a bank (encrypt)
 
@@ -236,6 +248,11 @@ defined coarse-grained groups (bits 0–6) work identically on RV32 and RV64.
 If bit 4 (PC) is set in an `ec.ob` mask, execution jumps to the restored program
 counter immediately on commit of the instruction.
 
+**Reserved-bit policy.** All bits marked Reserved in the table above must be zero.
+If any reserved bit is non-zero, the instruction must return error code
+`ILLEGAL_FIELD` (or the implementation-equivalent), or raise an
+illegal-operand trap. Silent ignore of reserved bits is prohibited.
+
 ---
 
 ## 8. CSRs
@@ -276,14 +293,21 @@ each entry (charter §3.2).
 
 ---
 
-## 10. Instruction Encoding Sketch
+## 10. Instruction Encoding
 
-* **Opcode**: 8 bits
-* **Function**: 4 bits (operation category per §6.1 naming scheme)
-* **Operands**: rd, rs1, rs2
-* **Mask/Imm**: 8 bits
+> **Non-normative placeholder.** The text below is not a valid RISC-V encoding.
+> A real encoding requires selecting one or more custom-opcode spaces
+> (custom-0 through custom-3), assigning funct3/funct7 discriminants,
+> placing rd/rs1/rs2 at the fixed RISC-V R-type positions, and handling
+> instructions with no rd by encoding rd = 00000 (x0). This work is tracked
+> as F8 in `docs/work-items.md` and will replace this section entirely.
 
-Full binary encoding is deferred to the formal opcode assignment stage.
+Conceptual layout (for reference only, not architectural):
+
+* **Opcode**: one of the RISC-V custom opcode spaces (TBD)
+* **Discriminant**: funct3 / funct7 fields (TBD per instruction)
+* **Operands**: rd, rs1, rs2 at standard R-type positions
+* Instructions with no `rd` encode rd field = 00000
 
 ---
 

@@ -298,7 +298,7 @@ code in `rd`. Silent ignore is prohibited.
 | `ec.om` | Fill Bank from ECS in RAM (DMA path) |
 | `ec.ig` | Assign a free Bank to an ECID's Group |
 | `ec.og` | Release a Bank from an ECID's Group |
-| `ec.it` | Delegate resources to a child ECID |
+| `ec.it` | Delegate one Bank to a child ECID (call once per bank) |
 | `ec.ot` | Revoke all resources from a child ECID |
 | `ec.ir` | Allocate a new child ECID |
 | `ec.oe` | Forced destroy of ECID and subtree (always succeeds) |
