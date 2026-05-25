@@ -19,12 +19,13 @@ Key design points:
 
 All CPE instructions follow the CE suite pattern:
 
-```
-cp.ip   // cache partition: assign (in) partition
-cp.op   // cache partition: revoke (out) partition
+```text
+cp.ir   // cache partition: assign (in) resource
+cp.or   // cache partition: revoke (out) resource
 ```
 
-`i` = in (assign), `o` = out (revoke), `p` = partition.
+`cp` = CPE extension; `i`/`o` = direction (in/out); `r` = resource/region (per charter §6.1).
+CPE uses the subset `{r}` from the target-letter table.
 
 ---
 
@@ -110,7 +111,7 @@ struct CPE_CPD_v1 {
 ```
 rs1 = {ECID=0x1234, LEVEL_SEL=Auto, COUPLE=1, MODE=WAY_MASK, INLINE=1, LOCK_EN=0, OPC=ASSIGN}
 rs2 = {L2 mask=0x000F, L1D mask=0x0F, L1I mask=0x00}
-cp.ip rs1, rs2
+cp.ir rs1, rs2
 ```
 
 ### Example 2: Reserve 50% of L1D and L2 for ECID 0x1234
@@ -118,14 +119,14 @@ cp.ip rs1, rs2
 ```
 rs1 = {ECID=0x1234, LEVEL_SEL=Auto, COUPLE=1, MODE=PERCENT, INLINE=1, OPC=ASSIGN}
 rs2 = {PCT_256_L2=128, PCT_256_L1D=128, PCT_256_L1I=0}
-cp.ip rs1, rs2
+cp.ir rs1, rs2
 ```
 
 ### Example 3: Revoke ECID’s Partition
 
 ```
 rs1 = {ECID=0x1234, LEVEL_SEL=Auto, OPC=REVOKE}
-cp.op rs1, x0
+cp.or rs1, x0
 ```
 
 ---
@@ -159,5 +160,5 @@ CPE operations return status via `rd` or a dedicated CSR:
 
 ---
 
-**Next:** Chapter 8 – CPE Usage Examples
+**Next:** Chapter 8 – MSE (Memory Scheduling Extension)
 
