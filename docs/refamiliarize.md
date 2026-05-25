@@ -45,24 +45,24 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.8 of the charter)
+### A.3 Chapter status (as of v0.8 of the charter, all `ec.oe` propagation complete)
 
 | Chapter | State | Next action |
 |---|---|---|
 | **Charter** (Project Instructions) | v0.8 — current | — |
 | **Chapter 0** (Fundamental Structure) | Done — aligned to charter v0.8; `ec.oe` throughout | — |
-| **Chapter 1** (Execution Context Model) | Done — ECID-first gateway chapter | — |
+| **Chapter 1** (Execution Context Model) | Done — ECID-first; `ec.oe` aligned (v0.8) | — |
 | **Chapter 2** (CME Instruction Set Reference) | Done — ECID operands, `ec.oe`, mnemonic scheme, per-extension subsets | — |
-| **Chapter 3** (Bank/Group/Delegation Semantics) | Done — GroupID=ECID, reversal trick, delegation invariants | — |
-| **Chapter 4** (HW Microarchitecture) | Done — EC[e] SRAM residency, radix-tree lookup path | — |
-| **Chapter 5** (Linux Kernel Integration) | Done — pointer idioms framed as Linux conventions, not architectural | — |
-| **Chapter 6** (CME Usage Examples) | Done — ECID-first operands, mnemonic scheme | — |
+| **Chapter 3** (Bank/Group/Delegation Semantics) | Done — GroupID=ECID, reversal trick, delegation invariants; `ec.oe` aligned (v0.8) | — |
+| **Chapter 4** (HW Microarchitecture) | Done — EC[e] SRAM residency, radix-tree lookup path; `ec.oe` aligned (v0.8) | — |
+| **Chapter 5** (Linux Kernel Integration) | Done — pointer idioms as Linux conventions; `ec.oe` aligned (v0.8) | — |
+| **Chapter 6** (CME Usage Examples) | Done — ECID-first operands, mnemonic scheme; `ec.oe` aligned (v0.8) | — |
 | **Chapter 7** (CPE Instruction Set Reference) | Done — `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
 | **Chapter 8** (MSE) | Done — BE/contract slot alternation, K nesting bound, ms.{ir,or,it,ot}, subset {r,t} | — |
 | **Chapter 9** (QoS) | Done — BE/contract slot alternation per domain, DMA attribution, qs.{ir,or,it,ot}, subset {r,t} | — |
 | **Appendix A** (ECID) | Done — radix-tree structs, allocation/delegation/destruction algorithms, diagrams | — |
 
-### A.4 What's been *decided* (locked in v0.7)
+### A.4 What's been *decided* (locked in v0.7–v0.8)
 
 If a chapter you're reading contradicts any of these, the chapter is wrong:
 
@@ -73,7 +73,7 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
    no delegation; D = 3 is the maximum allowed.
 5. **No pools.** Anywhere. Resource scheduling uses Contracts directly.
 6. **`ec.oe` is the forced-destroy instruction.** `ec.or` and `ec.od` are
-   retired. The trailing `e`=existence: "take this EC out of existence."
+   retired. The trailing `e`=existence: "take this EC out of existence." *(v0.8)*
 7. **Generation counters** in `EC[e]` for ABA safety on slot reuse.
 8. **No ECID migration across harts** — kernel rebinds, reusing ECS.
 9. **ECID allocation via radix tree** with prefix ownership and per-prefix
@@ -110,31 +110,35 @@ All instruction-set and semantics chapters (Ch 0–9) are done.
 ### A.7 Where things live
 
 ```
-.
-├── project_instructions.md          # the charter (this is the comb)
-├── refamiliarize.md                  # this document
-├── working_notes_for_authors.md     # workflow rules (not yet written)
-└── sketches/
-    ├── Chapter0-fundamentals/
-    │   ├── Chapter0-fundamental-structure.md    # use this one as base
-    │   ├── Chapter0-half-correct.md             # obsolete (has Pools)
-    │   └── Chapter0-also-half-correct.md        # obsolete (v0.5 transitional)
-    ├── Chapter1-Execution_Context_Model.md      # pre-ECID; refactor
-    ├── Chapter2-CME_Instruction_Set_Reference.md  # uses pointers; refactor
-    ├── Chapter3-Bank_Group_and_Delegation_Semantics.md  # 6-bit groups; refactor
-    ├── Chapter4-Hardware_Microarchitecture_Overview-REVISED.md  # keep this one
-    ├── Chapter4-Hardware_Microarchitecture_Overview.md          # obsolete
-    ├── Chapter5-Linux_Kernel_Integration.md     # pointer-based; refactor
-    ├── Chapter6-CME_Usage_Examples.md           # mostly fine, refresh
-    ├── Chapter7-CPE_Instruction_Set_Reference.md  # nearly aligned
-    ├── AppendixA-ECID.md            # scratchpad; convert to real appendix
-    ├── 101-mse-scratchpad.md        # MSE design material
-    ├── 102-mse-scratchpad2.md       # MSE BE/contract slot scheme
-    ├── UCS.md                       # exploratory note; charter §8.6
-    ├── CE-tree-of-truths.md         # axiom sketch; predates charter
-    ├── Rewrite-Plan.md              # the old plan; superseded by charter §7.3
-    ├── cme-instruction-reference-card   # quick reference; needs update
-    └── working_with_chatgpt.md      # workflow lessons; merge into companion doc
+docs/
+├── charter/
+│   ├── project_instructions.md      # the charter (this is the comb)
+│   └── CHANGELOG.md
+├── chapters/                        # normative spec content
+│   ├── ch00-fundamental-structure.md
+│   ├── ch01-execution-context-model.md
+│   ├── ch02-cme-instruction-set.md
+│   ├── ch03-bank-group-delegation.md
+│   ├── ch04-hardware-microarch.md
+│   ├── ch05-linux-integration.md
+│   ├── ch06-cme-usage-examples.md
+│   ├── ch07-cpe-instruction-set.md
+│   ├── ch08-mse-memory-scheduling.md
+│   ├── ch09-qos-io-quality-of-service.md
+│   └── appendix-a-ecid.md
+├── reference/
+│   ├── glossary.md
+│   └── instruction-card.md          # quick reference; may need update
+├── archive/                         # obsolete drafts — do not delete
+│   ├── chapter0-half-correct.md     # has Pools; obsolete
+│   ├── chapter0-also-half-correct.md  # v0.5 transitional; obsolete
+│   ├── chapter4-original.md         # pre-REVISED version; obsolete
+│   ├── rewrite-plan.md              # superseded by charter §7.3
+│   ├── ucs.md                       # exploratory; charter §8.5
+│   ├── ce-tree-of-truths.md         # axiom sketch; predates charter
+│   └── working_with_chatgpt.md      # workflow lessons; absorbed into working notes
+├── refamiliarize.md                 # this document
+└── working_notes_for_authors.md     # workflow rules for authors and AI assistants
 ```
 
 ---
