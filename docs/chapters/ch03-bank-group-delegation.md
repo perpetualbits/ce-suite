@@ -265,8 +265,8 @@ Once resources are delegated, the following hold:
 
 ### 3.5.1 Cooperative revocation: `ec.ot`
 
-`ec.ot rs1` revokes all resources from child ECID `rs1` and returns them to
-the parent's Group. After `ec.ot`:
+`ec.ot rd, rs1` revokes all resources from child ECID `rs1` and returns them to
+the parent's Group (`rd` receives 0 on success or an error code). After `ec.ot`:
 
 - All Banks owned by ECID `rs1`'s Group have their owner fields updated
   to the parent ECID.

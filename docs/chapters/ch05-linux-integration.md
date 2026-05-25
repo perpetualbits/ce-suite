@@ -83,20 +83,21 @@ context-switch sequence is:
 
 ```asm
     # Outgoing context: ec.ib uses current_ecid CSR implicitly.
-    # No ECID operand needed.
-    ec.ib  x0, FULL_MASK        # save current context to its bank
+    # No ECID operand; no rd (ec.ib always succeeds or traps).
+    ec.ib  FULL_MASK             # save current context to its bank
 
     # Load incoming ECID from the task struct (Linux convention):
     lhu    a1, ECID_OFFSET(next_task)   # a1 = next_task->ecid
 
-    # ec.ob takes the ECID number as operand (charter §6.2).
-    ec.ob  a1, FULL_MASK        # restore next context from its bank
+    # ec.ob takes rd, then ECID, then mask (charter §6.6).
+    ec.ob  x0, a1, FULL_MASK    # restore next context from its bank
 ```
 
 The `lhu` instruction is a Linux-software step that retrieves the ECID from
 the incoming task's `execution_context` struct. The `ec.ob` instruction itself
-is purely architectural and takes the 16-bit ECID number in `a1`. The two are
-distinct operations at distinct levels of abstraction.
+is purely architectural: `rd` (`x0`) discards the success/error result,
+`rs1` (`a1`) holds the 16-bit ECID number, and `rs2` is the register mask.
+The two are distinct operations at distinct levels of abstraction.
 
 ### 2.1 DMA spill and fill
 
@@ -107,11 +108,11 @@ DMA path:
     # Spill outgoing context from bank to ECS in RAM.
     # The hardware derives the ECS address from EC[current_ecid].ecs_ptr.
     mv     a0, current_ecid_reg        # or read from current_ecid CSR
-    ec.im  a0, FULL_MASK               # bank → ECS DMA
+    ec.im  x0, a0, FULL_MASK          # bank → ECS DMA
 
     # Fill incoming context from ECS to a newly assigned bank.
     lhu    a1, ECID_OFFSET(next_task)
-    ec.om  a1, FULL_MASK               # ECS → bank DMA
+    ec.om  x0, a1, FULL_MASK          # ECS → bank DMA
 ```
 
 The ECS address (`EC[e].ecs_ptr`) is architectural; the instruction derives it
