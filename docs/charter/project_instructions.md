@@ -348,20 +348,35 @@ must obey.
 All CE Suite instructions follow:
 
 ```text
-{ec, cp, ms, qs}.{i, o}{b, m, s, g, t, v, e, r}
+<ext>.<dir><target>
 ```
 
-- The two-letter prefix names the extension:
+- `<ext>` ∈ `{ec, cp, ms, qs}` — names the extension:
   `ec` = CME, `cp` = CPE, `ms` = MSE, `qs` = QoS.
-- The middle letter is direction: `i` = "into" (save/seal/create/assign-in),
+- `<dir>` ∈ `{i, o}` — direction: `i` = "into" (save/seal/create/assign-in),
   `o` = "out of" (restore/unseal/destroy/revoke).
-- The trailing letter names the target or kind: `b`=bank, `m`=memory,
-  `s`=stream/staging, `g`=group, `t`=tenant, `v`=vault, `e`=existence,
-  `r`=resource/region.
+- `<target>` — a single letter drawn from the pool below, naming the target
+  or kind. **Each extension uses only the subset applicable to it**; the
+  full cross-product is not valid.
 
-Authors must not invent mnemonics outside this scheme. New verbs require
-a charter change (with a version bump and changelog entry) before they
-may appear in any chapter.
+| Letter | Target / kind |
+|--------|---------------|
+| `b`    | bank |
+| `m`    | memory (ECS in RAM) |
+| `s`    | stream / staging bank |
+| `g`    | group |
+| `t`    | tenant |
+| `v`    | vault (sealed bank) |
+| `e`    | existence |
+| `r`    | resource / region |
+
+CME (`ec`) uses: `b`, `m`, `s`, `v`, `e` (and possibly `g`).
+CPE, MSE, and QoS target-letter subsets are defined in their respective
+chapters.
+
+Authors must not invent mnemonics outside this scheme. New letters or
+new extension prefixes require a charter change (with a version bump and
+changelog entry) before they may appear in any chapter.
 
 ### 6.2 ECID-first operands
 

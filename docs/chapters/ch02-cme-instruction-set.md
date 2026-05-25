@@ -15,21 +15,19 @@ every instruction in this chapter:
    via `rd` or a status CSR. (Charter §6.6)
 
 All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
-`ec.{i,o}{target}` (Charter §6.1):
-
-- `i` = into (save / create / assign-in); `o` = out of (restore / destroy / revoke).
-- The trailing letter names the target or kind:
+`ec.<dir><target>` (Charter §6.1), where `<dir>` ∈ `{i, o}` and `<target>` is
+a letter naming the target or kind. CME uses the following subset:
 
   | Letter | Target / kind |
   |--------|---------------|
   | `b`    | bank          |
   | `m`    | memory (ECS in RAM) |
   | `s`    | stream / staging bank |
-  | `g`    | group         |
-  | `t`    | tenant        |
   | `v`    | vault (sealed bank) |
-  | `d`    | destroy       |
-  | `r`    | resource / region |
+  | `e`    | existence     |
+
+(`g`=group may be added if group-level instructions are defined; `r`, `t`, and
+other pool letters do not apply to CME.)
 
 ---
 
