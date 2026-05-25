@@ -333,7 +333,7 @@ not touch ECS at all.
 
 Forced destruction of an ECID (and its subtree) must always succeed, even
 if the target is a zombie, blocked, or hostile. See §6.5 for the
-instruction (`ec.od`).
+instruction (`ec.oe`).
 
 ---
 
@@ -390,7 +390,7 @@ changelog entry) before they may appear in any chapter.
    ```text
    ec.ob rs1, rs2     # rs1 = target ECID, rs2 = restore mask
    ec.om rs1, rs2     # rs1 = target ECID, rs2 = mask
-   ec.od rs1          # rs1 = target ECID to destroy
+   ec.oe rs1          # rs1 = target ECID to destroy
    ```
 
 This is a **change** from earlier draft chapters (notably Ch2 and Ch5),
