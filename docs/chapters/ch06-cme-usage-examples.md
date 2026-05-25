@@ -14,9 +14,11 @@ All examples assume:
   the corresponding `EC[e]` entry (ECS pointer, delegation level, bank
   assignment) before the sequence begins.
 - Context banks are allocated and delegated in advance by the kernel.
-- The `ec.*` instruction set uses the `{ec}.{i,o}{verb}` format, where `i` means
-  "into" (save/seal) and `o` means "out of" (restore/unseal). Examples: `ec.ib`
-  saves to a bank, `ec.ob` restores from a bank, `ec.om` restores from memory.
+- The `ec.*` instruction set uses the `{ec}.{i,o}{target}` format, where `i`
+  means "into" (save/seal) and `o` means "out of" (restore/unseal), and the
+  trailing letter names the target or kind: `b`=bank, `m`=memory, `v`=vault,
+  `d`=destroy, and so on. Examples: `ec.ib` saves to a bank, `ec.ob` restores
+  from a bank, `ec.om` restores from memory. The full table is in Chapter 2.
 - Instruction operands are ECID numbers — 16-bit hart-local identifiers. They
   are not pointers to kernel structs. How the kernel stored or retrieved an ECID
   number is a Linux convention described in Chapter 5, not an architectural rule.

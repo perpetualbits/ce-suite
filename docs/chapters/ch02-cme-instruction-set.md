@@ -15,8 +15,21 @@ every instruction in this chapter:
    via `rd` or a status CSR. (Charter §6.6)
 
 All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
-`ec.{i,o}{verb}` where `i` = into (save/create/assign) and `o` = out of
-(restore/destroy/revoke). (Charter §6.1)
+`ec.{i,o}{target}` (Charter §6.1):
+
+- `i` = into (save / create / assign-in); `o` = out of (restore / destroy / revoke).
+- The trailing letter names the target or kind:
+
+  | Letter | Target / kind |
+  |--------|---------------|
+  | `b`    | bank          |
+  | `m`    | memory (ECS in RAM) |
+  | `s`    | stream / staging bank |
+  | `g`    | group         |
+  | `t`    | tenant        |
+  | `v`    | vault (sealed bank) |
+  | `d`    | destroy       |
+  | `r`    | resource / region |
 
 ---
 
