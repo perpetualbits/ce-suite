@@ -60,7 +60,7 @@ ownership layer that ties the other four together.
 | **Chapter 7** (CPE Instruction Set Reference) | Done — `cp.ir`/`cp.or`; 16-bit ECID field confirmed; CPE subset `{r}` declared | — |
 | **Chapter 8** (MSE) | Done — BE/contract slot alternation, K nesting bound, ms.{ir,or,it,ot}, subset {r,t} | — |
 | **Chapter 9** (QoS) | Done — BE/contract slot alternation per domain, DMA attribution, qs.{ir,or,it,ot}, subset {r,t} | — |
-| **Appendix A** (ECID) | Not converted | Convert scratchpad to proper appendix with radix tree algorithms and diagrams |
+| **Appendix A** (ECID) | Done — radix-tree structs, allocation/delegation/destruction algorithms, diagrams | — |
 
 ### A.4 What's been *decided* (locked in v0.7)
 
@@ -101,13 +101,9 @@ these, stop — that's a charter-level change.
 
 ### A.6 What's *next* (the suggested work order)
 
-1. **Appendix A** — convert the scratchpad (`docs/chapters/appendix-a-ecid.md`) into
-   a proper appendix with the radix-tree data structure (C struct), allocation,
-   delegation, and forced-destruction algorithms, and diagrams. This is the next
-   unfinished item.
-2. **Then Usage Examples chapters** for CPE, MSE, and QoS — one session per chapter.
+1. **Usage Examples chapters** for CPE, MSE, and QoS — one session per chapter.
    Chapter 6 covers CME examples; equivalent chapters for CPE, MSE, and QoS do not
-   yet exist.
+   yet exist. This is the next unfinished item.
 
 All instruction-set and semantics chapters (Ch 0–9) are done.
 

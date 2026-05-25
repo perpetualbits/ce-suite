@@ -1,229 +1,406 @@
-# Scratchpad – CE Design Issues and Resolutions
+# Appendix A — ECID Allocation, Delegation, and Destruction
 
-## ✅ Resolved Issues
-
-### ECID Mental Model (Q1, Q2)
-
-**ECID** (Execution Context ID) is a *hardware-managed identity token* per hart that:
-
-* Is **invisible to software** (not writable or readable directly)
-* Is loaded on `ec.ob`, and implicitly cleared on `ec.ib`
-* Serves as a **contract name** to lookup all CE-related rights
-
-**Mapped Resources via ECID (O(1) lookup):**
-
-| Resource           | Bound By       |
-| ------------------ | -------------- |
-| Context bank       | CME            |
-| Group ID           | CME            |
-| Cache partition    | CPE            |
-| QoS channels       | QOS            |
-| Memory contract    | MSE            |
-| ECS address (meta) | Kernel mapping |
-
-> ECID acts as an unforgeable identity token that defines what rights are granted to the currently executing code.
-> The process does not know its ECID, nor can it change it. It's managed entirely in the hart.
-
-**Security:** A process or VM cannot:
-
-* Forge ECIDs to gain access to other contexts
-* Access memory, cache, or bandwidth not defined in its ECID-bound contract
-* Jump across privilege boundaries (e.g., from guest to host) because ECID-to-bank-group mappings are enforced in hardware and delegation paths
-
-**Lifecycle:**
-
-* ECID is **created and loaded** via `ec.ob` (restore context)
-* ECID is **unloaded** via `ec.ib` (save context)
-* ECID can be **migrated** only by kernel actions when migrating an execution context between harts
+**Status:** Normative reference for kernel implementers.
+**Scope:** This appendix documents the kernel-side data structures and algorithms for
+ECID lifecycle management. It complements the architectural definitions in Chapter 0 §0.2–§0.3.
 
 ---
 
-### ✅ ECID Reuse After Destruction
+## A.1 Scope and relationship to the architectural model
 
-**Problem:** Can an ECID be reused after its context exits?
+The **architectural model** for ECIDs is the `EC[e]` array defined in Chapter 0 §0.3:
+a per-hart array indexed by ECID number, with `ecs_ptr` at offset 0. Hardware accesses
+ECIDs through this array. Hardware never traverses the kernel radix tree.
 
-**Resolution:** Yes, but only if:
+The **kernel ECID prefix tree** is a software data structure maintained per hart in
+kernel RAM. It serves three purposes:
 
-* All resources bound to that ECID are revoked
-* The ECS is cleared or reinitialized
-* A **generation counter** is associated with the ECID slot in memory, to prevent stale access (ABA problems)
+1. **Prefix ownership.** Each node tracks which privileged actor (kernel, hypervisor,
+   or nested hypervisor) owns which contiguous range of ECIDs.
+2. **Fast allocation.** O(1) allocation within a prefix via a free list; O(log N)
+   subtree walk for prefix delegation and revocation.
+3. **Quota enforcement.** Per-prefix caps on resourced ECIDs (those holding Contracts
+   or Banks) prevent tenant exhaustion of scarce hardware resources.
 
-> Internally, the kernel may use a tuple like `{hartID, ECID, generation}` (EECIDG) to identify contexts. Hardware only needs `{hartID, ECID}`.
+The two views are complementary: the kernel allocates an ECID by initializing the
+`EC[e]` entry on the appropriate hart and recording the allocation in its prefix tree.
+Hardware reads `EC[e]` directly; the prefix tree is invisible to hardware.
 
-**Status:** ✅ Reuse is safe if tracked correctly. Hardware unaware of reuse.
-
----
-
-### ✅ Zombie Process ECID Reclamation
-
-**Problem:** What if an ECID belongs to a zombie process?
-
-**Resolution:** The kernel can issue `ec.od` (execution context: destroy), which:
-
-* Revokes all contracts
-* Flushes context to memory (optional)
-* Marks ECID slot as reusable
-* Removes ECID from ownership trees
-
-> Guarantees forward progress — zombies cannot block resources indefinitely.
-
-**Status:** ✅ Resolution defined. `ec.od` to be added to CME set.
+**Relationship to EC migration.** ECIDs are hart-local. When the scheduler moves an EC
+from one hart to another, the kernel deallocates the source ECID (returning the slot to
+the source hart's prefix tree) and allocates a fresh ECID on the destination hart,
+reusing the same in-memory ECS. The prefix trees on each hart are updated independently;
+no cross-hart coordination is required for allocation or deallocation. Migration is
+covered in Chapter 0 §0.2 and Chapter 1.
 
 ---
 
-### ✅ ECID Migration Between Harts
+## A.2 Data structures
 
-**Problem:** What happens when a thread moves to another hart?
+### A.2.1 The `EC[e]` entry (architectural)
 
-**Resolution:** Do **not** migrate the ECID. Instead:
-
-* Kernel **unbinds** ECID from the source hart
-* Allocates a new ECID on the destination hart
-* Reuses the same ECS
-* Updates kernel mapping
-
-> This "rebind" strategy avoids cross-hart ECID tracking and simplifies implementation. Real-time contexts should not migrate anyway.
-
-**Status:** ✅ Option 2 chosen. Clean, simple, and kernel-manageable.
-
----
-
-## 🧩 Emerging Model for ECID Ownership and Delegation
-
-* Each execution context has a **parent** (except the L0 kernel or SBI).
-* **Parents create child ECIDs**, bind them to resource contracts, and may destroy them at any time.
-* Delegation of banks, cache partitions, bandwidth, and memory follows CE suite rules.
-* **ECID destruction must always succeed**, even if the process is 'zombie-like' or blocked.
-* Only privileged software (e.g., kernel or hypervisor) may create/destroy ECIDs.
-
-**Proposed ECID Hierarchy:**
-
-* ECIDs are arranged in a **tree structure**, with parent nodes able to delegate or revoke child ECIDs.
-* ECID groups might use **binary prefixes** to represent subtree ownership, making delegation efficient and trackable.
-* Kernel maintains a mapping table from ECIDs to their metadata (in memory), not in hart SRAM.
-
-**EECID (Extended ECID):**
-
-* Pair of {hart ID, ECID}, unique across system
-* Stored in the `execution_context_struct` (ECS)
-
-**Optimized ECID Representation:**
-
-* Vast majority of ECIDs have no bound resources—just ECS pointer for `ec.im`/`ec.om`
-* Explicit tracking is only needed for ECIDs that have CE suite resources assigned (banks, groups, partitions, etc.)
-* Use **binary prefix grouping**: Each node (privileged context) owns a prefix space
-
-  * Unused ECIDs live in a **consecutive allocation list**
-  * No fragmentation: always maintain a pointer to the next free slot
-  * One-hole allowance allows efficient reuse
-* **Space-efficient**: Avoids pre-allocating large SRAM; leverages memory for most structures
-
----
-
-### ECID Allocation and Limits
-
-* How many ECIDs can there be per hart? (**Resolved:** With a radix tree or sparse RAM-resident structure, there is *no hard architectural limit*; ECID space can scale to thousands or millions per hart, as only active ECIDs consume resources. No large SRAM pre-allocation required.)
-* Can we reclaim/evict ECID slots safely? (**Resolved:** Yes; with a radix tree or similar RAM-based structure, ECID slots are explicitly tracked and can be reclaimed immediately on context destruction or via forced-revocation instructions like `ec.od`. No fragmentation: the allocator always knows the next free slot or manages a one-hole invariant. Generation counters avoid ABA issues.)
-* Where are ECID lists kept? Likely in memory, not hart-local.
-* Can we limit ECID allocations per prefix owner to avoid exhaustion? (**Resolved:** Yes. Prefix ownership and ECID allocation are enforced in the radix tree model. Since only "resourced" ECIDs consume scarce hardware resources—and most ECIDs are unresourced—the kernel can set a per-prefix (per-tenant) quota or hard limit for contract ECIDs. This is tracked at the node (prefix) level. Ordinary (unresourced) ECIDs are limited only by RAM, and resource exhaustion is impossible unless a tenant/VM actually requests more hardware contracts than allowed. This quota model is both efficient and safe.)
-
-### ECID and Virtual Machines
-
-* Can a VM jump into its host context by guessing an ECID?
-
-  * No, because ECID bank access is enforced and VMs only see banks/groups delegated to them.
-  * However, delegation and revocation rules are now airtight, as the radix tree model enforces strict prefix ownership and resource mapping. Parent contexts can enumerate and forcibly revoke all subordinate ECIDs in their prefix, preventing privilege escalation, leaks, or orphaned resources. No context can access or guess ECIDs outside its delegated subtree.
-
-### Other
-
-* Zombie processes and blocked ECIDs — can they stall resource reclamation? (**Resolved:** No. Zombie processes may persist in the OS process table, but as soon as the kernel or parent issues `ec.od` (or equivalent forced destruction), all associated resources are immediately reclaimed. The ECID slot is freed and all contracts/banks/groups are revoked. Zombie or blocked status does not block resource reclamation or lead to resource leaks.)
-
-### ✅ Lowest-Level Actor Allowed to Create an ECID
-
-**Resolution:**
-The lowest-level actor allowed to create an ECID is always the currently privileged owner of a hart—normally the OS kernel (in M-mode or S-mode) or hypervisor (H-mode), depending on the system’s privilege structure.
-
-* **SBI (Supervisor Binary Interface):** While the SBI can provide services to S-mode, it is not itself a resource manager. The SBI should not create ECIDs except possibly at system boot for initial handoff.
-* **M-mode Firmware/Secure Monitor:** May create the *initial* ECID for the first kernel or hypervisor during boot, then delegates all further ECID management.
-* **User mode:** Never allowed.
-* **Normal runtime:** Only the kernel, hypervisor, or a delegated secure monitor can create or destroy ECIDs.
-
-**Principle:**
-*ECID creation must always be privileged, auditable, and strictly delegated. Normal user processes or guests cannot create ECIDs except via explicit kernel or hypervisor delegation.*
-
-###
-
-
-✅ ECID Data Structure and Allocation Model
-
-**Requirements:**
-
-* O(1) allocation and lookup for most ops; O(log N) for mass revocation/ownership traversal.
-* Binary prefix ownership for tenants/VMs/privileged contexts; scalable to thousands or millions.
-* Efficient handling of “lightweight” (no hardware resources) vs. “contract” ECIDs.
-* Space-efficient; spillover into RAM for scalability.
-
----
-
-#### **Radix Tree–Backed ECID Table**
-
-* **Key:** ECID (e.g., 16 or 32 bits; composed of prefix + index)
-* **Node type:** Each node represents a prefix owned by a tenant/context.
-* **Leaf:** Points to an ECID entry or subtree.
-
-**Sample structure:**
+Reproduced from Chapter 0 §0.3 for reference. This is the structure hardware reads:
 
 ```c
-struct ecid_entry {
-    uint32_t ecid;              // {prefix, index}
-    uint8_t  generation;        // For reuse safety
-    uint8_t  valid;             // Allocated flag
-    uint8_t  resourced;         // Has contract
-    uint32_t parent_prefix;     // Ownership check
-    uint64_t eecs_ptr;          // ECS pointer
-    // Resource fields (unions/structs as needed):
-    uint16_t context_bank;
-    uint16_t group_id;
-    uint16_t cache_partition;
-    uint16_t qos_channel;
-    uint16_t mem_contract;
-    // ...future resource fields
+/* Per-hart; conceptually RAM-resident, SRAM-cached for active ECIDs. */
+struct EC_entry {
+    void     *ecs_ptr;       /* ECS pointer — always at offset 0              */
+    uint8_t   generation;    /* incremented on every slot reuse               */
+    uint8_t   delegation_L;  /* delegation level, 0 ≤ L ≤ D                  */
+    uint16_t  parent_ecid;   /* parent ECID in the delegation tree            */
+    /* Implementation-defined: cached bank/contract refs, flags, etc.         */
 };
 ```
 
-* **Radix tree mapping:**
+The kernel must write this entry before making the new ECID visible to any software.
+The `generation` field must be incremented each time a slot is reused, to prevent
+stale `(hart_id, ECID, generation)` references from reaching the wrong target.
 
-  * Root node owned by kernel or L0 hypervisor.
-  * Prefix delegation creates new subtrees/nodes; tenants/VMs get ownership of an entire subtree of ECIDs.
-  * Allocation within a prefix is O(1) or O(log N) as needed; deallocation fills “holes.”
-  * Only ECIDs with resources or actively running need entries in the tree—sparse by default.
+### A.2.2 The kernel prefix tree node
 
-**Advantages:**
+```c
+/* One node in the kernel ECID prefix tree. One tree per hart, in kernel RAM. */
+struct ecid_prefix_node {
+    uint16_t  ecid_base;          /* first ECID in this node's range            */
+    uint16_t  ecid_limit;         /* one past the last ECID in range            */
+    uint16_t  owner_ecid;         /* ECID of the actor that owns this range     */
+    uint8_t   delegation_L;       /* delegation level of owner_ecid             */
 
-* **Unlimited tenants/VMs/privileged contexts** (no hard-coded prefix bit limit).
-* **Fast forced revocation**: Parent can enumerate or destroy all ECIDs in a prefix/subtree efficiently.
-* **No pre-allocation or wasted space**—nodes only exist when needed.
-* **Dynamic growth**: New tenants/VMs just create new subtrees on demand.
+    uint32_t  resourced_quota;    /* max resourced ECIDs allowed in this subtree */
+    uint32_t  resourced_count;    /* current resourced ECID count in subtree    */
+
+    struct ecid_prefix_node *parent;
+    struct ecid_prefix_node *first_child;   /* head of singly-linked child list */
+    struct ecid_prefix_node *next_sibling;  /* sibling list link                */
+
+    /* Implementation-defined: free list of unallocated ECIDs in [ecid_base, ecid_limit)
+       that have not been delegated to child nodes. Push and pop must be O(1).  */
+};
+```
+
+**Range invariant.** Every child node's range `[child.ecid_base, child.ecid_limit)` is a
+non-overlapping subset of its parent's range. The union of all child ranges never covers
+the full parent range: the remainder is the parent's own free pool, managed in the
+implementation-defined free list.
+
+**Prefix alignment.** For radix-tree efficiency, `ecid_base` should be aligned to
+`ecid_limit − ecid_base` and the range size should be a power of two. This makes
+subtree indexing O(1) at each tree level. Implementations are not architecturally
+required to enforce alignment, but unaligned ranges degrade allocation performance.
+
+**Reverse lookup.** The destruction algorithm (§A.5.2) requires finding the prefix node
+that contains a given ECID. Implementations may maintain a flat reverse-index
+(`ecid → prefix_node *`) for O(1) lookup, or walk the tree for O(log N) lookup. The
+choice is implementation-defined; the algorithm below uses `find_prefix_node` to
+abstract over it.
 
 ---
 
-**For comparison:**
+## A.3 ECID allocation
 
-| Feature      | Flat prefix array | Radix tree model    |
-| ------------ | ----------------- | ------------------- |
-| Tenant limit | Fixed (e.g., 16)  | Dynamic (unlimited) |
-| Delegation   | O(N) scan         | O(log N) walk       |
-| Reclamation  | O(N)              | O(log N)            |
-| Space usage  | Dense, wasteful   | Sparse, efficient   |
-| Scalability  | Poor              | Excellent           |
+### A.3.1 Overview
+
+ECID allocation is always performed by the privileged actor that owns the containing
+prefix — the kernel (L0), a hypervisor (L1), or a nested hypervisor (L2). User mode
+may never allocate ECIDs. The maximum delegation depth is D ≤ 3 (charter §5.1).
+
+Two operations cover the full allocation surface:
+
+- **Single ECID allocation** (`ecid_alloc`): pops one ECID from the node's free list
+  and initializes the corresponding `EC[e]` entry. O(1).
+- **Prefix delegation** (`ecid_delegate_prefix`): carves a contiguous, aligned sub-range
+  out of a parent node and gives it to a child privileged actor. The child may then
+  allocate ECIDs within that range without coordinating with the parent. O(range size)
+  to initialize the child free list.
+
+### A.3.2 Algorithm: single ECID allocation
+
+```
+function ecid_alloc(node, delegation_L) → new_ecid | error:
+
+    preconditions:
+        node.delegation_L < D            // node's owner may create children
+        delegation_L == node.delegation_L + 1  // child is exactly one level deeper
+
+    if node.free_list is empty:
+        return ECID_ERR_EXHAUSTED
+
+    new_ecid = node.free_list.pop()      // O(1)
+
+    EC[new_ecid].ecs_ptr      = null     // caller must set before dispatch
+    EC[new_ecid].generation  += 1        // ABA guard; wraps modulo 256
+    EC[new_ecid].delegation_L = delegation_L
+    EC[new_ecid].parent_ecid  = node.owner_ecid
+
+    return new_ecid
+```
+
+The caller must write a valid `ecs_ptr` into `EC[new_ecid]` before dispatching the ECID
+to any hart. The entry is not visible to hardware until `ecs_ptr` is non-null.
+
+**Resourced ECIDs.** If the newly allocated ECID will hold Contracts or Banks
+(a "resourced" ECID), the caller must additionally increment `node.resourced_count`
+and verify that it does not exceed `node.resourced_quota`. Unresourced ECIDs are
+limited only by the free list and do not consume the quota.
+
+### A.3.3 Algorithm: prefix delegation
+
+Prefix delegation creates a new child prefix node owned by a specific child ECID.
+The child's free list is populated with the delegated range; that range is removed
+from the parent's free list.
+
+```
+function ecid_delegate_prefix(parent_node, base, limit, child_ecid, quota) → error:
+
+    preconditions:
+        base >= parent_node.ecid_base
+        limit <= parent_node.ecid_limit
+        base < limit
+        is_power_of_two(limit - base)              // alignment
+        base % (limit - base) == 0                 // alignment
+        not overlaps_any_child(parent_node, base, limit)
+        EC[child_ecid].delegation_L < D            // child may delegate further
+        quota <= parent_node.resourced_quota - parent_node.resourced_count
+
+    // Remove [base, limit) from the parent's free pool.
+    // ECIDs in [base, limit) already allocated to specific contexts are
+    // not in the free list and are not affected here.
+    parent_node.free_list.remove_range(base, limit)
+
+    // Create and link the child node.
+    child_node = new ecid_prefix_node
+    child_node.ecid_base       = base
+    child_node.ecid_limit      = limit
+    child_node.owner_ecid      = child_ecid
+    child_node.delegation_L    = EC[child_ecid].delegation_L
+    child_node.resourced_quota = quota
+    child_node.resourced_count = 0
+    child_node.parent          = parent_node
+    child_node.first_child     = null
+    child_node.next_sibling    = parent_node.first_child
+    parent_node.first_child    = child_node
+
+    // Populate the child's free list.
+    for ecid in [base .. limit):
+        child_node.free_list.push(ecid)   // O(range size) total
+
+    return ECID_OK
+```
+
+After this call, the child ECID's software owns the range and may call `ecid_alloc`
+or `ecid_delegate_prefix` on the child node without coordinating with the parent.
 
 ---
 
-**Integration:**
+## A.4 Delegation
 
-* Kernel keeps the radix tree in RAM per hart.
-* Only currently loaded ECIDs live in SRAM for CE fast-path (context switch, contract lookup).
-* On destruction or migration, ECID entry is cleaned up, and parent’s subtree is updated.
+### A.4.1 Resource delegation
+
+Allocating a child ECID (§A.3.2) creates the child's *identity*. Delegating *resources*
+— Banks and Contracts — is a separate step performed after ECID allocation.
+
+**Banks** are delegated to a child ECID via `ec.it`. The instruction atomically updates
+the Bank's owner field from the parent ECID to the child ECID. The Bank's owner field
+is maintained by hardware; software cannot forge or overwrite it directly.
+
+**Contracts** are split from the parent's Contract via the appropriate admission
+instruction (`ms.it` for MSE, `qs.it` for QoS, `cp.ir` for CPE). Each split requires
+chip-global arbitration and either succeeds atomically or fails with no state change
+(charter §4.3, atomic admission invariant). The parent's remaining Contract is reduced
+by the amount allocated to the child.
+
+### A.4.2 Delegation invariants
+
+After any delegation step, the following invariants must hold:
+
+1. **Level monotonicity.** `EC[child].delegation_L == EC[parent].delegation_L + 1`.
+2. **Parent pointer.** `EC[child].parent_ecid == parent_ecid`.
+3. **Bank ownership.** Any Bank delegated to the child has `bank.group_id == child_ecid`.
+4. **Contract subset.** Any Contract split to the child represents a strict subset of
+   the parent's allocation; the parent's allocation is reduced accordingly so that the
+   sum never exceeds the original.
+5. **Quota compliance.** If the child ECID is resourced, `parent_node.resourced_count`
+   has been incremented and does not exceed `parent_node.resourced_quota`.
+6. **Depth cap.** `EC[child].delegation_L ≤ D`. Delegation is not permitted when
+   `EC[parent].delegation_L == D`.
 
 ---
 
+## A.5 Forced destruction
+
+### A.5.1 Guarantee
+
+The instruction `ec.oe rs1` (charter §6.5) destroys the ECID in `rs1` and its entire
+delegation subtree. It **always succeeds**. A zombie, blocked, or hostile EC cannot
+stall its own destruction. The kernel need not wait for the target to be cooperatively
+scheduled or to voluntarily release resources.
+
+### A.5.2 Algorithm: destroy ECID subtree
+
+`ec.oe rs1` triggers the following sequence in the implementation:
+
+```
+function ecid_destroy(target_ecid):
+
+    // 1. Find the target's prefix node.
+    node = find_prefix_node(target_ecid)
+
+    // 2. Recursively destroy all allocated ECIDs in child nodes (post-order).
+    for each child_node in subtree(node), post-order:
+        for each ecid allocated within child_node:
+            ecid_destroy_single(ecid)
+        // Collapse the child node; its range reverts to the parent.
+        parent = child_node.parent
+        parent.free_list.add_range(child_node.ecid_base, child_node.ecid_limit)
+        unlink_and_free(child_node)
+
+    // 3. Destroy the target ECID itself.
+    ecid_destroy_single(target_ecid)
+
+    // 4. If target_ecid is a prefix owner, collapse its node.
+    if node != null and node.owner_ecid == target_ecid:
+        parent_node = node.parent
+        if parent_node != null:
+            parent_node.free_list.add_range(node.ecid_base, node.ecid_limit)
+        unlink_and_free(node)
+
+
+function ecid_destroy_single(ecid):
+
+    // a. Revoke all Contracts owned by ecid.
+    //    Resources return to the parent Contract automatically.
+    for each contract where contract.owner_ecid == ecid:
+        contract.resources → dissolve to parent Contract
+        contract.owner_ecid = INVALID
+
+    // b. Free all Banks owned by ecid.
+    for each bank where bank.group_id == ecid:
+        bank.group_id = INVALID
+        bank.state    = FREE
+
+    // c. Invalidate the EC[e] entry on the hart.
+    EC[ecid].ecs_ptr      = null
+    EC[ecid].delegation_L = INVALID
+    EC[ecid].parent_ecid  = INVALID
+    EC[ecid].generation  += 1          // invalidates all stale (ecid, generation) refs
+
+    // d. Return the ECID slot to the parent node's free list.
+    prefix_node = find_prefix_node(ecid)
+    if prefix_node != null:
+        prefix_node.free_list.push(ecid)
+```
+
+**Step ordering.** Contracts must be revoked before Banks are freed, to ensure no Contract
+can reference a freed Bank. The `EC[e]` entry must be invalidated before the ECID slot
+is returned to the free list, so that the slot cannot be reallocated and observed in a
+partially-initialized state.
+
+**Active hart preemption.** Before step (c), the implementation must ensure the target
+ECID is not currently active on any hart (`current_ecid ≠ target_ecid` on all harts).
+If the target is executing on a remote hart, that hart must be interrupted and the context
+switched away before `EC[e]` is written. The mechanism for cross-hart interruption is
+implementation-defined.
+
+**Subtree depth.** Because D ≤ 3, the delegation subtree has at most four levels.
+Post-order destruction is therefore bounded to a shallow, fast walk in practice.
+
+---
+
+## A.6 Diagrams
+
+### A.6.1 Prefix ownership tree
+
+The diagram below shows a four-level delegation hierarchy (D = 3) with two hypervisors
+and multiple guest VMs, as it would appear in the kernel prefix tree for one hart.
+
+```
+ECID space: [0x0000 .. 0xFFFF]
+│
+└─ L0  Kernel
+       owner_ecid: 0x0001, range: 0x0000–0xFFFF, quota: unlimited
+   │
+   ├─ L1  Hypervisor A
+   │      owner_ecid: 0x0010, range: 0x1000–0x1FFF, quota: 512 resourced
+   │  │
+   │  ├─ L2  Guest VM 1
+   │  │      owner_ecid: 0x1010, range: 0x1000–0x10FF, quota: 64 resourced
+   │  │      allocated: 0x1011, 0x1012, 0x1013  (L3 guest threads)
+   │  │
+   │  └─ L2  Guest VM 2
+   │         owner_ecid: 0x1020, range: 0x1100–0x11FF, quota: 64 resourced
+   │         allocated: 0x1101, 0x1102  (L3 guest threads)
+   │
+   └─ L1  Hypervisor B
+          owner_ecid: 0x0020, range: 0x2000–0x2FFF, quota: 256 resourced
+          │
+          └─ L2  Guest VM 3
+                 owner_ecid: 0x2010, range: 0x2000–0x20FF, quota: 32 resourced
+                 allocated: 0x2001  (L3 single thread)
+```
+
+The owner ECIDs (0x0010, 0x1010, etc.) are ordinary ECIDs allocated from the parent's
+range by the parent's software. There is no structural difference between an owner ECID
+and any other allocated ECID; the `owner_ecid` field in the prefix node is a software
+record, not a hardware distinction.
+
+Calling `ec.oe 0x0010` (destroy Hypervisor A) would collapse the entire subtree rooted
+at that node: ECIDs 0x1010, 0x1011, 0x1012, 0x1013, 0x1020, 0x1101, 0x1102, and 0x0010
+itself would all be destroyed, their Banks freed, and their Contracts dissolved. The range
+0x1000–0x1FFF would be returned to the kernel's free list.
+
+### A.6.2 `EC[e]` array and prefix tree relationship
+
+Hardware sees only the `EC[e]` array. The kernel prefix tree is in RAM, invisible to
+hardware. The diagram shows how the two views correspond for the Guest VM 1 subtree.
+
+```
+  Kernel prefix tree (RAM)                       Hardware EC[e] array (SRAM + RAM)
+  ─────────────────────────────────────────      ─────────────────────────────────────────
+  node: 0x1000–0x1FFF                            EC[0x0010]: ecs_ptr=…, gen=2, L=1
+    owner: 0x0010  (Hypervisor A)                EC[0x1010]: ecs_ptr=…, gen=5, L=2
+    free:  [0x1030, 0x1031, …]                   EC[0x1011]: ecs_ptr=…, gen=1, L=3
+    │                                            EC[0x1012]: ecs_ptr=…, gen=3, L=3
+    └─ node: 0x1000–0x10FF                       EC[0x1013]: ecs_ptr=…, gen=1, L=3
+         owner: 0x1010  (Guest VM 1)             EC[0x1020]: ecs_ptr=…, gen=1, L=2
+         allocated: 0x1011, 0x1012, 0x1013       …
+         free: [0x1014, 0x1015, …]
+                    │
+                    └──── EC[0x1011].ecs_ptr ──► ┌─ ECS (RAM)
+                                                 │  privilege level, scheduling flags
+                                                 │  saved GPRs, FPRs (if spilled)
+                                                 │  bank_ids[], contract_ids[]
+                                                 │  OS private fields
+                                                 └─────────────────────────────────
+```
+
+**Flow for a context switch (fast path).**
+The kernel issues `ec.ib` (save current context to Bank) followed by `ec.ob` with the
+target ECID number. Neither instruction touches the prefix tree or the ECS — only the
+Bank and `current_ecid` are updated. The prefix tree is consulted only during allocation,
+delegation, or destruction.
+
+---
+
+## A.7 Complexity summary
+
+| Operation | Complexity | Notes |
+|---|---|---|
+| Allocate single ECID in a prefix | O(1) | Free-list pop |
+| Look up `EC[e]` by ECID | O(1) | `base + e × stride`; hardware direct |
+| Find prefix node for an ECID | O(1) or O(log N) | Depends on reverse-index; tree depth ≤ D+1 |
+| Delegate prefix to child actor | O(range size) | Initialize child free list |
+| Destroy single ECID | O(C + B) | C = Contracts held, B = Banks held; both bounded by quota |
+| Destroy ECID subtree (`ec.oe`) | O(S · (C̄ + B̄)) | S = subtree size; C̄, B̄ = average resources per ECID |
+| Return slot to free list | O(1) | Free-list push |
+
+**Depth bound.** Because D ≤ 3, subtree depth is at most four levels. The "log N" factor
+in prefix-node lookup is therefore a small constant, not a scaling concern.
+
+**Quota bound.** Resourced ECIDs are counted against per-prefix quotas, so the total
+number of Contracts and Banks in any subtree is bounded by the quota. Destruction of
+the entire subtree is therefore bounded by a constant multiple of the quota, not by the
+total ECID space.
+
+---
+
+*End of Appendix A.*
