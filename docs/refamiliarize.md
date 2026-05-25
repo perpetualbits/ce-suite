@@ -101,26 +101,15 @@ these, stop — that's a charter-level change.
 
 ### A.6 What's *next* (the suggested work order)
 
-1. Read the charter; read Chapter 0; read this document. Don't edit yet.
-2. **Refactor Chapter 1** to be the gateway. It's the chapter every reader
-   sees first; getting it right pays compound interest.
-3. **Refactor Chapter 2** to use ECID operands and add `ec.od`. This is
-   where the most concrete drift happened in the past.
-4. **Consolidate Chapter 0.** Pick one of the three drafts as the base
-   (recommended: `Chapter0-fundamental-structure.md`), align it strictly
-   with charter v0.7, retire the others.
-5. **Then Chapter 3** (delegation), **Chapter 4** (microarch — use REVISED),
-   **Chapter 5** (Linux), **Chapter 6** (examples). In that order.
-6. **Then Appendix A** as a real document.
-7. **Then write MSE** as its own chapter from the scratchpads.
-8. **Then QoS** from the MSE template.
-9. **Then Usage Examples chapters** for each extension (CME, CPE, MSE, QoS) — one
-   session per chapter, after all instruction-set and semantics chapters are stable.
+1. **Appendix A** — convert the scratchpad (`docs/chapters/appendix-a-ecid.md`) into
+   a proper appendix with the radix-tree data structure (C struct), allocation,
+   delegation, and forced-destruction algorithms, and diagrams. This is the next
+   unfinished item.
+2. **Then Usage Examples chapters** for CPE, MSE, and QoS — one session per chapter.
    Chapter 6 covers CME examples; equivalent chapters for CPE, MSE, and QoS do not
    yet exist.
 
-Roughly: charter → Chapter 0 → Chapter 1 → instruction-reference chapters
-→ semantics chapters → microarch → kernel → examples → appendix → MSE → QoS.
+All instruction-set and semantics chapters (Ch 0–9) are done.
 
 ### A.7 Where things live
 
