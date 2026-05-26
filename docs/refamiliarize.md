@@ -68,6 +68,7 @@ ownership layer that ties the other four together.
 | **Chapter 11** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Chapter 12** (QoS Usage Examples) | Done | qs.it inline requires RV64; pointer form noted |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
+| **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs across CME/CPE/MSE/QoS; provisional addresses 0x7C0–0x7CE and 0xFC0–0xFCF |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
 

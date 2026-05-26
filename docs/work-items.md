@@ -261,22 +261,20 @@ International expects for ratification.
 
 ---
 
-### P1 · CSR chapter — addresses, bit-fields, access control
+### P1 · CSR chapter — addresses, bit-fields, access control ✓ RESOLVED
 
-**Affects:** New chapter (proposed: ch13) or major new section in ch00.
+**Affects:** `docs/chapters/ch13-csr-reference.md` (new chapter).
 
-Every CSR mentioned across all chapters needs formal specification:
-- Numeric address from the RISC-V CSR address map (custom M-mode: 0x800–0x8FF, etc.)
-- Complete bit-field table: field name, width, access type (RO/RW/WARL), reset value.
-- Which privilege levels may read/write it.
-- Behavior on illegal access (trap or zero-read).
+31 CSRs specified across CME (9), CPE (4), MSE (8), QoS (10). Each entry
+includes: provisional address, bit-field table with access type (RO/RW/WARL/W1C)
+and reset value, semantics, and illegal-access behavior. Two provisional address
+ranges used: 0x7C0–0x7CE (M-mode RW custom) and 0xFC0–0xFCF (M-mode RO custom).
 
-Known CSRs to specify: `cme_ec_table_base`, `cme_status`, `cpe_caps`, `vmt_ready`,
-`ms_status`, `qs_status`, and any implementation-parameter CSRs referenced in the
-chapters. A full audit is needed before writing.
+New CSR names introduced: `cme_del_cap` (delegation depth cap D, previously
+unnamed), `cme_status.VMT_RDY` bit (VMT-ready flag, previously unnamed in ch04).
+`cpe_caps` bit layout promoted from informative (ch07 §7) to normative (ch13 §4.1).
 
-**Blocks:** P2 (privilege model references CSR access rules), P4 (discovery needs a
-capability CSR address).
+**Blocks unblocked:** P2 (privilege model) and P4 (discovery) may now proceed.
 
 ---
 
@@ -377,10 +375,10 @@ and is noted here for completeness. Not a near-term authoring task.
 
 ## Proposal-readiness priority order
 
-1. **P1** — CSR chapter (blocks P2 and P4).
-2. **P2** — Privilege model (depends on P1).
-3. **P3** — Trap/exception table (can start in parallel with P1).
-4. **P4** — Discovery mechanism (depends on P1).
+1. ~~**P1** — CSR chapter (blocks P2 and P4).~~ — **DONE** (ch13).
+2. **P2** — Privilege model (depends on P1 ✓).
+3. **P3** — Trap/exception table (can start in parallel with P2).
+4. **P4** — Discovery mechanism (depends on P1 ✓).
 5. **P5** — Memory ordering (independent; can be done any time).
 6. **P6** — Opcode/name allocation (process item; engage RISC-V International).
 7. **P7** — AsciiDoc conversion (mechanical; do last).
