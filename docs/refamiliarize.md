@@ -160,7 +160,7 @@ docs/
 │   └── appendix-a-ecid.md
 ├── reference/
 │   ├── glossary.md
-│   └── instruction-card.md          # quick reference; may need update
+│   └── instruction-card.md          # quick reference; current as of v0.13
 ├── archive/                         # obsolete drafts — do not delete
 │   ├── chapter0-half-correct.md     # has Pools; obsolete
 │   ├── chapter0-also-half-correct.md  # v0.5 transitional; obsolete
