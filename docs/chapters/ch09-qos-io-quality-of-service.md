@@ -538,7 +538,55 @@ All error codes are returned in `rd` or in `qos_status`. Silent failure is prohi
 
 ---
 
-## 12. Out of Scope for v1
+## 12. Instruction Encoding
+
+All CE Suite instructions share the same R-type format and custom-0 opcode
+(`0001011`). See Chapter 2 §10.1–§10.2 for the bitfield diagram and the
+funct3 extension-selector table.
+
+**QoS uses funct3 = `011`.**
+
+### 12.1 QoS instruction encoding (funct3 = `011`)
+
+| funct7      | Mnemonic | rd field | rs1 field   | rs2 field                 |
+|-------------|----------|----------|-------------|---------------------------|
+| `0000000`   | `qs.ir`  | result   | target ECID | contract parameters       |
+| `0000001`   | `qs.or`  | result   | target ECID | domain selector           |
+| `0000010`   | `qs.it`  | result   | parent ECID | delegation descriptor     |
+| `0000011`   | `qs.ot`  | result   | child ECID  | domain selector           |
+
+funct7 values `0000100`–`1111111` (4–127) are reserved for future QoS instructions.
+
+Unlike CPE and MSE, all four QoS instructions use all three register fields — there
+are no rs2=`00000` cases. `qs.or` and `qs.ot` carry a domain selector in rs2
+(0 = revoke all domains simultaneously) per charter §6.7.
+
+### 12.2 Encoding examples
+
+`qs.ir a0, a1, a2` — assign I/O Contract (parameters in a2) to ECID in a1,
+result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000000 │ 01100  │ 01011  │ 011  │ 01010  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  qs.ir      rs2=a2   rs1=a1   QoS    rd=a0   custom-0
+```
+
+`qs.or a0, a1, a2` — revoke I/O Contract on domain in a2 from ECID in a1, result in a0:
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000001 │ 01100  │ 01011  │ 011  │ 01010  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  qs.or      rs2=a2   rs1=a1   QoS    rd=a0   custom-0
+```
+
+---
+
+## 13. Out of Scope for v1
 
 - **DRAM arbitration.** Covered by MSE (Chapter 8).
 - **L1/L2 cache isolation.** Covered by CPE (Chapter 7).
