@@ -58,7 +58,7 @@ ownership layer that ties the other four together.
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added |
 | **Chapter 3** (Bank/Group/Delegation Semantics) | Done | D2 applied |
-| **Chapter 4** (HW Microarchitecture) | Done | — |
+| **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
 | **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3/F8 applied |
@@ -115,7 +115,7 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
-- **G3** — RV32/RV64 width audit (systematic sweep; lowest urgency)
+None. All D, F, and G items are resolved.
 
 All D items (D1–D4) and all F/G items except F8 and G3 are resolved. See work-items.md for details.
 
@@ -134,7 +134,7 @@ Chapter 6 covers CME usage examples.
 
 **Phase 3 — Remaining F/G items** (can be done in parallel with Phase 2):
 - ~~**F8** — Binary encoding.~~ **DONE.**
-- **G3** — RV32 width audit. Systematic; lowest urgency.
+- ~~**G3** — RV32 width audit.~~ **DONE.**
 
 ### A.7 Where things live
 

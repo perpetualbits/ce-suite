@@ -208,25 +208,17 @@ an illegal-instruction trap); silent ignore prohibited.
 
 ---
 
-### G3 · RV32 width audit — "64-bit" assumptions throughout
+### G3 · RV32 width audit — "64-bit" assumptions throughout ✓ RESOLVED
 
-**Affects:** All chapters; highest risk in ch02, ch07, ch08, ch09 (instruction
-operand descriptions).
+**Affects:** ch00 §0.6, ch04 §5–§6. All other chapters already XLEN-aware.
 
-**Problem:** The mask width bug found in ch00 §0.10 / ch02 §7 (said "64-bit value";
-should be "XLEN-wide") is a symptom of a broader pattern: the spec was written with
-RV64 implicitly assumed. Similar silent assumptions may lurk elsewhere:
-
-- Instruction operand widths stated as "64-bit" instead of XLEN.
-- EC entry field sizes that only make sense on RV64.
-- ECS pointer arithmetic that assumes 8-byte pointers.
-- Timing or bandwidth figures that assume 64-bit bus transactions.
-
-**Done when:** A full audit of all chapters replaces hard-coded "64-bit" claims with
-XLEN-aware language where the value is passed in a register or affects hardware
-behavior differently on RV32 vs RV64. Items that are genuinely 64-bit (e.g., a
-64-bit counter that lives in memory, not in a register) should be annotated as such
-with a rationale.
+**Audit findings (all chapters checked):**
+- ch01–ch03, ch05, ch07–ch12, appendix-a: already use `[XLEN-1]`, `XLEN-wide`,
+  and explicit RV32/RV64 labels. No fixes needed.
+- ch00 §0.6: RV32 bank FPR row assumed FLEN=32 silently. Fixed: FLEN note added
+  with adjusted totals for FLEN=32/64/128.
+- ch04 §5–§6: timing table NV row used 1 KB (RV64) without labeling it as such.
+  Fixed: split into NV (RV64) and NV (RV32) rows; §6 examples labelled.
 
 ---
 
@@ -248,7 +240,7 @@ with a rationale.
 14. ~~**G2** (reserved-bit policy)~~ — **DONE**.
 15. ~~**G1** (diagrams)~~ — **DONE**.
 16. ~~**F8** (binary encoding)~~ — **DONE**.
-17. **G3** (RV32 width audit) — systematic sweep; lowest urgency.
+17. ~~**G3** (RV32 width audit)~~ — **DONE**.
 
 ---
 
