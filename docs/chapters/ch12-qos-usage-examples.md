@@ -1,0 +1,418 @@
+# Chapter 12 — QoS Usage Examples
+
+## 1. Overview
+
+This chapter illustrates real-world usage patterns of the I/O Quality-of-Service
+Extension (QoS). Examples cover domain discovery, Contract assignment, DMA channel
+binding, context-switch transparency, delegation to guest vCPUs, multi-domain
+setup, revocation, error handling, and the combination of QoS with MSE for
+end-to-end bounded I/O latency.
+
+All examples assume:
+
+- ECIDs and banks are pre-allocated; `EC[e]` entries are initialised before the
+  sequences shown.
+- The `qs.*` instruction set uses the `{qs}.{i,o}{target}` format, where `i`
+  means "into" (assign/delegate) and `o` means "out of" (revoke). Target
+  letters: `r`=resource (Contract), `t`=tenant (delegation). The full reference
+  is in Chapter 9.
+- Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
+  `x0` is used for `rd` to discard the result where the fast path is expected
+  to succeed.
+- Inline `rs2` values use the encoding defined in Chapter 9 §7:
+  - For `qs.ir`: bits 3:0 = `bw_class`, bits 7:4 = `lat_class`, bits 23:8 =
+    `domain_id`, bit `[XLEN-1]` = 0 (inline form).
+  - For `qs.it`: bits 15:0 = `child_ecid`, bits 19:16 = `child_bw_class`,
+    bits 23:20 = `child_lat_class`, bits 39:24 = `domain_id`
+    (RV64 inline; pointer form required on RV32), bit `[XLEN-1]` = 0.
+  - For `qs.or`/`qs.ot` rs2: `domain_id` or 0 for all domains.
+
+---
+
+## 2. Discovering Fabric Domains
+
+### Scenario
+
+At boot, the kernel enumerates the available I/O fabric domains and caches their
+properties for later Contract assignment decisions.
+
+### Code
+
+```asm
+    csrr   t0, qos_domain_count  # number of domains present (RO)
+    csrr   t1, qos_domain_base   # base address of domain descriptor array (RO)
+
+    # Walk domain descriptor array (each entry has a fixed stride; see ch09 §6.1).
+    li     t2, 0                 # domain index
+.domain_loop:
+    bge    t2, t0, .domain_done
+
+    # Read domain descriptor at qos_domain_base + t2 * stride.
+    # Fields: domain_id, domain_class (0=NoC/1=DMA/2=Peripheral),
+    #         slot_ns, total_cn_budget, max_ecids.
+    # (stride and field offsets are implementation-defined)
+
+    addi   t2, t2, 1
+    j      .domain_loop
+.domain_done:
+
+    csrr   t3, qos_max_nesting   # K: maximum interrupt nesting depth (system-wide)
+```
+
+### Notes
+
+- Domain IDs are stable across boots for a given implementation but are not
+  architectural constants. Always discover them at runtime via the descriptor array.
+- `qos_max_nesting` is the same K as `mse_max_nesting`; implementations that
+  support both MSE and QoS expose a single value satisfying both extensions.
+- Select the `qos_domain_sel` CSR before accessing domain-scoped CSRs
+  (`qos_slot_ratio`, `qos_bw_sum`, `qos_violation`, etc.).
+
+---
+
+## 3. Assigning a Contract to a Real-Time Task
+
+### Scenario
+
+A real-time NoC producer (`rt_ecid`) is assigned a QoS Contract on the NoC domain
+to guarantee bounded I/O latency for its data path.
+
+### Code — inline descriptor
+
+```asm
+    # Build inline qs.ir descriptor:
+    #   bits  3:0  = bw_class   (e.g. 3)
+    #   bits  7:4  = lat_class  (e.g. 1 = high priority)
+    #   bits 23:8  = domain_id  (e.g. noc_domain_id discovered at boot)
+    #   bit [XLEN-1] = 0 (inline form)
+
+    li    a2, 0                        # start with zero
+    or    a2, a2, 3                    # bw_class = 3
+    ori   a2, a2, (1 << 4)            # lat_class = 1
+    slli  t0, noc_domain_id, 8        # domain_id into bits 23:8
+    or    a2, a2, t0
+    qs.ir a0, rt_ecid, a2             # assign Contract; a0 = 0 on success
+    bnez  a0, .qos_assign_error
+
+    # Contract stored in EC[rt_ecid] for the specified domain.
+    # Takes effect on next ec.ob that restores rt_ecid, or immediately if
+    # rt_ecid is currently running on this hart.
+```
+
+### Notes
+
+- `bw_class` controls the minimum number of CN slots per scheduling window on
+  this domain. `lat_class` controls arbitration priority within CN slots: lower
+  value = higher priority.
+- An ECID may hold at most one Contract per domain. Calling `qs.ir` for a domain
+  the ECID already holds a Contract on returns `QOS_ERR_ALREADY_BOUND`; revoke
+  the existing Contract first with `qs.or`.
+- Read `qos_bw_sum` (after setting `qos_domain_sel`) to check available CN budget
+  on a domain before calling `qs.ir`.
+
+---
+
+## 4. DMA Channel Binding
+
+### Scenario
+
+A DMA engine is bound to an ECID so that its memory transfers are arbitrated under
+that ECID's QoS Contract, giving the transfer a guaranteed I/O bandwidth share.
+
+### Code
+
+```asm
+    # Bind DMA channel (dma_domain_id) to rt_ecid.
+    # Use the same qs.ir descriptor encoding with domain_id = dma channel's domain_id.
+    li    a2, 0
+    ori   a2, a2, 4                    # bw_class = 4
+    ori   a2, a2, (2 << 4)            # lat_class = 2
+    slli  t0, dma_domain_id, 8
+    or    a2, a2, t0
+    qs.ir a0, rt_ecid, a2             # binds DMA channel to rt_ecid
+    bnez  a0, .qos_dma_bind_error
+
+    # From this point, all DMA transfers on dma_domain_id are arbitrated
+    # using rt_ecid's bw_class=4, lat_class=2.
+```
+
+### Revoke DMA binding
+
+```asm
+    # Revoke just the DMA domain Contract; leave other domains intact.
+    qs.or  a0, rt_ecid, dma_domain_id  # rs2 = specific domain_id
+    bnez   a0, .qos_revoke_error
+```
+
+### Notes
+
+- A DMA channel that is not bound to any ECID competes in BE slots only — no
+  guaranteed bandwidth or latency.
+- A DMA channel may be bound to at most one ECID at a time. Binding an
+  already-bound channel returns `QOS_ERR_DOMAIN_BUSY`.
+- DMA channel bindings survive context switches: they are per-channel register
+  state, not per-hart state. Unlike CPU-side Contracts, DMA bindings are not
+  reloaded by `ec.ob` — they remain until explicitly revoked by `qs.or` or
+  dissolved by `ec.oe`.
+
+---
+
+## 5. Context Switch — QoS Contract Is Automatic (CPU Side)
+
+### Scenario
+
+Two tasks share a hart. One holds a QoS Contract on the NoC domain (`rt_ecid`);
+the other is best-effort (`be_ecid`). The scheduler switches between them.
+
+### Code
+
+```asm
+    ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; QoS Contract restored automatically
+```
+
+### Notes
+
+- CPU-side QoS Contract parameters (`bw_class`, `lat_class` per domain) are
+  stored in the CP field of the non-VMT bank (Chapter 0 §0.6) alongside MSE
+  and CPE parameters. `ec.ob` restores all of them atomically.
+- No separate `qs.ir` is needed on every context switch for CPU-initiated I/O.
+- DMA channel bindings are **not** part of the bank and are not reloaded by
+  `ec.ob`. They persist until explicitly revoked. This is correct behavior:
+  a DMA transfer initiated by a task should continue under that task's Contract
+  even while the CPU switches to another task.
+
+---
+
+## 6. Multi-Domain Setup — NoC and DMA Together
+
+### Scenario
+
+A real-time video pipeline (`rt_ecid`) needs bounded latency on both the NoC
+(for register access) and a DMA channel (for frame transfers). Both Contracts
+are set up at task creation.
+
+### Code
+
+```asm
+    # Assign NoC Contract: bw_class=2, lat_class=1.
+    li    a2, 0
+    ori   a2, a2, 2
+    ori   a2, a2, (1 << 4)
+    slli  t0, noc_domain_id, 8
+    or    a2, a2, t0
+    qs.ir x0, rt_ecid, a2
+
+    # Assign DMA Contract: bw_class=6, lat_class=1.
+    li    a2, 0
+    ori   a2, a2, 6
+    ori   a2, a2, (1 << 4)
+    slli  t0, dma_domain_id, 8
+    or    a2, a2, t0
+    qs.ir x0, rt_ecid, a2
+```
+
+### End-to-end latency bound (with MSE also assigned)
+
+```
+    NoC access latency:    ≤ (K+1) × slot_ns(noc_domain)
+    DMA transfer latency:  ≤ (K+1) × slot_ns(dma_domain)    (I/O side)
+                         + (K+1) × mse_slot_ns               (DRAM side)
+```
+
+### Notes
+
+- Admission control is per-domain and independent: the NoC and DMA domain budgets
+  do not affect each other.
+- Revoke all Contracts at once with `qs.or x0, rt_ecid, 0` (rs2=0 = all domains).
+- See Chapter 9 §10 for the DMA end-to-end latency model combining QoS and MSE.
+
+---
+
+## 7. Delegating a Contract to a Guest vCPU
+
+### Scenario
+
+A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
+`bw_class=8`, `lat_class=1`. It delegates portions to two vCPUs.
+
+### Delegate to first vCPU (RV64 inline form)
+
+```asm
+    # Build inline qs.it descriptor (RV64):
+    #   bits 15:0  = vcpu0_ecid
+    #   bits 19:16 = child_bw_class = 3
+    #   bits 23:20 = child_lat_class = 2
+    #   bits 39:24 = noc_domain_id
+
+    li    t0, 0
+    or    t0, t0, vcpu0_ecid           # bits 15:0 = child_ecid
+    ori   t0, t0, (3 << 16)           # bits 19:16 = child_bw_class
+    ori   t0, t0, (2 << 20)           # bits 23:20 = child_lat_class
+    slli  t1, noc_domain_id, 24       # bits 39:24 = domain_id
+    or    t0, t0, t1
+    qs.it a0, hyp_ecid, t0
+    bnez  a0, .qos_delegate_error
+```
+
+### Delegate to second vCPU
+
+```asm
+    li    t0, 0
+    or    t0, t0, vcpu1_ecid
+    ori   t0, t0, (3 << 16)
+    ori   t0, t0, (2 << 20)
+    slli  t1, noc_domain_id, 24
+    or    t0, t0, t1
+    qs.it a0, hyp_ecid, t0
+    bnez  a0, .qos_delegate_error
+    # hyp_ecid has delegated 6 of its 8 bw_class units on the NoC domain.
+```
+
+### Notes
+
+- On RV32, `qs.it` cannot be encoded inline (domain_id occupies bits 39:24,
+  which are unreachable). Use the pointer form (`QOS_Delegation_Params` struct,
+  Chapter 9 §7).
+- After delegation, the vCPU's Contract is restored automatically by `ec.ob`
+  on context switch — no per-switch `qs.it` needed.
+- `child_bw_class=0` and `child_lat_class=0` cause the child to inherit the
+  parent's full class for that domain.
+
+---
+
+## 8. Revocation and Teardown
+
+### Scenario A — revoke one domain before reassignment
+
+```asm
+    # Revoke rt_ecid's NoC Contract only, leaving DMA Contract intact.
+    qs.or  a0, rt_ecid, noc_domain_id
+    bnez   a0, .qos_revoke_error
+    # noc_domain_id budget freed; rt_ecid still holds its DMA Contract.
+```
+
+### Scenario B — revoke all domains at once
+
+```asm
+    qs.or  a0, rt_ecid, x0            # rs2 = 0 = all domains
+    bnez   a0, .qos_revoke_error
+    # All QoS Contracts on all domains revoked; DMA bindings released.
+```
+
+### Scenario C — teardown via `ec.oe` (implicit revoke)
+
+```asm
+    ec.oe  rt_ecid                    # forced destroy; all QoS Contracts revoked
+                                      # and DMA bindings released automatically.
+```
+
+### Scenario D — revoking a delegated vCPU Contract
+
+```asm
+    # Revoke vcpu0's delegated NoC Contract; returns bw_class to hyp_ecid.
+    qs.ot  a0, vcpu0_ecid, noc_domain_id
+    bnez   a0, .qos_revoke_error
+```
+
+### Notes
+
+- `qs.or` and `qs.ot` with rs2=0 walk all domains; if child Contracts exist on
+  any domain, those are revoked first (recursive, bounded by D ≤ 3).
+- `ec.oe` cascades through all QoS domains and revokes DMA bindings as part of
+  the ECID destroy sequence. Explicit `qs.or` before `ec.oe` is redundant.
+
+---
+
+## 9. Error Handling
+
+### `QOS_ERR_ALREADY_BOUND` — duplicate Contract on same domain
+
+```asm
+    # rt_ecid already holds a NoC Contract. Attempting to assign another fails.
+    qs.ir  a0, rt_ecid, noc_descriptor
+    li     t0, 7                      # QOS_ERR_ALREADY_BOUND = 7
+    beq    a0, t0, .handle_already_bound
+    # Fix: revoke the existing Contract with qs.or first.
+```
+
+### `QOS_ERR_DOMAIN_BUSY` — DMA channel already bound
+
+```asm
+    # Another ECID already holds the DMA channel binding.
+    qs.ir  a0, rt_ecid, dma_descriptor
+    li     t0, 8                      # QOS_ERR_DOMAIN_BUSY = 8
+    beq    a0, t0, .handle_domain_busy
+    # Fix: revoke the other ECID's binding first.
+```
+
+### `QOS_ERR_CAP_EXCEEDED` — group bandwidth cap
+
+```asm
+    # hyp_ecid's remaining headroom is 2; requesting bw_class=3 fails.
+    qs.it  a0, hyp_ecid, descriptor_with_bw3
+    li     t0, 3                      # QOS_ERR_CAP_EXCEEDED = 3
+    beq    a0, t0, .handle_cap
+    # Fix: revoke one vCPU's delegation or request fewer bw_class units.
+```
+
+### `QOS_ERR_SYSTEM_FULL` — domain CN budget exhausted
+
+```asm
+    # Check remaining budget first to avoid a failing call.
+    csrw   qos_domain_sel, noc_domain_id
+    csrr   t0, qos_bw_sum             # current sum on this domain
+    # Compare t0 with total_cn_budget from domain descriptor before calling qs.ir.
+```
+
+### Notes
+
+- On any error, no state changes.
+- The full error code table is in Chapter 9 §11.
+
+---
+
+## 10. Monitoring Contract Violations
+
+### Setup
+
+```asm
+    # Enable violation interrupt for the NoC domain.
+    csrw   qos_domain_sel, noc_domain_id
+    li     t0, 1
+    csrw   qos_violation_en, t0
+```
+
+### Violation handler
+
+```asm
+    # Identify which domain triggered the violation.
+    csrw   qos_domain_sel, noc_domain_id
+    csrr   t0, qos_violation
+    li     t1, 1
+    csrw   qos_violation, t1          # write 1 to clear sticky bit
+
+    # t0 encodes violation details (implementation-defined).
+    # Log, raise system alert, or reduce the affected ECID's bw_class.
+```
+
+### Notes
+
+- `qos_violation` is per-domain (domain selector must be set before reading).
+- A violation indicates a Contract holder did not receive its guaranteed CN slots
+  in a scheduling window. Causes include: too many Contract holders admitted,
+  slot ratio configured too low, or traffic patterns exceeding the modeled load.
+
+---
+
+## 11. Where to go next
+
+**Chapter 9** is the normative QoS reference: domain model, slot scheme, Contract
+parameters, arbitration rules, CSRs, DMA attribution, and error codes.
+
+**Chapter 8** and **Chapter 11** cover MSE and its usage examples. For DMA
+workloads, QoS (I/O side) and MSE (DRAM side) are used together — see §6 above
+and Chapter 9 §10 for the combined latency model.
+
+**Appendix A** covers ECID radix-tree algorithms, allocation, and forced-destruction
+sequences that underlie all of the teardown examples in this chapter.

@@ -267,7 +267,7 @@ with a rationale.
 
 - ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
 - ~~Chapter 11 — MSE Usage Examples~~ — **DONE**
-- Chapter 12 — QoS Usage Examples — not yet started
+- ~~Chapter 12 — QoS Usage Examples~~ — **DONE**
 
 ---
 

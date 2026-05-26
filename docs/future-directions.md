@@ -289,4 +289,36 @@ the safety manual.
 
 ---
 
+## 18. No-`rd` Instructions as Missed Opportunities (Normative candidate)
+
+**Idea:** Instructions with no `rd` — currently `ec.ib` (always succeeds or traps) and
+`ec.oe` (always succeeds) — discard the return-value slot entirely. Even when an
+instruction cannot fail, the `rd` field could carry back useful information:
+
+- `ec.ib` could return the bank ID (or slot index) into which the context was saved.
+  Useful for a hypervisor that wants to know *which* bank is now occupied by a saved
+  guest, without an extra CSR read.
+- `ec.oe` could return a count of resources freed (banks released, Contracts dissolved,
+  ECIDs reclaimed). Useful for auditing and capacity accounting without polling separate
+  CSRs.
+- `ec.ib` could return a generation token for the saved state — a (bank, generation)
+  pair that makes the save result addressable for a later targeted restore.
+
+**Why it matters:** In RISC-V, the `rd=x0` convention already provides the discard case
+for free. Adding a meaningful return value to these instructions costs nothing in the
+encoding and potentially saves software a follow-on CSR read.
+
+**Current state:** `ec.ib` and `ec.oe` have no `rd` because they were defined as
+"always-succeed" instructions where failure reporting was the only justification for
+`rd`. This reasoning is sound but narrow — it excludes the success-path information case.
+
+**Open questions:** Which bank ID namespace would `ec.ib` return? Is it hart-local? Is
+it stable across context switches? What exactly does `ec.oe` count — leaf ECIDs, total
+resources, or subtree depth?
+
+**Disposition:** Normative candidate. Revisit when the Bank assignment model is fully
+defined. Any change would require bumping the instruction encoding revision.
+
+---
+
 *End of Future Directions.*
