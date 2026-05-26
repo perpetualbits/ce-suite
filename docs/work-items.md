@@ -252,4 +252,140 @@ an illegal-instruction trap); silent ignore prohibited.
 
 ---
 
+## Category P — Proposal-readiness gaps
+
+These items are required to make the CE Suite a submittable RISC-V ISA extension
+proposal. They are independent of the D/F/G work above (which fixed internal
+consistency); these fill gaps between the spec as written and what RISC-V
+International expects for ratification.
+
+---
+
+### P1 · CSR chapter — addresses, bit-fields, access control
+
+**Affects:** New chapter (proposed: ch13) or major new section in ch00.
+
+Every CSR mentioned across all chapters needs formal specification:
+- Numeric address from the RISC-V CSR address map (custom M-mode: 0x800–0x8FF, etc.)
+- Complete bit-field table: field name, width, access type (RO/RW/WARL), reset value.
+- Which privilege levels may read/write it.
+- Behavior on illegal access (trap or zero-read).
+
+Known CSRs to specify: `cme_ec_table_base`, `cme_status`, `cpe_caps`, `vmt_ready`,
+`ms_status`, `qs_status`, and any implementation-parameter CSRs referenced in the
+chapters. A full audit is needed before writing.
+
+**Blocks:** P2 (privilege model references CSR access rules), P4 (discovery needs a
+capability CSR address).
+
+---
+
+### P2 · Privilege model integration — M/S/U/VS/VU per instruction
+
+**Affects:** ch00 §0.9, each ISR chapter (ch03, ch07, ch09, ch11).
+
+For each CE Suite instruction: which privilege levels may execute it? Under what
+conditions does a lower-privilege invocation trap vs. succeed? Specific open questions:
+
+- Does `ec.ir` from S-mode create L0 or L1 ECIDs?
+- Can VS-mode hold L1 ECIDs directly, or must all CE operations go through HS-mode?
+- Is there a per-privilege CE-enable bit (analogous to mie/sie)?
+- How does the H-extension (VS-mode, VU-mode) compose with the delegation depth D?
+
+**Depends on:** P1 (privilege control CSRs need addresses first).
+
+---
+
+### P3 · Complete trap/exception table
+
+**Affects:** ch00 §0.9, each ISR chapter.
+
+For each instruction × each documented error condition: is the outcome a synchronous
+exception (trap) or a return code in `rd`? Currently the spec says "trap or return
+code" without always specifying which. Needed:
+
+- A unified table covering all 24 instructions and all defined error codes.
+- Numeric values for any new mcause/scause exception causes added by CE Suite.
+- Whether CE faults are delegatable to S-mode via `medeleg`.
+
+---
+
+### P4 · Discovery mechanism
+
+**Affects:** ch00, new section; ch03 §1 (CME overview).
+
+Software needs a standard way to probe: is CE Suite present? Which sub-extensions
+(CME/CPE/MSE/QoS)? What implementation parameters (E_max, max D, bank count)?
+
+Requires:
+- Proposed ISA string extension names (e.g., `Xce`, `Xcecme`, `Xcecpe`, `Xcemse`,
+  `Xceqos`) following RISC-V naming conventions.
+- A top-level capability CSR or pointer to a Unified Discovery structure.
+- Alignment with the existing per-extension capability probing (`cpe_caps`, etc.).
+
+**Depends on:** P1 (capability CSR needs an address).
+
+---
+
+### P5 · Memory ordering guarantees
+
+**Affects:** ch03 (CME ISR), ch09 (MSE ISR), ch11 (QoS ISR); possibly ch00.
+
+The spec says nothing about memory ordering. A RISC-V proposal must state:
+
+- Does `ec.ib` (save to bank) require prior stores to be globally visible?
+- Does `ec.ob` (restore from bank) act as a load-acquire?
+- What fences does software need around `ec.im`/`ec.om` DMA operations?
+- Do Contract assignments (`ms.ir`, `cp.ir`, `qs.ir`) have cross-hart ordering
+  implications?
+
+---
+
+### P6 · Opcode and extension-name allocation (process item)
+
+**Affects:** ch03 §10, ch07 §11, ch09 §11, ch11 §12; charter.
+
+Custom-0 (`0001011`) is used as a placeholder. Real submission requires:
+- Formal extension names registered with RISC-V International.
+- Allocated opcode space (or confirmation that custom-0 is appropriate for the
+  proposal stage).
+
+This is a process item, not an authoring item — it requires engagement with RISC-V
+International and cannot be resolved by editing the spec alone.
+
+---
+
+### P7 · AsciiDoc conversion (mechanical)
+
+**Affects:** All chapters.
+
+RISC-V International specs use AsciiDoc with a specific toolchain. The Markdown
+source needs conversion before a formal submission can be prepared. This is largely
+mechanical but non-trivial given the volume of tables, code blocks, and cross-references.
+
+---
+
+### P8 · Sail formal model (large, separate project)
+
+**Affects:** Separate deliverable alongside the spec.
+
+RISC-V ratification increasingly requires a Sail formal model of instruction
+semantics. This is a significant engineering effort independent of the spec text
+and is noted here for completeness. Not a near-term authoring task.
+
+---
+
+## Proposal-readiness priority order
+
+1. **P1** — CSR chapter (blocks P2 and P4).
+2. **P2** — Privilege model (depends on P1).
+3. **P3** — Trap/exception table (can start in parallel with P1).
+4. **P4** — Discovery mechanism (depends on P1).
+5. **P5** — Memory ordering (independent; can be done any time).
+6. **P6** — Opcode/name allocation (process item; engage RISC-V International).
+7. **P7** — AsciiDoc conversion (mechanical; do last).
+8. **P8** — Sail formal model (large separate project; deferred).
+
+---
+
 *End of Work Items.*

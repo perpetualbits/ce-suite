@@ -115,26 +115,37 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
-None. All D, F, and G items are resolved.
-
-All D items (D1–D4) and all F/G items except F8 and G3 are resolved. See work-items.md for details.
+All D, F, and G items are resolved (v0.13). The active work items are now
+the **P series** — gaps between the written spec and a submittable RISC-V
+International extension proposal. See work-items.md §P for the full list.
 
 ### A.6 What's *next* (the suggested work order)
 
-**Phase 1 — Resolve work items.**
-All D items and all F/G items except F8 and G3 are resolved as of v0.12. Remaining:
-F8 (binary encoding) and G3 (RV32 audit). See work-items.md for details.
+All internal consistency work (D/F/G) and usage examples are done. The
+remaining sessions fill proposal-readiness gaps (P series):
 
-**Phase 2 — Usage examples chapters.**
-- ~~Chapter 8 — CPE Usage Examples~~ — **DONE**
-- ~~Chapter 10 — MSE Usage Examples~~ — **DONE**
-- ~~Chapter 12 — QoS Usage Examples~~ — **DONE**
+**P1 — CSR chapter** *(highest priority — blocks P2 and P4)*
+Define all CSR addresses, bit-fields, access control, and reset values for
+every CSR mentioned across the spec. Likely a new ch13 or a major new section.
 
-Chapter 6 covers CME usage examples.
+**P2 — Privilege model integration** *(depends on P1)*
+Specify which instructions are legal at which privilege level (M/S/U/VS/VU),
+H-extension interaction with the delegation model, and any CE-enable CSRs.
 
-**Phase 3 — Remaining F/G items** (can be done in parallel with Phase 2):
-- ~~**F8** — Binary encoding.~~ **DONE.**
-- ~~**G3** — RV32 width audit.~~ **DONE.**
+**P3 — Trap/exception table** *(can start in parallel with P1)*
+For each instruction × each error condition: trap or return code in `rd`?
+Numeric values for any new mcause/scause causes. medeleg delegatability.
+
+**P4 — Discovery mechanism** *(depends on P1)*
+ISA string extension names (Xce, Xcecme, …) and a top-level capability CSR
+or Unified Discovery pointer.
+
+**P5 — Memory ordering** *(independent; any time)*
+Ordering guarantees for ec.ib/ec.ob, DMA ops (ec.im/ec.om), Contract
+assignments on other harts.
+
+**P6–P8 — Process and mechanical items** (P6: opcode allocation via RISC-V
+International; P7: AsciiDoc conversion; P8: Sail formal model — large effort).
 
 ### A.7 Where things live
 
