@@ -296,19 +296,89 @@ each entry (charter §3.2).
 
 ## 10. Instruction Encoding
 
-> **Non-normative placeholder.** The text below is not a valid RISC-V encoding.
-> A real encoding requires selecting one or more custom-opcode spaces
-> (custom-0 through custom-3), assigning funct3/funct7 discriminants,
-> placing rd/rs1/rs2 at the fixed RISC-V R-type positions, and handling
-> instructions with no rd by encoding rd = 00000 (x0). This work is tracked
-> as F8 in `docs/work-items.md` and will replace this section entirely.
+> **Proposal encoding.** CE Suite instructions use RISC-V custom-0 opcode space
+> (`0001011`, 0x0B) for proposal and prototyping purposes. If CE Suite is ratified
+> by RISC-V International, the foundation will assign a permanent opcode allocation
+> through the standard opcode-reservation process; the encoding below is subject to
+> change at that time. Everything else in this section (R-type format, funct3/funct7
+> scheme, register-field conventions) reflects the architectural intent.
 
-Conceptual layout (for reference only, not architectural):
+### 10.1 Instruction format
 
-* **Opcode**: one of the RISC-V custom opcode spaces (TBD)
-* **Discriminant**: funct3 / funct7 fields (TBD per instruction)
-* **Operands**: rd, rs1, rs2 at standard R-type positions
-* Instructions with no `rd` encode rd field = 00000
+All CE Suite instructions are 32-bit R-type:
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ funct7  │  rs2   │  rs1   │ fn3  │   rd   │ opcode  │
+│  7 bits │ 5 bits │ 5 bits │3 bits│ 5 bits │ 7 bits  │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+```
+
+* **opcode** = `0001011` (custom-0, 0x0B) for all CE Suite instructions.
+* **funct3** [14:12] selects the extension (see §10.2).
+* **funct7** [31:25] selects the instruction within that extension (see §10.3).
+* **rd**, **rs1**, **rs2** are standard 5-bit RISC-V register fields.
+* Instructions that carry no `rd` operand encode rd = `00000` (x0).
+* Instructions that carry no `rs2` operand encode rs2 = `00000` (x0).
+
+All variable-width operands (register masks, partition descriptors, delegation
+descriptors, contract parameters) are passed in registers — no I-type variants
+are needed.
+
+### 10.2 Extension selector (funct3)
+
+| funct3 | Extension | Prefix |
+|--------|-----------|--------|
+| `000`  | CME       | `ec.*` |
+| `001`  | CPE       | `cp.*` |
+| `010`  | MSE       | `ms.*` |
+| `011`  | QoS       | `qs.*` |
+| `100`–`111` | Reserved | — |
+
+CPE, MSE, and QoS instruction encoding tables are in chapters 7, 8, and 9
+respectively. This section covers CME (funct3 = `000`).
+
+### 10.3 CME instruction encoding (funct3 = `000`)
+
+| funct7      | Mnemonic | rd field      | rs1 field          | rs2 field          |
+|-------------|----------|---------------|--------------------|--------------------|
+| `0000000`   | `ec.ib`  | `00000` (none)| mask register      | `00000`            |
+| `0000001`   | `ec.ob`  | result        | target ECID        | mask register      |
+| `0000010`   | `ec.im`  | result        | target ECID        | mask register      |
+| `0000011`   | `ec.om`  | result        | target ECID        | mask register      |
+| `0000100`   | `ec.ig`  | result        | target ECID        | `00000`            |
+| `0000101`   | `ec.og`  | result        | target ECID        | `00000`            |
+| `0000110`   | `ec.it`  | result        | source ECID        | child ECID         |
+| `0000111`   | `ec.ot`  | result        | child ECID         | `00000`            |
+| `0001000`   | `ec.ir`  | new ECID / 0  | leaf flag (0 or 1) | `00000`            |
+| `0001001`   | `ec.oe`  | `00000` (none)| target ECID        | `00000`            |
+| `0001010`   | `ec.iv`  | result        | target ECID        | mask register      |
+| `0001011`   | `ec.ov`  | result        | target ECID        | mask register      |
+
+funct7 values `0001100`–`1111111` (12–127) are reserved for future CME instructions.
+
+### 10.4 Encoding examples
+
+`ec.ib a0` — save current context, mask in a0 (x10 = `01010`):
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000000 │ 00000  │ 01010  │ 000  │ 00000  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  ec.ib      rs2=x0   rs1=a0   CME    rd=x0   custom-0
+```
+
+`ec.ob x0, a1, a2` — restore ECID in a1 (x11 = `01011`), mask in a2 (x12 = `01100`), discard result:
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000001 │ 01100  │ 01011  │ 000  │ 00000  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  ec.ob      rs2=a2   rs1=a1   CME    rd=x0   custom-0
+```
 
 ---
 
