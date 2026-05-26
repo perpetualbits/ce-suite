@@ -57,7 +57,7 @@ reaches it only through `EC[e].ecs_ptr`, which the kernel sets after calling
 
 ```
 1. Kernel calls ec.ir to allocate a new ECID slot.
-   ec.ir rd, rs1   // rd = new ECID number; rs1 = max delegation depth for child
+   ec.ir rd, rs1   // rd = new ECID number; rs1 = 0 (leaf child) or 1 (delegating child)
    
 2. Kernel allocates struct execution_context in kernel memory.
 
@@ -163,8 +163,8 @@ Contracts. The kernel allocates a Contract representing a bandwidth/latency
 budget and binds it to the task's ECID at task-creation time:
 
 ```
-ms.ir  rd, rs1    # allocate child MSE Contract; rs1 = parent ECID; rd = Contract ID
-ms.it  rs1, rs2   # delegate Contract rs1 to ECID rs2
+ms.ir  rd, rs1, rs2   # assign MSE Contract to ECID rs1; rs2 = descriptor; rd = 0 or error
+ms.it  rd, rs1, rs2   # delegate sub-Contract to child ECID in rs2; rs1 = parent ECID; rd = 0 or error
 ```
 
 When the task is destroyed, `ec.oe` dissolves its MSE Contract automatically.

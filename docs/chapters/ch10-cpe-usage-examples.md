@@ -272,7 +272,7 @@ The hypervisor reclaims its vCPU's partition before VM teardown.
     #   bits 7:0  = 0x0F (L1 ways 0-3, 4 ways)
     #   bits 15:8 = 0x01 (L2 way 0, 1 way)
     #   bit 18    = 1    (couple enabled)
-    li    a2, 0x40F01            # couple=1 at bit 18, l2=0x01, l1=0x0F
+    li    a2, 0x4010F            # couple=1 at bit 18, l1=0x0F, l2=0x01
     cp.ir a0, rt_ecid, a2
     li    t0, 4                  # CPE_ERR_COUPLE_MISMATCH = 4
     beq   a0, t0, .handle_couple
