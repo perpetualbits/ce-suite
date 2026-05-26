@@ -25,7 +25,7 @@ not "pointer to a specific struct layout."
 
 ---
 
-## 1. The Linux Execution Context Struct
+## 5.1 The Linux Execution Context Struct
 
 Linux defines one struct to represent the CE-relevant state of a schedulable
 unit — thread, process, vCPU, interrupt handler, or enclave:
@@ -53,7 +53,7 @@ reaches it only through `EC[e].ecs_ptr`, which the kernel sets after calling
 > applies to the hardware `EC[e]` struct, not to the Linux `struct
 > execution_context`.
 
-### 1.1 ECID lifecycle from Linux's perspective
+### 5.1.1 ECID lifecycle from Linux's perspective
 
 ```
 1. Kernel calls ec.ir to allocate a new ECID slot.
@@ -76,7 +76,7 @@ reaches it only through `EC[e].ecs_ptr`, which the kernel sets after calling
 
 ---
 
-## 2. The Linux Idiom for CME Instructions
+## 5.2 The Linux Idiom for CME Instructions
 
 CME instructions take **ECID numbers**, not pointers. The canonical Linux
 context-switch sequence is:
@@ -99,7 +99,7 @@ is purely architectural: `rd` (`x0`) discards the success/error result,
 `rs1` (`a1`) holds the 16-bit ECID number, and `rs2` is the register mask.
 The two are distinct operations at distinct levels of abstraction.
 
-### 2.1 DMA spill and fill
+### 5.2.1 DMA spill and fill
 
 When no free bank is available for the incoming task, Linux falls back to the
 DMA path:
@@ -121,7 +121,7 @@ operand.
 
 ---
 
-## 3. Cache Residency via CPE
+## 5.3 Cache Residency via CPE
 
 Linux can use CPE to guarantee that frequently-accessed kernel data structures
 — including hot parts of `struct execution_context` for runnable tasks — remain
@@ -139,7 +139,7 @@ Chapter 7 for the full CPE instruction reference.
 
 ---
 
-## 4. Interaction with Other CE Components
+## 5.4 Interaction with Other CE Components
 
 Linux exposes CE capabilities via a unified per-task context that covers all
 four extensions:
@@ -156,7 +156,7 @@ binds CPE partitions, MSE Contracts, and QoS Contracts to it. Tearing down an
 ECID via `ec.oe` cascades: all bound Contracts dissolve and return their
 resources to the parent Contract; all assigned banks are freed.
 
-### 4.1 MSE Contract binding
+### 5.4.1 MSE Contract binding
 
 Linux's real-time scheduling classes (SCHED_DEADLINE, SCHED_FIFO) map onto MSE
 Contracts. The kernel allocates a Contract representing a bandwidth/latency
@@ -172,7 +172,7 @@ If the task is demoted (e.g., moved from SCHED_DEADLINE to SCHED_OTHER), the
 kernel explicitly revokes the Contract with `ms.ot` before the ECID continues
 running without it.
 
-### 4.2 Delegation to guests (KVM/bhyve)
+### 5.4.2 Delegation to guests (KVM/bhyve)
 
 When Linux runs a guest VM, the hypervisor kernel:
 
@@ -189,7 +189,7 @@ child as that child's Group 0.")
 
 ---
 
-## 5. Non-Linux Operating Systems
+## 5.5 Non-Linux Operating Systems
 
 The architectural contract is ECID number in a register. Any OS can integrate
 CE without adopting the Linux `struct execution_context` layout. The only
@@ -218,7 +218,7 @@ its own business.
 
 ---
 
-## 6. Disable and Ignore
+## 5.6 Disable and Ignore
 
 Linux must handle three CE availability modes gracefully:
 
@@ -240,4 +240,4 @@ during debugging.
 
 ---
 
-*Next: Chapter 6 — CME Usage Examples.*
+[Next: Chapter 6 — CME Usage Examples](ch06-cme-usage-examples.md)

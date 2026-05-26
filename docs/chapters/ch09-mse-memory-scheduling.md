@@ -1,6 +1,6 @@
 # Chapter 9 — MSE: Memory Scheduling Extension
 
-## 1. Overview
+## 9.1 Overview
 
 The **Memory Scheduling Extension (MSE)** provides hardware-enforced deterministic
 DRAM arbitration for shared SoCs. Its purpose is to make Worst-Case Execution Time
@@ -29,9 +29,9 @@ handled by QoS (Chapter 11). L1/L2 cache isolation is handled by CPE (Chapter 7)
 
 ---
 
-## 2. The BE/Contract Slot Scheme
+## 9.2 The BE/Contract Slot Scheme
 
-### 2.1 Alternating slots
+### 9.2.1 Alternating slots
 
 The memory controller divides time into fixed-size **slots** (implementation-defined
 size, typically one DRAM burst period). Slots alternate between two classes:
@@ -41,24 +41,24 @@ size, typically one DRAM burst period). Slots alternate between two classes:
 ```
 
 - **CN (contract) slots** — served only to ECIDs holding an active MSE Contract whose
-  latency class is non-zero. Within a CN slot, the arbitration rule in §7 selects
+  latency class is non-zero. Within a CN slot, the arbitration rule in §9.7 selects
   which eligible EC is served.
 - **BE (best-effort) slots** — available to any EC regardless of Contract status.
   BE slots are never reserved; any requesting EC may use them. They are also the
-  landing zone for interrupts (§3).
+  landing zone for interrupts (§9.3).
 
 The default split is 50 % CN / 50 % BE. Implementations may expose a configurable
-split ratio via the `mse_slot_ratio` CSR (§6), but the BE fraction must be at least
-25 % and the CN fraction at least 25 % to preserve the latency bounds in §3.
+split ratio via the `mse_slot_ratio` CSR (§9.6), but the BE fraction must be at least
+25 % and the CN fraction at least 25 % to preserve the latency bounds in §9.3.
 
-### 2.2 Slot size
+### 9.2.2 Slot size
 
 Slot size is implementation-defined and exposed as a read-only value in `mse_slot_ns`
 (nanoseconds per slot). Software uses this value to convert Contract latency classes
 into wall-clock latency bounds. Slot sizes are typically 64–256 ns on current DRAM
 technology.
 
-### 2.3 Steady-state bandwidth
+### 9.2.3 Steady-state bandwidth
 
 In steady state with N active Contract holders each claiming one CN slot per pair:
 
@@ -69,9 +69,9 @@ In steady state with N active Contract holders each claiming one CN slot per pai
 
 ---
 
-## 3. Interrupt Accommodation and Latency Bounds
+## 9.3 Interrupt Accommodation and Latency Bounds
 
-### 3.1 Interrupts absorb into BE slots
+### 9.3.1 Interrupts absorb into BE slots
 
 When an interrupt fires, its handler executes as a new EC on the interrupted hart.
 If that handler needs DRAM access, it competes in the next available BE slot. Because
@@ -82,7 +82,7 @@ in flight.
 CN slots are never preempted by an interrupt. This is what keeps Contract holders'
 bandwidth guarantees intact under interrupt load.
 
-### 3.2 Nested interrupts and the nesting cap K
+### 9.3.2 Nested interrupts and the nesting cap K
 
 Interrupt nesting extends the worst-case latency for CN slots. MSE defines a
 parameter **K** — the maximum hardware-tolerated interrupt nesting depth — exposed via
@@ -106,7 +106,7 @@ latency_max = (K + 1) × slot_size
 
 **Contract bandwidth** remains at the configured CN fraction regardless of K.
 
-### 3.3 Practical values
+### 9.3.3 Practical values
 
 | K | Worst-case CN latency | Notes |
 |---|---|---|
@@ -120,12 +120,12 @@ and is not permitted by MSE v1.
 
 ---
 
-## 4. MSE Contracts
+## 9.4 MSE Contracts
 
 MSE Contracts are instances of the general Contract model (charter §4.3). This section
 specifies the MSE-specific parameters each Contract carries.
 
-### 4.1 Contract parameters
+### 9.4.1 Contract parameters
 
 Each MSE Contract holds two fields set by the privileged actor that creates it:
 
@@ -141,7 +141,7 @@ Both fields are zero for best-effort ECIDs. An ECID with both fields non-zero is
 loaded atomically by `ec.ob` on context switch. The memory controller reads these
 fields from per-hart registers, not from RAM, during arbitration.
 
-### 4.2 Group bandwidth cap
+### 9.4.2 Group bandwidth cap
 
 The privileged actor that creates an ECID may set a **group bandwidth cap** on it:
 a ceiling on the total `bw_class` sum across all ECIDs in that ECID's delegation
@@ -158,17 +158,17 @@ A child cannot claim more guaranteed bandwidth than the parent has delegated. Th
 is the mechanism that prevents a tenant VM from over-committing global memory
 resources.
 
-### 4.3 Hierarchical splitting
+### 9.4.3 Hierarchical splitting
 
 A privileged actor may split an MSE Contract into a parent Contract and one or more
 child Contracts (charter §4.3.2). Each child's `bw_class` must be ≤ the parent's
 `bw_class` minus what the parent retains. The sum of all children's `bw_class` values
 must never exceed the parent's `bw_class`.
 
-Splitting is performed via `ms.it` (§5.3) and is **atomic**: if the hardware
+Splitting is performed via `ms.it` (§9.5) and is **atomic**: if the hardware
 admission check fails, no state is changed (charter §4.3.3).
 
-### 4.4 Dissolution
+### 9.4.4 Dissolution
 
 When an ECID's Contract is revoked (via `ms.or` or `ec.oe`), the Contract dissolves
 and its `bw_class` is returned to the parent ECID's cap headroom. If the ECID has
@@ -178,7 +178,7 @@ ECIDs.
 
 ---
 
-## 5. MSE Instructions
+## 9.5 MSE Instructions
 
 All MSE instructions are privileged. They follow the naming scheme
 `ms.{i,o}{target}` (charter §6.1). MSE uses the subset `{r, t}`:
@@ -195,6 +195,8 @@ opaque group ID (charter §6.2).
 ---
 
 ### `ms.ir` — Assign a memory Contract to an ECID
+
+> `ms.ir` = memory scheduling into resource (`ms` = MSE, `i` = into/assign, `r` = resource)
 
 * **Syntax**: `ms.ir rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
@@ -227,6 +229,8 @@ struct MSE_Contract_Params {
 
 ### `ms.or` — Revoke the memory Contract from an ECID
 
+> `ms.or` = memory scheduling out of resource (`ms` = MSE, `o` = out of/revoke, `r` = resource)
+
 * **Syntax**: `ms.or rd, rs1`
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Target ECID.
@@ -243,6 +247,8 @@ struct MSE_Contract_Params {
 ---
 
 ### `ms.it` — Delegate a child Contract to a child ECID
+
+> `ms.it` = memory scheduling into tenant (`ms` = MSE, `i` = into/delegate, `t` = tenant/child ECID)
 
 * **Syntax**: `ms.it rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
@@ -282,6 +288,8 @@ struct MSE_Delegation_Params {
 
 ### `ms.ot` — Revoke a child Contract back to the parent
 
+> `ms.ot` = memory scheduling out of tenant (`ms` = MSE, `o` = out of/revoke, `t` = tenant/child ECID)
+
 * **Syntax**: `ms.ot rd, rs1`
   * `rs1`: Child ECID whose Contract is being revoked.
   * `rd`: 0 on success; error code on failure.
@@ -294,7 +302,7 @@ struct MSE_Delegation_Params {
 
 ---
 
-## 6. MSE CSRs
+## 9.6 MSE CSRs
 
 | CSR | Access | Purpose |
 |---|---|---|
@@ -309,9 +317,9 @@ struct MSE_Delegation_Params {
 
 ---
 
-## 7. Arbitration
+## 9.7 Arbitration
 
-### 7.1 Per-access arbitration (CN slots)
+### 9.7.1 Per-access arbitration (CN slots)
 
 Within each CN slot, the memory controller selects one requesting EC using the
 following rule, executed in O(1) hardware:
@@ -325,12 +333,12 @@ following rule, executed in O(1) hardware:
 Best-effort requests (zero `lat_class`) are not eligible in CN slots; they wait for
 the next BE slot.
 
-### 7.2 Per-access arbitration (BE slots)
+### 9.7.2 Per-access arbitration (BE slots)
 
 All harts with a pending request are eligible. Arbitration is round-robin. Burst size
 is implementation-defined (typically one cache line per BE slot).
 
-### 7.3 Admission control
+### 9.7.3 Admission control
 
 Admission control prevents over-commitment of the CN slot budget. The hardware
 maintains a running sum of `bw_class` across all active Contract holders (visible in
@@ -347,15 +355,15 @@ implementation capacity. If the check fails, the instruction returns
 
 This check is O(1): a single addition and comparison.
 
-### 7.4 Group caps
+### 9.7.4 Group caps
 
-Group caps (§4.2) are enforced on every `ms.ir` and `ms.it` call as described there.
+Group caps (§9.4.2) are enforced on every `ms.ir` and `ms.it` call as described there.
 No runtime per-access group check is needed: once admitted, the per-hart registers
 already encode the correct class bits.
 
 ---
 
-## 8. Scheduling Window
+## 9.8 Scheduling Window
 
 MSE operates with a rolling **scheduling window** — a period over which bandwidth
 guarantees are measured. The window length is implementation-defined and exposed in
@@ -376,7 +384,7 @@ reset overhead; longer windows smooth out bursty workloads. Typical values are
 
 ---
 
-## 9. Interaction with CME and CPE
+## 9.9 Interaction with CME and CPE
 
 **CME.** On every `ec.ob` (context restore), CME atomically loads the new EC's full
 bank state, which includes the `bw_class` and `lat_class` fields in the CP slot (see
@@ -400,7 +408,7 @@ An EC with both a CPE cache partition and an MSE Contract has:
 
 ---
 
-## 10. Error Codes
+## 9.10 Error Codes
 
 | Code | Value | Meaning |
 |---|---|---|
@@ -416,15 +424,15 @@ All error codes are returned in `rd` or in `mse_status`. Silent failure is prohi
 
 ---
 
-## 11. Instruction Encoding
+## 9.11 Instruction Encoding
 
 All CE Suite instructions share the same R-type format and custom-0 opcode
-(`0001011`). See Chapter 3 §10.1–§10.2 for the bitfield diagram and the
+(`0001011`). See Chapter 3 §3.10.1–§3.10.2 for the bitfield diagram and the
 funct3 extension-selector table.
 
 **MSE uses funct3 = `010`.**
 
-### 11.1 MSE instruction encoding (funct3 = `010`)
+### 9.11.1 MSE instruction encoding (funct3 = `010`)
 
 | funct7      | Mnemonic | rd field | rs1 field    | rs2 field                 |
 |-------------|----------|----------|--------------|---------------------------|
@@ -437,7 +445,7 @@ funct7 values `0000100`–`1111111` (4–127) are reserved for future MSE instru
 
 `ms.or` and `ms.ot` carry no `rs2` operand; the rs2 field is encoded as `00000` (x0).
 
-### 11.2 Encoding examples
+### 9.11.2 Encoding examples
 
 `ms.ir a0, a1, a2` — assign memory Contract (parameters in a2) to ECID in a1,
 result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
@@ -462,7 +470,7 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ---
 
-## 12. Out of Scope for v1
+## 9.12 Out of Scope for v1
 
 - **NoC, DMA, and peripheral arbitration.** Covered by QoS (Chapter 11).
 - **NUMA-aware Contract assignment.** Multi-socket NUMA semantics for MSE Contracts
@@ -475,4 +483,4 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ---
 
-**Next:** Chapter 10 — MSE Usage Examples
+[Next: Chapter 10 — MSE Usage Examples](ch10-mse-usage-examples.md)

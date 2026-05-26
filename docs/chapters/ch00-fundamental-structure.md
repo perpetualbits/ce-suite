@@ -277,6 +277,33 @@ into (save/create/assign) and `o` = out of (restore/destroy/revoke). Target
 letters name the target or kind and are drawn from `{b, m, s, g, t, v, e, r}`
 (charter §6.1).
 
+**Target letter definitions:**
+
+| Letter | Full name | Meaning in instructions |
+|--------|-----------|-------------------------|
+| `b`    | bank      | hardware register-state container |
+| `m`    | memory    | ECS in RAM (DMA path) |
+| `s`    | stream / staging bank | hardware-internal; no software instruction uses `s` |
+| `g`    | group     | bank assignment to an ECID's Group |
+| `t`    | tenant    | delegation to a child ECID |
+| `v`    | vault     | sealed bank under hardware encryption |
+| `e`    | existence | ECID lifecycle — forced destroy only (`ec.oe`) |
+| `r`    | resource  | ECID allocation (`ec.ir`) or cache/memory/I/O resource |
+
+**All CE Suite instructions — shell notation:**
+
+```
+ec.{i,o}{b,m,g,t,r,e,v}   — CME (12 instructions; 's' is hardware-internal)
+cp.{i,o}{r,t}              — CPE (4 instructions)
+ms.{i,o}{r,t}              — MSE (4 instructions)
+qs.{i,o}{r,t}              — QoS (4 instructions)
+```
+
+Not every cross-product exists. Within CME: there is no `ec.or` (the name was
+retired; forced destroy is `ec.oe`). Within CPE, MSE, and QoS: all four
+combinations `{i,o}{r,t}` are valid. Full definitions are in Chapter 3 (CME),
+Chapter 7 (CPE), Chapter 9 (MSE), and Chapter 11 (QoS).
+
 **ECID-first operands.** Any instruction that targets a context other than the
 currently running one takes an ECID number as its primary operand — never a raw
 pointer, never a bank ID:
@@ -303,24 +330,25 @@ Any instruction referencing an unallocated slot, a stale generation, or a
 privilege violation must raise a defined trap or return a documented failure
 code in `rd`. Silent ignore is prohibited.
 
-**Instruction summary:**
+**CME instruction summary:**
 
-| Instruction | Description |
-|---|---|
-| `ec.ib` | Save current context to Bank (fast path) |
-| `ec.ob` | Restore target ECID's context from Bank (fast path) |
-| `ec.im` | Spill Bank to ECS in RAM (DMA path) |
-| `ec.om` | Fill Bank from ECS in RAM (DMA path) |
-| `ec.ig` | Assign a free Bank to an ECID's Group |
-| `ec.og` | Release a Bank from an ECID's Group |
-| `ec.it` | Delegate one Bank to a child ECID (call once per bank) |
-| `ec.ot` | Revoke all resources from a child ECID |
-| `ec.ir` | Allocate a new child ECID |
-| `ec.oe` | Forced destroy of ECID and subtree (always succeeds) |
-| `ec.iv` | Seal Bank under hardware encryption |
-| `ec.ov` | Unseal Bank for a secure enclave |
+| Instruction | Name expansion | Description |
+|---|---|---|
+| `ec.ib` | ECID into bank | Save current context to Bank (fast path) |
+| `ec.ob` | ECID out of bank | Restore target ECID's context from Bank (fast path) |
+| `ec.im` | ECID into memory | Spill Bank to ECS in RAM (DMA path) |
+| `ec.om` | ECID out of memory | Fill Bank from ECS in RAM (DMA path) |
+| `ec.ig` | ECID into group | Assign a free Bank to an ECID's Group |
+| `ec.og` | ECID out of group | Release a Bank from an ECID's Group |
+| `ec.it` | ECID into tenant | Delegate one Bank to a child ECID (call once per bank) |
+| `ec.ot` | ECID out of tenant | Revoke all resources from a child ECID |
+| `ec.ir` | ECID into resource | Allocate a new child ECID |
+| `ec.oe` | ECID out of existence | Forced destroy of ECID and subtree (always succeeds) |
+| `ec.iv` | ECID into vault | Seal Bank under hardware encryption |
+| `ec.ov` | ECID out of vault | Unseal Bank for a secure enclave |
 
-Full instruction definitions are in Chapter 3.
+Full instruction definitions are in Chapter 3. CPE, MSE, and QoS instruction
+summaries are in Chapters 7, 9, and 11 respectively.
 
 ---
 
@@ -355,3 +383,7 @@ Bits not assigned above are reserved and must be zero.
 the table above are architecturally unreachable. All entries at those positions
 are currently Reserved or VMT-only; coarse-grained group selection (bits 0–6)
 works identically on RV32 and RV64.
+
+---
+
+[Next: Chapter 1 — Execution Context Model](ch01-execution-context-model.md)

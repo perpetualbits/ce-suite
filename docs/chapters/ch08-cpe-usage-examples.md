@@ -1,6 +1,6 @@
 # Chapter 8 — CPE Usage Examples
 
-## 1. Overview
+## 8.1 Overview
 
 This chapter illustrates real-world usage patterns of the Cache Partitioning
 Extension (CPE). Examples cover partition assignment for real-time tasks,
@@ -20,14 +20,14 @@ All examples assume:
   path is expected to succeed.
 - Inline descriptors are XLEN-wide values with bit `[XLEN-1]` = 0. The pointer
   form (bit `[XLEN-1]` = 1) is used in examples that need more than 8 ways per
-  level; the struct fields are defined in Chapter 7 §4 and §5.
+  level; the struct fields are defined in Chapter 7 §7.4 and §7.5.
 - `cpe_caps` field positions used below are **informative**, not yet normative
-  (Chapter 7 §7). A production driver should read the normative layout once it
+  (Chapter 7 §7.7). A production driver should read the normative layout once it
   is defined. The examples show the probing pattern; the exact shifts may change.
 
 ---
 
-## 2. Probing Capabilities
+## 8.2 Probing Capabilities
 
 ### Scenario
 
@@ -56,7 +56,7 @@ maximum number of ways per level and which levels support partitioning.
 
 ### Notes
 
-- The `cpe_caps` bit layout shown here is **informative** (Chapter 7 §7). Treat
+- The `cpe_caps` bit layout shown here is **informative** (Chapter 7 §7.7). Treat
   the field positions as illustrative until the normative encoding is defined.
 - A driver should perform this probe once at boot and cache the results; do not
   read `cpe_caps` on every partition assignment.
@@ -64,7 +64,7 @@ maximum number of ways per level and which levels support partitioning.
 
 ---
 
-## 3. Assigning a Partition to a Real-Time Task
+## 8.3 Assigning a Partition to a Real-Time Task
 
 ### Scenario
 
@@ -72,6 +72,8 @@ A real-time audio DSP task (`rt_ecid`) is assigned exclusive use of L1 ways 0–
 and L2 ways 0–1 to prevent cache eviction by other tasks on the same hart.
 
 ### Code — inline descriptor, L1 + L2
+
+> `cp.ir` = cache partition into resource (`cp` = CPE, `i` = into/assign, `r` = resource)
 
 ```asm
     # Build inline cp.ir descriptor for cp.ir rd, rs1, rs2:
@@ -103,7 +105,7 @@ and L2 ways 0–1 to prevent cache eviction by other tasks on the same hart.
 
 - Way masks are bit-per-way: bit 0 = way 0, bit 1 = way 1, etc. The inline form
   supports up to 8 ways per level. For implementations with more than 8 ways,
-  use the pointer form (`CPE_Assignment_Params` struct, Chapter 7 §4).
+  use the pointer form (`CPE_Assignment_Params` struct, Chapter 7 §7.4).
 - If any requested way is already assigned to another ECID at the same level,
   `cp.ir` returns `CPE_ERR_OVERLAP` and no state changes.
 - A subsequent `cp.ir` for the same ECID replaces the prior assignment entirely
@@ -112,7 +114,7 @@ and L2 ways 0–1 to prevent cache eviction by other tasks on the same hart.
 
 ---
 
-## 4. Context Switch — CPE State Is Automatic
+## 8.4 Context Switch — CPE State Is Automatic
 
 ### Scenario
 
@@ -120,6 +122,8 @@ Two tasks share a hart. One holds a CPE partition (`rt_ecid`); the other does no
 (`be_ecid`, best-effort). The scheduler switches between them.
 
 ### Code
+
+> `ec.ib` = ECID into bank — `ec.ob` = ECID out of bank (CPE partition restored automatically)
 
 ```asm
     # Switch from best-effort task to real-time task.
@@ -136,11 +140,11 @@ Two tasks share a hart. One holds a CPE partition (`rt_ecid`); the other does no
 - When `be_ecid` is restored, its absence of a CPE partition assignment is equally
   automatic: the hardware reverts to unpartitioned access for that ECID.
 - CPE enforcement begins immediately when `ec.ob` commits (or at the next
-  instruction boundary; implementation-defined per Chapter 7 §3).
+  instruction boundary; implementation-defined per Chapter 7 §7.3).
 
 ---
 
-## 5. Delegating a Sub-Partition to a Guest vCPU
+## 8.5 Delegating a Sub-Partition to a Guest vCPU
 
 ### Scenario
 
@@ -149,6 +153,8 @@ launches two vCPUs and delegates 4 ways to each. Neither vCPU can exceed its
 allocation; neither can observe the other's partition.
 
 ### Setup — delegate to first vCPU
+
+> `cp.it` = cache partition into tenant (`cp` = CPE, `i` = into/delegate, `t` = tenant/child ECID)
 
 ```asm
     # Build inline cp.it descriptor for cp.it rd, rs1, rs2:
@@ -182,15 +188,17 @@ allocation; neither can observe the other's partition.
   returns `CPE_ERR_PERMISSION`.
 - To delegate both L1 and L2 ways, set `l2_ways` (bits 23:20) in the same
   descriptor. For more than 15 ways in either direction, use the pointer form
-  (`CPE_Delegation_Params` struct, Chapter 7 §5).
+  (`CPE_Delegation_Params` struct, Chapter 7 §7.5).
 - The vCPU's delegated partition is enforced automatically on `ec.ob` — no
-  per-switch `cp.ir` is needed for the guest (Chapter 7 §9).
+  per-switch `cp.ir` is needed for the guest (Chapter 7 §7.9).
 
 ---
 
-## 6. Revocation and Teardown
+## 8.6 Revocation and Teardown
 
 ### Scenario A — explicit revoke before reassignment
+
+> `cp.or` = cache partition out of resource — `cp.ot` = cache partition out of tenant
 
 The kernel wants to reclaim `rt_ecid`'s partition and reassign it to a different
 task before `rt_ecid` is destroyed.
@@ -227,7 +235,7 @@ The hypervisor reclaims its vCPU's partition before VM teardown.
 ### Notes
 
 - `cp.or` and `cp.ot` both invalidate the cache lines in the revoked ways before
-  returning (Chapter 7 §6, sanity rule 5). This is required for isolation: a
+  returning (Chapter 7 §7.6, sanity rule 5). This is required for isolation: a
   subsequent task cannot read stale data from a previously assigned way.
 - `ec.oe` revokes all CPE Contracts in the subtree before freeing the ECID slots.
   Explicit `cp.or` before `ec.oe` is redundant but harmless.
@@ -237,7 +245,7 @@ The hypervisor reclaims its vCPU's partition before VM teardown.
 
 ---
 
-## 7. Error Handling
+## 8.7 Error Handling
 
 ### `CPE_ERR_OVERLAP` — way conflict
 
@@ -281,12 +289,12 @@ The hypervisor reclaims its vCPU's partition before VM teardown.
 
 ### Notes
 
-- On any error, `cp.ir` and `cp.it` make no state changes (Chapter 7 §6).
-- The full error code table is in Chapter 7 §8.
+- On any error, `cp.ir` and `cp.it` make no state changes (Chapter 7 §7.6).
+- The full error code table is in Chapter 7 §7.8.
 
 ---
 
-## 8. Hart Migration
+## 8.8 Hart Migration
 
 ### Scenario
 
@@ -323,7 +331,7 @@ destination hart after migration.
 
 ### Notes
 
-- CPE state is per-hart (Chapter 7 §9). After migration, the kernel must call
+- CPE state is per-hart (Chapter 7 §7.9). After migration, the kernel must call
   `cp.ir` on the destination hart before the migrated task runs.
 - The ECS in RAM — including saved register state — is reused across harts. Only
   the ECID and CPE assignment are hart-local and must be re-established.
@@ -332,7 +340,7 @@ destination hart after migration.
 
 ---
 
-## 9. Where to go next
+## 8.9 Where to go next
 
 **Chapter 7** is the normative CPE instruction reference: full instruction
 semantics, descriptor encoding tables, hardware sanity rules, CSRs, and error

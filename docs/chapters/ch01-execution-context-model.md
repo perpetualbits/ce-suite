@@ -299,3 +299,7 @@ masks; the encoding follows Chapter 0 §0.9.
 
 **Appendix A** contains the radix-tree data structure and the ECID allocation,
 delegation, and forced-destruction algorithms.
+
+---
+
+[Next: Chapter 2 — Bank, Group, and Delegation Semantics](ch02-bank-group-delegation.md)

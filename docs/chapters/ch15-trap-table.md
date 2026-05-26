@@ -1,0 +1,472 @@
+# Chapter 15 — CE Suite Trap and Exception Table
+
+## 15.1 Overview
+
+This chapter (P3 work item) resolves the ambiguity in earlier chapters: for
+every CE Suite instruction and every documented error condition, it specifies
+whether the outcome is a **synchronous exception (trap)** or a **return code
+in `rd`**.
+
+The two mechanisms are distinct and must not be confused:
+
+* **`rd` return code** — the instruction executes normally; `rd` carries 0
+  (success) or a non-zero error code. No exception is raised. The PC advances
+  to the next instruction. The kernel inspects `rd` and handles the error in
+  software.
+* **Synchronous exception (trap)** — the instruction does not complete;
+  control transfers to the trap handler at the privilege level that owns the
+  exception cause. `rd` is not written. The PC of the trapping instruction is
+  in `mepc` / `sepc`.
+
+Additionally, this chapter defines the CME error code table (which was absent
+from Chapter 3) and assigns a new CE Suite exception cause code.
+
+---
+
+## 15.2 Outcome Model
+
+### 15.2.1 Universal trap conditions (all 24 CE Suite instructions)
+
+The following conditions trap before any instruction-specific processing and
+apply to every CE Suite instruction:
+
+| Condition | Outcome | mcause |
+|---|---|---|
+| CE instruction executed at wrong privilege level (Chapter 14) | trap | 2 — illegal instruction |
+| CE instruction with invalid funct7 (reserved for this extension) | trap | 2 — illegal instruction |
+| CE instruction while CE Suite is not implemented | trap | 2 — illegal instruction |
+
+These are hardware-level checks. When they fire, `rd` is not written and no
+CE Suite state changes. They are caught before any per-instruction logic.
+
+### 15.2.2 Memory-access faults from pointer operands
+
+Several CE Suite instructions read or write a struct in RAM (the ECS struct for
+`ec.im`/`ec.om`; the descriptor struct for CPE/MSE/QoS pointer-form operands).
+If the pointer is invalid, the fault is a standard RISC-V memory fault raised
+by the hardware access — not a CE Suite error code.
+
+| Access | If pointer is unmapped | If pointer is hardware-inaccessible |
+|---|---|---|
+| `ec.im` (store to ECS) | trap, cause 15 (store/AMO page fault) | trap, cause 7 (store/AMO access fault) |
+| `ec.om` (load from ECS) | trap, cause 13 (load page fault) | trap, cause 5 (load access fault) |
+| CPE/MSE/QoS pointer-form `rs2` | trap, cause 13 (load page fault) | trap, cause 5 (load access fault) |
+
+In all cases, `tval` / `stval` holds the faulting address (the struct pointer).
+These faults follow standard RISC-V delegation rules and are not CE Suite-specific.
+
+### 15.2.3 Everything else: `rd` return codes
+
+Outside the universal trap conditions and memory-access faults, all CE Suite
+error conditions return a non-zero code in `rd`. The instruction completes
+(PC advances), no state changes, and the error code identifies the cause. If
+`rd = x0`, the error is silently discarded (caller opted out). The corresponding
+status CSR (`cme_status`, `cpe_status`, `mse_status`, `qos_status`) is
+updated in parallel for diagnostic logging.
+
+Silent ignore of errors is prohibited by the charter (§6.6): an implementation
+must either return an error code or trap; it must not silently succeed when a
+constraint is violated.
+
+---
+
+## 15.3 CE Suite Exception Causes
+
+### 15.3.1 Reused standard RISC-V causes
+
+| Cause | Name | When raised by CE Suite |
+|---|---|---|
+| 2 | Illegal instruction | Privilege check failure; reserved encoding |
+| 5 | Load access fault | ECS/descriptor pointer hardware error (ec.om, pointer-form rs2) |
+| 7 | Store/AMO access fault | ECS pointer hardware error (ec.im) |
+| 13 | Load page fault | ECS/descriptor pointer virtual mapping fault |
+| 15 | Store/AMO page fault | ECS pointer virtual mapping fault (ec.im) |
+
+### 15.3.2 New cause: `CE_EXC_BANK_FAULT` (cause 16)
+
+`ec.ib` carries no `rd` — it always succeeds or traps. If the bank SRAM
+hardware raises a fault during the save (uncorrectable ECC error, bus error),
+the instruction cannot return a soft error code and must trap.
+
+`ec.ob` also performs a bank SRAM read; the same hardware fault applies.
+Although `ec.ob` carries `rd`, a hardware bank SRAM error is non-recoverable
+in software and traps rather than returning an error code.
+
+| Cause | Name | Value | Meaning | Trapping instructions |
+|---|---|---|---|---|
+| `CE_EXC_BANK_FAULT` | CE bank SRAM error | 16 | Uncorrectable hardware fault during bank read/write | `ec.ib`, `ec.ob` |
+
+`tval`/`stval` is zero for this exception (there is no faulting virtual
+address; the error is in the bank SRAM, not in a software-accessible address).
+
+**Assignment.** Cause code 16 is in the custom/platform range of the RISC-V
+exception cause space (causes 16–23 are designated for custom use). Real
+ratification will need this assigned through the RISC-V International process.
+
+---
+
+## 15.4 CME Error Codes
+
+Chapter 3 (§3.12) described CME error conditions informally but did not assign
+numeric values. The table below is the normative CME error code table.
+
+| Value | Name | Meaning |
+|---|---|---|
+| 0 | `CME_OK` | Success |
+| 1 | `CME_ERR_INVALID_ECID` | ECID not allocated, or generation counter mismatch |
+| 2 | `CME_ERR_NO_BANK` | No free bank available; free pool or Group is empty |
+| 3 | `CME_ERR_PERMISSION` | Caller is not a parent or authorized ancestor of the target ECID |
+| 4 | `CME_ERR_CAP_DEPTH` | Allocation would exceed delegation depth D; parent is at level D |
+| 5 | `CME_ERR_ILLEGAL_FIELD` | Reserved or out-of-range operand field (e.g., `rs1 > 1` in `ec.ir`) |
+| 6 | `CME_ERR_ALREADY_SEALED` | Bank is already sealed; cannot seal again without unsealing first |
+| 7 | `CME_ERR_NOT_SEALED` | Bank is not sealed, or vault authentication failed |
+
+Note: `ec.ib` and `ec.oe` carry no `rd`; they do not return codes from this
+table. `ec.ib` uses the trap path (§15.3.2); `ec.oe` always succeeds.
+
+---
+
+## 15.5 Per-Instruction Outcome Tables
+
+The tables below list every documented error condition per instruction. Column
+"Outcome" is `rd` (software error code) or `trap` (synchronous exception).
+The universal trap conditions from §15.2.1 are not repeated.
+
+Memory-access faults (§15.2.2) are noted where they apply but listed as
+"trap (cause 5/7/13/15)" for brevity.
+
+### 15.5.1 CME instructions
+
+**`ec.ib`** (save current context to bank)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | — | no `rd` |
+| Reserved mask bit non-zero | trap | 2 (illegal instruction) |
+| Hardware bank SRAM error | trap | 16 (`CE_EXC_BANK_FAULT`) |
+
+**`ec.ob`** (restore context from bank)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Target ECID has no bank assigned | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Caller is not an authorized ancestor of target | rd | 3 (`CME_ERR_PERMISSION`) |
+| Hardware bank SRAM error during restore | trap | 16 (`CE_EXC_BANK_FAULT`) |
+
+**`ec.im`** (spill bank to ECS in RAM)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Target ECID has no bank to spill | rd | 2 (`CME_ERR_NO_BANK`) |
+| ECS pointer (`EC[rs1].ecs_ptr`) causes a memory fault | trap | 7 or 15 |
+
+**`ec.om`** (fill bank from ECS in RAM)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| No free bank available to fill into | rd | 2 (`CME_ERR_NO_BANK`) |
+| ECS pointer (`EC[rs1].ecs_ptr`) causes a memory fault | trap | 5 or 13 |
+
+**`ec.ig`** (assign free bank to ECID's Group)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | bank selector (non-zero) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Free bank pool is empty | rd | 2 (`CME_ERR_NO_BANK`) |
+
+**`ec.og`** (release a bank from ECID's Group)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | remaining bank count (≥ 0) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Target ECID's Group is empty (no banks to release) | rd | 2 (`CME_ERR_NO_BANK`) |
+| Caller is not an authorized ancestor of target | rd | 3 (`CME_ERR_PERMISSION`) |
+
+**`ec.it`** (delegate one bank to a child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Source ECID (`rs1`) not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Destination ECID (`rs2`) not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Source Group has no banks to delegate | rd | 2 (`CME_ERR_NO_BANK`) |
+| Caller is not an authorized ancestor of source | rd | 3 (`CME_ERR_PERMISSION`) |
+| `rs2` is not a child of `rs1` in the delegation tree | rd | 3 (`CME_ERR_PERMISSION`) |
+
+**`ec.ot`** (revoke all resources from a child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Caller is not the parent of target ECID | rd | 3 (`CME_ERR_PERMISSION`) |
+
+**`ec.ir`** (allocate a child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | new child ECID number (non-zero) |
+| Caller's current ECID is already at delegation depth D | rd | 4 (`CME_ERR_CAP_DEPTH`) |
+| `rs1 > 1` (reserved value) | rd | 5 (`CME_ERR_ILLEGAL_FIELD`) |
+
+**`ec.oe`** (forced destroy of ECID and subtree)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Always succeeds | — | no `rd`; never fails |
+
+**`ec.iv`** (seal a bank — vault) *(instruction shell; cryptographic semantics deferred)*
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Bank is already sealed | rd | 6 (`CME_ERR_ALREADY_SEALED`) |
+
+**`ec.ov`** (unseal a bank — vault) *(instruction shell; cryptographic semantics deferred)*
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CME_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Bank is not sealed, or vault authentication failed | rd | 7 (`CME_ERR_NOT_SEALED`) |
+
+---
+
+### 15.5.2 CPE instructions
+
+CPE error codes are defined in Chapter 7 §7.8.
+
+**`cp.ir`** (assign cache partition to ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CPE_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CPE_ERR_INVALID_ECID`) |
+| Assigned ways overlap another ECID's partition | rd | 2 (`CPE_ERR_OVERLAP`) |
+| Coupling constraint violated | rd | 4 (`CPE_ERR_COUPLE_MISMATCH`) |
+| `lock_en` set with zero ways assigned | rd | 5 (`CPE_ERR_ILLEGAL_FIELD`) |
+| Reserved field non-zero in descriptor | rd | 5 (`CPE_ERR_ILLEGAL_FIELD`) |
+| Requested level not implemented by hardware | rd | 6 (`CPE_ERR_UNSUPPORTED`) |
+| Caller is not a parent or privileged ancestor | rd | 7 (`CPE_ERR_PERMISSION`) |
+| Pointer-form `rs2` causes a memory fault | trap | 5 or 13 |
+
+**`cp.or`** (revoke all cache partitions from ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CPE_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CPE_ERR_INVALID_ECID`) |
+| Caller is not a parent or privileged ancestor | rd | 7 (`CPE_ERR_PERMISSION`) |
+
+**`cp.it`** (delegate a cache-partition sub-slice to a child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CPE_OK`) |
+| Parent ECID not allocated / generation mismatch | rd | 1 (`CPE_ERR_INVALID_ECID`) |
+| Parent ECID holds no CPE Contract | rd | 1 (`CPE_ERR_INVALID_ECID`) |
+| Delegation would exceed parent's way allocation | rd | 3 (`CPE_ERR_CAP_EXCEEDED`) |
+| Reserved field non-zero in descriptor | rd | 5 (`CPE_ERR_ILLEGAL_FIELD`) |
+| Requested level not implemented by hardware | rd | 6 (`CPE_ERR_UNSUPPORTED`) |
+| `child_ecid` is not a child of `rs1` | rd | 7 (`CPE_ERR_PERMISSION`) |
+| Pointer-form `rs2` causes a memory fault | trap | 5 or 13 |
+
+**`cp.ot`** (revoke a delegated cache partition from a child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`CPE_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`CPE_ERR_INVALID_ECID`) |
+| Target ECID holds no delegated CPE Contract | rd | 1 (`CPE_ERR_INVALID_ECID`) |
+| Caller is not the parent of target ECID | rd | 7 (`CPE_ERR_PERMISSION`) |
+
+---
+
+### 15.5.3 MSE instructions
+
+MSE error codes are defined in Chapter 9 §9.10.
+
+**`ms.ir`** (assign MSE Contract to ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`MSE_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`MSE_ERR_INVALID_ECID`) |
+| Request exceeds group bandwidth cap | rd | 3 (`MSE_ERR_CAP_EXCEEDED`) |
+| Global CN budget exhausted | rd | 4 (`MSE_ERR_SYSTEM_FULL`) |
+| Caller does not have permission to modify target's Contract | rd | 5 (`MSE_ERR_PRIVILEGE`) |
+| Pointer-form `rs2` causes a memory fault | trap | 5 or 13 |
+
+**`ms.or`** (revoke MSE Contract from ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`MSE_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`MSE_ERR_INVALID_ECID`) |
+| Caller does not have permission to modify target's Contract | rd | 5 (`MSE_ERR_PRIVILEGE`) |
+
+**`ms.it`** (delegate MSE Contract to child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`MSE_OK`) |
+| Parent ECID not allocated / generation mismatch | rd | 1 (`MSE_ERR_INVALID_ECID`) |
+| `child_ecid` is not a child of `rs1` in the delegation tree | rd | 2 (`MSE_ERR_NOT_CHILD`) |
+| Request would exceed group bandwidth cap | rd | 3 (`MSE_ERR_CAP_EXCEEDED`) |
+| Global CN budget exhausted | rd | 4 (`MSE_ERR_SYSTEM_FULL`) |
+| Caller does not have permission to modify parent's Contract | rd | 5 (`MSE_ERR_PRIVILEGE`) |
+| Pointer-form `rs2` causes a memory fault | trap | 5 or 13 |
+
+**`ms.ot`** (revoke delegated MSE Contract from child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`MSE_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`MSE_ERR_INVALID_ECID`) |
+| Caller does not have permission to modify target's Contract | rd | 5 (`MSE_ERR_PRIVILEGE`) |
+
+---
+
+### 15.5.4 QoS instructions
+
+QoS error codes are defined in Chapter 11 §11.11.
+
+**`qs.ir`** (assign QoS Contract to ECID on a fabric domain)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`QOS_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`QOS_ERR_INVALID_ECID`) |
+| `child_ecid` is not a child of `rs1` | rd | 2 (`QOS_ERR_NOT_CHILD`) |
+| Request would exceed group bandwidth cap on this domain | rd | 3 (`QOS_ERR_CAP_EXCEEDED`) |
+| Global CN budget for this domain exhausted | rd | 4 (`QOS_ERR_SYSTEM_FULL`) |
+| Caller does not have permission to modify target's Contract | rd | 5 (`QOS_ERR_PRIVILEGE`) |
+| `domain_id` is not present on this implementation | rd | 6 (`QOS_ERR_INVALID_DOMAIN`) |
+| ECID already holds a Contract on this domain | rd | 7 (`QOS_ERR_ALREADY_BOUND`) |
+| DMA channel is already bound to another ECID | rd | 8 (`QOS_ERR_DOMAIN_BUSY`) |
+| Pointer-form `rs2` causes a memory fault | trap | 5 or 13 |
+
+**`qs.or`** (revoke QoS Contract from ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`QOS_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`QOS_ERR_INVALID_ECID`) |
+| `domain_id` is not present on this implementation | rd | 6 (`QOS_ERR_INVALID_DOMAIN`) |
+| Caller does not have permission to modify target's Contract | rd | 5 (`QOS_ERR_PRIVILEGE`) |
+
+**`qs.it`** (delegate QoS Contract to child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`QOS_OK`) |
+| Parent ECID not allocated / generation mismatch | rd | 1 (`QOS_ERR_INVALID_ECID`) |
+| `child_ecid` is not a child of `rs1` | rd | 2 (`QOS_ERR_NOT_CHILD`) |
+| Request would exceed group bandwidth cap on this domain | rd | 3 (`QOS_ERR_CAP_EXCEEDED`) |
+| Global CN budget for this domain exhausted | rd | 4 (`QOS_ERR_SYSTEM_FULL`) |
+| Caller does not have permission to modify parent's Contract | rd | 5 (`QOS_ERR_PRIVILEGE`) |
+| `domain_id` is not present on this implementation | rd | 6 (`QOS_ERR_INVALID_DOMAIN`) |
+| ECID already holds a Contract on this domain (use `qs.or` first) | rd | 7 (`QOS_ERR_ALREADY_BOUND`) |
+| Pointer-form `rs2` causes a memory fault | trap | 5 or 13 |
+
+**`qs.ot`** (revoke delegated QoS Contract from child ECID)
+
+| Condition | Outcome | Value |
+|---|---|---|
+| Normal completion | rd | 0 (`QOS_OK`) |
+| Target ECID not allocated / generation mismatch | rd | 1 (`QOS_ERR_INVALID_ECID`) |
+| `domain_id` is not present on this implementation | rd | 6 (`QOS_ERR_INVALID_DOMAIN`) |
+| Caller does not have permission to modify target's Contract | rd | 5 (`QOS_ERR_PRIVILEGE`) |
+
+---
+
+## 15.6 Exception Delegation via `medeleg` and `hedeleg`
+
+CE Suite exceptions participate in the standard RISC-V exception delegation
+mechanism. M-mode may delegate any exception cause to S-mode via `medeleg`.
+When the H extension is present, HS-mode may further delegate causes to VS-mode
+via `hedeleg`.
+
+### 15.6.1 Delegation recommendations
+
+| Cause | Delegatable | Notes |
+|---|---|---|
+| 2 — illegal instruction | Yes | Delegate if S-mode handles CE privilege violations directly |
+| 5 — load access fault | Yes | Standard delegation rules apply |
+| 7 — store/AMO access fault | Yes | Standard delegation rules apply |
+| 13 — load page fault | Yes | Standard delegation rules apply |
+| 15 — store/AMO page fault | Yes | Standard delegation rules apply |
+| 16 — `CE_EXC_BANK_FAULT` | Yes | Delegate if S-mode manages bank error recovery |
+
+Cause 2 (illegal instruction) covers both CE privilege violations and ordinary
+illegal instructions. Delegating it to S-mode means S-mode sees all illegal
+instruction exceptions, not just CE ones. Software must filter by the faulting
+instruction encoding if it needs to distinguish CE violations from other illegal
+instructions.
+
+### 15.6.2 S-mode CE exception handler responsibilities
+
+When S-mode receives a CE-related exception (delegated by M-mode):
+
+* **Cause 2 from a CE instruction**: Check whether `cme_priv_ctl.S_EN = 1`.
+  If S_EN = 0, the exception indicates that M-mode has not enabled CE for
+  S-mode; the handler should abort the operation and return an error to the
+  caller. If S_EN = 1, the exception indicates an invalid CE instruction
+  encoding; treat as a programming error.
+
+* **Cause 16 (`CE_EXC_BANK_FAULT`)**: The bank SRAM experienced a hardware
+  error. The handler should log the fault, mark the affected ECID as
+  non-schedulable, and notify the system health monitor. Recovery may require
+  a reset of the affected hart or a reboot of the affected partition.
+
+* **Causes 5, 7, 13, 15**: ECS pointer fault during `ec.im` or `ec.om`. The
+  handler should validate `EC[rs1].ecs_ptr` and either remap the ECS struct or
+  terminate the faulting task.
+
+---
+
+## 15.7 Quick-Reference Summary
+
+**Instructions with no `rd` (always succeed or trap):**
+
+| Instruction | Trap cause if hardware error | Never fails in software |
+|---|---|---|
+| `ec.ib` | 16 (`CE_EXC_BANK_FAULT`) | mask validity still checked |
+| `ec.oe` | — | always succeeds, no trap path |
+
+**Instructions that always return `rd` (no trap except universal conditions):**
+
+All other 22 CE Suite instructions return error codes in `rd`. The only traps
+they can raise are: (1) illegal instruction (cause 2) from privilege or encoding
+checks; (2) memory faults (causes 5, 7, 13, 15) from pointer-form operands.
+
+**New exception cause introduced by CE Suite:**
+
+| Cause | Name | Description |
+|---|---|---|
+| 16 | `CE_EXC_BANK_FAULT` | Hardware error in bank SRAM during `ec.ib` or `ec.ob` |
+
+---
+
+## 15.8 Where to go next
+
+**Chapter 14** defines which privilege levels may execute CE Suite instructions
+and under what conditions; Chapter 15 defines what happens when they fail.
+
+**Chapter 3** (CME instruction set) should be read with the error code table in
+§15.4 in hand; the per-instruction descriptions reference error names that are
+now numerically assigned here.
+
+**P4** (discovery mechanism, not yet written) will define how software probes
+for CE Suite presence and which sub-extensions are implemented.
+
+[Next: Chapter 16 — (P4) Discovery Mechanism](ch16-discovery.md)

@@ -21,7 +21,7 @@ This chapter assumes the foundational definitions from Chapter 0 and the instruc
 
 ---
 
-## 1. Context Bank Types
+## 4.1 Context Bank Types
 
 Each hart contains a configurable number of context banks:
 
@@ -38,7 +38,7 @@ Each hart contains a configurable number of context banks:
 
 ---
 
-## 2. EC[e] Array and SRAM Residency
+## 4.2 EC[e] Array and SRAM Residency
 
 The `EC[e]` array is the primary hardware-visible per-ECID data structure (Chapter 0 §0.3). Each entry holds:
 
@@ -59,7 +59,7 @@ entry_addr(e) = cme_ec_table_base + e × stride
 ecs_ptr(e)    = *entry_addr(e)          // ecs_ptr is always at offset 0
 ```
 
-### 2.1 SRAM vs RAM residency
+### 4.2.1 SRAM vs RAM residency
 
 The full `EC[e]` table is RAM-resident. Implementations keep a **hot set** of entries in on-chip SRAM — typically the entries for ECIDs currently runnable on that hart.
 
@@ -68,13 +68,13 @@ The full `EC[e]` table is RAM-resident. Implementations keep a **hot set** of en
 
 A fast-path access to an entry not in the SRAM hot set must either stall until the entry is promoted, or be handled by a hardware prefetch mechanism. Implementations may expose the hot-set capacity as a read-only parameter CSR.
 
-### 2.2 Generation checks
+### 4.2.2 Generation checks
 
 Before acting on any `EC[e]` entry, hardware compares the stored `generation` field against any software-held reference. A mismatch indicates the slot was freed and reallocated; the instruction must trap or return a documented failure code (Chapter 0 §0.9). Silent ignore is prohibited.
 
 ---
 
-## 3. Bank Ownership and Security Checks
+## 4.3 Bank Ownership and Security Checks
 
 Hardware maintains a **bank tag** per bank:
 
@@ -94,7 +94,7 @@ On every `ec.ib` / `ec.ob` / `ec.im` / `ec.om`:
 
 ---
 
-## 4. Staging Banks and Copy Engine
+## 4.4 Staging Banks and Copy Engine
 
 Direct per-bit N-way muxing from the live register file to any bank is area- and timing-prohibitive at scale. Each hart therefore uses two **staging banks**:
 
@@ -113,7 +113,7 @@ Direct per-bit N-way muxing from the live register file to any bank is area- and
 
 ---
 
-## 5. Reference Profile: Option A (Fast Path)
+## 4.5 Reference Profile: Option A (Fast Path)
 
 **Lane count:** 16  
 **Lane width:** 256 b (32 B)  
@@ -132,7 +132,7 @@ VMT size is independent of XLEN and scales with vector width.
 
 ---
 
-## 6. Masked Transfers
+## 4.6 Masked Transfers
 
 Each bank stores dirty/used bits per register group. On save or restore, only register groups with dirty = 1 are transferred. This saves cycles and power proportionally to the number of inactive groups.
 
@@ -141,7 +141,7 @@ Example (RV32): GPR + PC only (~136 B in Option A) → 1 beat → save/restore =
 
 ---
 
-## 7. VMT-Ready Flag
+## 4.7 VMT-Ready Flag
 
 VMT banks are larger than NV banks; restoring them in full before resuming execution would penalize scalar-only code. Hardware supports early scalar resume:
 
@@ -155,7 +155,7 @@ On `ec.ob` with VMT state:
 
 ---
 
-## 8. Bank Allocation Engine
+## 4.8 Bank Allocation Engine
 
 Per hart:
 
@@ -165,7 +165,7 @@ Per hart:
 
 ---
 
-## 9. Radix-Tree Lookup Path
+## 4.9 Radix-Tree Lookup Path
 
 The kernel maintains a **radix tree** keyed on ECID numbers to track allocation, ownership, and per-prefix quotas (Chapter 0 §0.2). Hardware does not traverse this tree. From the hardware perspective, ECID `e` is simply an index into the flat `EC[e]` array.
 
@@ -179,7 +179,7 @@ This separation is intentional. The radix tree is a kernel policy structure — 
 
 ---
 
-## 10. DMA Spill/Fill (Slow Path)
+## 4.10 DMA Spill/Fill (Slow Path)
 
 When no bank is available for the requested ECID:
 
@@ -190,7 +190,7 @@ Banks remain locked (unavailable for reuse) until the DMA transfer completes. Ow
 
 ---
 
-## 11. Secure Vault Engine (Optional)
+## 4.11 Secure Vault Engine (Optional)
 
 - **Seal** (`ec.iv`): encrypts a bank's contents and sets the lock bit. No access is permitted until the bank is unsealed.
 - **Unseal** (`ec.ov`): decrypts the bank for the authorized ECID and clears the lock bit.
@@ -199,7 +199,7 @@ Key derivation, attestation, and rotation are charter open items (charter §8.7)
 
 ---
 
-## 12. Fast Context Switching Summary
+## 4.12 Fast Context Switching Summary
 
 | Scenario                   | Save         | Restore                          |
 |----------------------------|--------------|----------------------------------|
@@ -210,7 +210,7 @@ Key derivation, attestation, and rotation are charter open items (charter §8.7)
 
 ---
 
-## Placeholder: Diagram — CME Microarchitecture
+## 4.13 Placeholder: Diagram — CME Microarchitecture
 
 Show:
 
@@ -224,3 +224,5 @@ Show:
 - Secure Vault engine (optional, labeled)
 
 ---
+
+[Next: Chapter 5 — Linux Kernel Integration](ch05-linux-integration.md)

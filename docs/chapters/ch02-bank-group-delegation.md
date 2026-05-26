@@ -20,9 +20,9 @@ they are encoded.
 
 ---
 
-## 3.1 Groups
+## 2.1 Groups
 
-### 3.1.1 GroupID = ECID
+### 2.1.1 GroupID = ECID
 
 Every ECID `e` has exactly one Group. The Group's identifier is the ECID
 number itself: **GroupID = ECID**. There is no separate Group ID space, no
@@ -37,7 +37,7 @@ ownership, hardware reads that field and compares it to `current_ecid` —
 one load, one comparison. If Groups had their own ID space, hardware would
 need an additional translation step.
 
-### 3.1.2 Group as inventory, not container
+### 2.1.2 Group as inventory, not container
 
 A Group does not maintain a downward member list. It does not store a list
 of "which Banks belong to me." Instead, the relationship is inverted:
@@ -54,7 +54,7 @@ This is the **reversal trick**: ownership flows from resource to Group, not
 from Group to resource. It converts membership queries from O(N) (searching
 a member list) to O(1) (reading an up-pointer).
 
-### 3.1.3 Child Groups and visibility
+### 2.1.3 Child Groups and visibility
 
 When a parent ECID delegates resources to a child ECID, the child receives
 those resources into its own Group — the Group whose GroupID equals the child
@@ -73,9 +73,9 @@ ambiguity about who owns what.
 
 ---
 
-## 3.2 Banks
+## 2.2 Banks
 
-### 3.2.1 Bank record
+### 2.2.1 Bank record
 
 Every Bank has an owner field: the ECID number of the Group that currently
 owns the Bank. The owner field is set when a Bank is assigned to an ECID's
@@ -83,7 +83,7 @@ Group (via `ec.ig`) and cleared when the Bank is returned to the free pool
 (via `ec.og` or `ec.oe`). The owner field is maintained by the hardware;
 software cannot forge or overwrite it.
 
-### 3.2.2 Bank states
+### 2.2.2 Bank states
 
 A Bank is always in exactly one of four states:
 
@@ -99,7 +99,7 @@ from Free to Owned via `ec.ig`. A Bank transitions from Owned to Free via
 `ec.og` or as part of `ec.oe`. A Bank transitions to Sealed via `ec.iv`
 and back to Owned via `ec.ov`.
 
-### 3.2.3 Bank types
+### 2.2.3 Bank types
 
 **Non-VMT banks** hold general-purpose registers, floating-point registers,
 selected CSRs, SATP, and cache partition configuration (CP). Size: 1 KB on
@@ -114,7 +114,7 @@ bank require that the target ECID has VMT delegation rights (specified in
 `EC[e]`; see Chapter 0 §0.2). Implementations that do not support VMT
 may omit VMT banks entirely.
 
-### 3.2.4 Bank ownership invariant
+### 2.2.4 Bank ownership invariant
 
 **A Bank may be owned by at most one ECID at any instant.** No instruction
 sequence may cause a Bank's owner field to simultaneously reflect two
@@ -128,9 +128,9 @@ trap (charter §6.6).
 
 ---
 
-## 3.3 Contracts
+## 2.3 Contracts
 
-### 3.3.1 Contract record
+### 2.3.1 Contract record
 
 A Contract is a slice of a global multiplexed resource. The Contract record
 holds:
@@ -145,7 +145,7 @@ holds:
 - **Delegation level**: the `L` value at which this Contract was created,
   used to bound Contract trees by the same D as ECID delegation.
 
-### 3.3.2 Ownership and splitting
+### 2.3.2 Ownership and splitting
 
 **Single ownership.** A Contract has exactly one owner at any instant. The
 owner is identified by an ECID number in the Contract's owner field — the
@@ -156,16 +156,16 @@ duplicated.
 Contracts. Each child is a strict subset of its parent's allocation. The
 sum of all children's allocations must never exceed the parent's
 allocation. This invariant is enforced by hardware at the time of splitting
-(atomic admission, §3.3.3). A Contract tree is bounded by the same depth
+(atomic admission, §2.3.3). A Contract tree is bounded by the same depth
 D as the ECID delegation tree; this matches the virtualization hierarchy
-(§3.4.3).
+(§2.4.3).
 
 **Assignment to a Group.** When a Contract is created or transferred, its
 owner field is updated to the recipient ECID. The recipient's Group now
 "holds" the Contract via the same up-pointer mechanism as Banks: the
 Contract points up to its owner ECID.
 
-### 3.3.3 Atomic admission
+### 2.3.3 Atomic admission
 
 Splitting a Contract or assigning it to a new Group requires chip-global
 arbitration. The arbitration either succeeds and commits the state change
@@ -174,7 +174,7 @@ success. This is necessary to prevent double-counting: without atomicity,
 two simultaneous splits of the same parent could both succeed while
 together exceeding the parent's allocation.
 
-### 3.3.4 Dissolution
+### 2.3.4 Dissolution
 
 When an ECID's Group is destroyed (via `ec.oe`), all Contracts held by
 that Group are dissolved:
@@ -188,9 +188,9 @@ that Group are dissolved:
 
 ---
 
-## 3.4 Delegation
+## 2.4 Delegation
 
-### 3.4.1 What delegation means
+### 2.4.1 What delegation means
 
 Delegation transfers resources from a parent ECID's Group to a child
 ECID's Group. After delegation:
@@ -201,7 +201,7 @@ ECID's Group. After delegation:
   cannot issue `ec.ib` against a Bank it has delegated away, and it cannot
   use a Contract it has delegated away.
 
-**Bank delegation** uses `ec.it` (Chapter 3 §4): one bank per call,
+**Bank delegation** uses `ec.it` (Chapter 3 §3.4): one bank per call,
 parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
 `ec.it` N times.
 
@@ -212,10 +212,10 @@ parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
 Neither instruction takes a Group ID as a separate argument, because
 GroupID = ECID.
 
-### 3.4.2 Creating a child ECID
+### 2.4.2 Creating a child ECID
 
 Delegation presupposes a child ECID. The instruction `ec.ir` (Chapter 3
-§5) allocates a new child ECID in the calling context's radix-tree prefix.
+§3.5) allocates a new child ECID in the calling context's radix-tree prefix.
 The kernel then:
 
 1. Sets `EC[child].ecs_ptr` to point to the child's ECS in RAM.
@@ -229,7 +229,7 @@ Steps 1–3 are kernel software operations (writes to the `EC[e]` array via
 the kernel's privileged view). Step 4 issues one `ec.it` call per bank
 being delegated; each call is O(1).
 
-### 3.4.3 Delegation-level invariants
+### 2.4.3 Delegation-level invariants
 
 Delegation depth is bounded by the implementation's cap `D`, where `D ≤ 3`
 (charter §5.1). The four levels support the realistic virtualization
@@ -241,7 +241,7 @@ hierarchy: L0 host kernel, L1 hypervisor, L2 nested hypervisor, L3 guest.
 | `L = D`   | This ECID may bind resources for itself but may not delegate.      |
 
 An attempt to create a child ECID from an ECID at level `L = D` raises a
-trap or returns an error code in `rd` (chapter §6.6). The parent's
+trap or returns an error code in `rd` (charter §6.6). The parent's
 delegation level `L` is stored in `EC[parent].delegation_L` and is
 checked by hardware at the time of `ec.ir` and `ec.it`.
 
@@ -250,7 +250,7 @@ can be split into children only if `L < D`. This ensures the Contract
 hierarchy never exceeds four levels, bounding the worst-case dissolution
 walk.
 
-### 3.4.4 After delegation
+### 2.4.4 After delegation
 
 Once resources are delegated, the following hold:
 
@@ -267,9 +267,9 @@ Once resources are delegated, the following hold:
 
 ---
 
-## 3.5 Revocation
+## 2.5 Revocation
 
-### 3.5.1 Cooperative revocation: `ec.ot`
+### 2.5.1 Cooperative revocation: `ec.ot`
 
 `ec.ot rd, rs1` revokes all resources from child ECID `rs1` and returns them to
 the parent's Group (`rd` receives 0 on success or an error code). After `ec.ot`:
@@ -288,11 +288,11 @@ Cooperative revocation is the normal teardown path: the parent decides
 the child is done, revokes its resources, and then destroys the child ECID
 via `ec.oe`.
 
-### 3.5.2 Forced destruction: `ec.oe`
+### 2.5.2 Forced destruction: `ec.oe`
 
 `ec.oe rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
 resources. This instruction always succeeds. The target context cannot
-stall, block, or defend against it. See Chapter 3 §5 for the step-by-step
+stall, block, or defend against it. See Chapter 3 §3.5 for the step-by-step
 semantics.
 
 `ec.oe` is the path for:
@@ -306,7 +306,7 @@ generation counters incremented. Any software holding references to
 `(hart_id, ECID, generation)` triples in the destroyed subtree will detect
 the stale references on next use.
 
-### 3.5.3 Resource reclamation path
+### 2.5.3 Resource reclamation path
 
 After `ec.oe`:
 
@@ -315,7 +315,7 @@ After `ec.oe`:
    ancestor's Group if a partial subtree was destroyed.
 2. All Contracts formerly held by the destroyed subtree are dissolved
    upward, with allocations returning to parent Contracts as described in
-   §3.3.4.
+   §2.3.4.
 3. All `EC[e]` slots in the destroyed subtree are marked free with
    incremented generation counters.
 
@@ -325,7 +325,7 @@ radix-tree bookkeeping in RAM).
 
 ---
 
-## 3.6 Invariants
+## 2.6 Invariants
 
 The following invariants must hold at all times in a conforming
 implementation. They are checked at the time of each `ec.ig`, `ec.og`,
@@ -353,9 +353,9 @@ prohibited (charter §6.6).
 
 ---
 
-## 3.7 Error and Trap Semantics
+## 2.7 Error and Trap Semantics
 
-Operations that violate the invariants in §3.6, reference an unallocated
+Operations that violate the invariants in §2.6, reference an unallocated
 or stale ECID slot, or exceed the caller's privilege level must result in
 one of:
 
@@ -371,7 +371,7 @@ already reflects the destruction; there is nothing to undo.
 
 ---
 
-## 3.8 Relationship to Radix Tree
+## 2.8 Relationship to Radix Tree
 
 The radix tree (Appendix A) is the kernel-side data structure that backs
 ECID allocation and the delegation hierarchy. It is not an architectural

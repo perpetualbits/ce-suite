@@ -1,6 +1,6 @@
 # Chapter 10 — MSE Usage Examples
 
-## 1. Overview
+## 10.1 Overview
 
 This chapter illustrates real-world usage patterns of the Memory Scheduling
 Extension (MSE). Examples cover Contract assignment, latency bound calculation,
@@ -19,14 +19,14 @@ All examples assume:
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   `x0` is used for `rd` to discard the result where the fast path is expected
   to succeed.
-- Inline `rs2` values use the encoding defined in Chapter 9 §5:
+- Inline `rs2` values use the encoding defined in Chapter 9 §9.5:
   - For `ms.ir`: bits 3:0 = `bw_class`, bits 7:4 = `lat_class`, bit `[XLEN-1]` = 0.
   - For `ms.it`: bits 15:0 = `child_ecid`, bits 19:16 = `child_bw_class`,
     bits 23:20 = `child_lat_class`, bit `[XLEN-1]` = 0.
 
 ---
 
-## 2. Reading Latency Parameters
+## 10.2 Reading Latency Parameters
 
 ### Scenario
 
@@ -56,7 +56,7 @@ nesting depth to determine worst-case DRAM latency bounds.
 
 ---
 
-## 3. Assigning a Contract to a Real-Time Task
+## 10.3 Assigning a Contract to a Real-Time Task
 
 ### Scenario
 
@@ -64,6 +64,8 @@ A real-time audio DSP task (`rt_ecid`) is assigned an MSE Contract guaranteeing
 minimum memory bandwidth and bounded latency. The ECID is not currently running.
 
 ### Code — inline descriptor
+
+> `ms.ir` = memory scheduling into resource (`ms` = MSE, `i` = into/assign, `r` = resource)
 
 ```asm
     # Build inline ms.ir descriptor:
@@ -98,13 +100,13 @@ minimum memory bandwidth and bounded latency. The ECID is not currently running.
 - An ECID with `bw_class=0` and `lat_class=0` is best-effort and does not
   participate in CN slot arbitration. Assigning both to zero via `ms.ir` has
   the same effect as `ms.or`.
-- `ms.ir` checks two admission conditions before committing (Chapter 9 §5, §7.3):
+- `ms.ir` checks two admission conditions before committing (Chapter 9 §9.5, §9.7.3):
   the group bandwidth cap and the system-wide CN budget. If either fails, `rd`
   holds the error code and no state changes.
 
 ---
 
-## 4. Context Switch — MSE Contract Is Automatic
+## 10.4 Context Switch — MSE Contract Is Automatic
 
 ### Scenario
 
@@ -112,6 +114,8 @@ Two tasks share a hart. One holds an MSE Contract (`rt_ecid`); the other is
 best-effort (`be_ecid`). The scheduler switches between them.
 
 ### Code
+
+> `ec.ib` = ECID into bank — `ec.ob` = ECID out of bank (MSE Contract restored automatically)
 
 ```asm
     # Switch from best-effort task to real-time task.
@@ -133,7 +137,7 @@ best-effort (`be_ecid`). The scheduler switches between them.
 
 ---
 
-## 5. MSE and CPE Together — End-to-End Latency
+## 10.5 MSE and CPE Together — End-to-End Latency
 
 ### Scenario
 
@@ -177,7 +181,7 @@ context switches.
 
 ---
 
-## 6. Delegating a Contract to a Guest vCPU
+## 10.6 Delegating a Contract to a Guest vCPU
 
 ### Scenario
 
@@ -186,6 +190,8 @@ A hypervisor (`hyp_ecid`, L=1) holds an MSE Contract with `bw_class=8`,
 guaranteed memory bandwidth share.
 
 ### Delegate to first vCPU
+
+> `ms.it` = memory scheduling into tenant (`ms` = MSE, `i` = into/delegate, `t` = tenant/child ECID)
 
 ```asm
     # Inline ms.it descriptor: child_ecid=vcpu0_ecid, bw_class=3, lat_class=2.
@@ -223,9 +229,11 @@ guaranteed memory bandwidth share.
 
 ---
 
-## 7. Revocation and Teardown
+## 10.7 Revocation and Teardown
 
 ### Scenario A — explicit Contract revoke before task demotion
+
+> `ms.or` = memory scheduling out of resource — `ms.ot` = memory scheduling out of tenant
 
 A task is demoted from real-time to best-effort (e.g., moved from SCHED_DEADLINE
 to SCHED_OTHER in Linux). The kernel revokes the MSE Contract before the ECID
@@ -267,7 +275,7 @@ as part of the destroy sequence.
 
 ---
 
-## 8. Error Handling
+## 10.8 Error Handling
 
 ### `MSE_ERR_CAP_EXCEEDED` — group bandwidth cap
 
@@ -313,7 +321,7 @@ as part of the destroy sequence.
 
 ---
 
-## 9. Monitoring Contract Violations
+## 10.9 Monitoring Contract Violations
 
 ### Scenario
 
@@ -345,19 +353,19 @@ does not receive its guaranteed CN slots in a scheduling window.
 - `mse_violation` is sticky: it accumulates until explicitly cleared by writing 1.
 - A violation means the hardware detected that a Contract holder did not receive
   its guaranteed `bw_class` worth of CN slots in the last scheduling window
-  (Chapter 9 §8). This can indicate system overload or a mis-configured slot ratio.
+  (Chapter 9 §9.8). This can indicate system overload or a mis-configured slot ratio.
 - The slot ratio is adjustable via `mse_slot_ratio` (bits 7:0, where 128=50%).
-  The BE fraction must remain ≥ 25 % and the CN fraction ≥ 25 % (Chapter 9 §2.1).
+  The BE fraction must remain ≥ 25 % and the CN fraction ≥ 25 % (Chapter 9 §9.2.1).
 
 ---
 
-## 10. Where to go next
+## 10.10 Where to go next
 
 **Chapter 9** is the normative MSE reference: slot scheme, Contract parameters,
 arbitration rules, CSRs, and error codes.
 
 **Chapter 7** covers CPE (cache partitioning), which composes with MSE for
-end-to-end bounded memory latency (see §5 above).
+end-to-end bounded memory latency (see §10.5 above).
 
 **Chapter 12** covers QoS usage examples: how I/O and NoC bandwidth Contracts
 compose with MSE for workloads that span both DRAM and peripheral interconnect.

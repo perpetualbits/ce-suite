@@ -1,6 +1,6 @@
 # Chapter 11 — QoS: I/O Quality-of-Service Extension
 
-## 1. Overview
+## 11.1 Overview
 
 The **I/O Quality-of-Service Extension (QoS)** applies the same arbitration philosophy
 as MSE (Chapter 9) to the on-chip I/O fabric: the Network-on-Chip (NoC), DMA engines,
@@ -36,13 +36,13 @@ both — QoS on the I/O side, MSE on the DRAM side. Neither subsumes the other.
 
 ---
 
-## 2. Fabric Domains
+## 11.2 Fabric Domains
 
 Unlike MSE, which governs a single DRAM controller, QoS governs **multiple heterogeneous
 fabric domains** within the same SoC. Each domain is an independent arbitration point
 with its own bandwidth capacity, slot timescale, and CN budget.
 
-### 2.1 Domain classes
+### 11.2.1 Domain classes
 
 | Domain class | Examples | Typical slot timescale |
 |---|---|---|
@@ -50,19 +50,19 @@ with its own bandwidth capacity, slot timescale, and CN budget.
 | **DMA** | DMA engines, IOMMU-mapped transfer channels | 100 ns – 10 µs (transfer credit unit) |
 | **Peripheral** | APB, AHB, AXI peripheral bus segments | 10–200 ns (bus transaction period) |
 
-### 2.2 Domain identifier (`domain_id`)
+### 11.2.2 Domain identifier (`domain_id`)
 
 Each fabric domain visible to QoS software has an implementation-assigned
 **`domain_id`**: an integer of implementation-defined width, exposed via the
-`qos_domain_count` CSR (§6). Domain IDs are stable across boots for a given
+`qos_domain_count` CSR (§11.6). Domain IDs are stable across boots for a given
 implementation; they are not architectural constants.
 
 Software discovers available domains and their properties by reading the domain
-descriptor array (§6.1). A `domain_id` that does not correspond to a domain present
+descriptor array (§11.6.1). A `domain_id` that does not correspond to a domain present
 in the implementation is invalid; instructions that reference it return
 `QOS_ERR_INVALID_DOMAIN`.
 
-### 2.3 Per-domain isolation
+### 11.2.3 Per-domain isolation
 
 Admission control, CN budgets, scheduling windows, and violation tracking are all
 **per-domain**. Exhausting the CN budget on the NoC domain does not block assignment
@@ -71,9 +71,9 @@ of a DMA Contract. This is a deliberate consequence of keeping Contracts single-
 
 ---
 
-## 3. The BE/Contract Slot Scheme
+## 11.3 The BE/Contract Slot Scheme
 
-### 3.1 Alternating slots
+### 11.3.1 Alternating slots
 
 Each fabric domain independently divides its arbitration time into alternating slots:
 
@@ -82,19 +82,19 @@ Each fabric domain independently divides its arbitration time into alternating s
 ```
 
 - **CN (contract) slots** — served only to ECIDs holding an active QoS Contract on
-  this domain whose `lat_class` is non-zero. The arbitration rule in §8 selects which
+  this domain whose `lat_class` is non-zero. The arbitration rule in §11.8 selects which
   eligible EC is served.
 - **BE (best-effort) slots** — available to any EC regardless of Contract status.
   DMA channels not bound to a Contract also compete in BE slots.
 
 The default split is 50 % CN / 50 % BE. Each domain exposes a `qos_slot_ratio` CSR
-field (§6); the BE fraction must be at least 25 % and the CN fraction at least 25 %
-to preserve the latency bounds in §4.
+field (§11.6); the BE fraction must be at least 25 % and the CN fraction at least 25 %
+to preserve the latency bounds in §11.4.
 
-### 3.2 Slot size
+### 11.3.2 Slot size
 
 Slot size is implementation-defined and per-domain. Each domain's slot size is exposed
-as a read-only value via the domain descriptor array (§6.1) in nanoseconds. Software
+as a read-only value via the domain descriptor array (§11.6.1) in nanoseconds. Software
 uses this value to convert Contract latency classes into wall-clock latency bounds.
 
 Typical values:
@@ -105,7 +105,7 @@ Typical values:
 | DMA | 200 ns – 2 µs |
 | Peripheral | 20–200 ns |
 
-### 3.3 Steady-state bandwidth
+### 11.3.3 Steady-state bandwidth
 
 In steady state with N active Contract holders each claiming one CN slot per pair on
 a given domain:
@@ -117,9 +117,9 @@ a given domain:
 
 ---
 
-## 4. Interrupt Accommodation and Latency Bounds
+## 11.4 Interrupt Accommodation and Latency Bounds
 
-### 4.1 Interrupts absorb into BE slots
+### 11.4.1 Interrupts absorb into BE slots
 
 When an interrupt fires, its handler executes as a new EC. If that handler performs
 I/O (acknowledging a peripheral, draining a FIFO, initiating a DMA), those accesses
@@ -130,7 +130,7 @@ handler is **one slot** on that domain beyond whatever access is already in flig
 CN slots are never preempted by an interrupt. This keeps Contract holders' bandwidth
 guarantees intact under interrupt load.
 
-### 4.2 Nested interrupts and the nesting cap K
+### 11.4.2 Nested interrupts and the nesting cap K
 
 Interrupt nesting extends the worst-case latency for CN slots. QoS defines a
 parameter **K** — the maximum hardware-tolerated interrupt nesting depth — exposed
@@ -150,7 +150,7 @@ latency_max = (K + 1) × slot_size(domain)
 
 **Contract bandwidth** remains at the configured CN fraction regardless of K.
 
-### 4.3 Practical values
+### 11.4.3 Practical values
 
 | K | Worst-case CN latency | Notes |
 |---|---|---|
@@ -164,12 +164,12 @@ and is not permitted by QoS v1.
 
 ---
 
-## 5. QoS Contracts
+## 11.5 QoS Contracts
 
 QoS Contracts are instances of the general Contract model (charter §4.3). This section
 specifies the QoS-specific parameters each Contract carries.
 
-### 5.1 Contract parameters
+### 11.5.1 Contract parameters
 
 Each QoS Contract holds three fields set by the privileged actor that creates it:
 
@@ -190,7 +190,7 @@ domain does not prevent holding a separate Contract on a DMA domain.
 domain and loaded atomically by `ec.ob` on context switch. The I/O fabric controller
 reads these fields from per-hart registers, not from RAM, during arbitration.
 
-### 5.2 Group bandwidth cap
+### 11.5.2 Group bandwidth cap
 
 The privileged actor that creates an ECID may set a **group bandwidth cap** on it:
 a ceiling on the total `bw_class` sum across all ECIDs in that ECID's delegation
@@ -205,15 +205,15 @@ sum(bw_class, subtree(e), domain) ≤ bw_cap(e, domain)
 
 A child cannot claim more guaranteed I/O bandwidth than the parent has delegated.
 
-### 5.3 Hierarchical splitting
+### 11.5.3 Hierarchical splitting
 
 A privileged actor may split a QoS Contract into a parent Contract and one or more
 child Contracts (charter §4.3.3). Each child's `bw_class` must be ≤ the parent's
 `bw_class` minus what the parent retains. The sum of all children's `bw_class` values
-must never exceed the parent's. Splitting is performed via `qs.it` (§7.3) and is
+must never exceed the parent's. Splitting is performed via `qs.it` (§11.7) and is
 **atomic**: if the hardware admission check fails, no state is changed.
 
-### 5.4 Dissolution
+### 11.5.4 Dissolution
 
 When an ECID's Contract is revoked (via `qs.or` or `ec.oe`), the Contract dissolves
 and its `bw_class` is returned to the parent ECID's cap headroom for that domain.
@@ -221,7 +221,7 @@ If the ECID has child Contracts on the same domain, those are revoked first,
 recursively (charter §4.3.5). Dissolution always succeeds — even for zombie or hostile
 ECIDs — and is O(log N) via the radix tree.
 
-### 5.5 DMA attribution
+### 11.5.5 DMA attribution
 
 DMA engines generate fabric traffic that is not CPU-pipeline-initiated. QoS handles
 this through **DMA channel binding**: when a privileged actor calls `qs.ir` with a
@@ -237,7 +237,7 @@ or `ec.oe`.
 
 ---
 
-## 6. QoS CSRs
+## 11.6 QoS CSRs
 
 QoS CSRs are **domain-scoped**: a domain selector register (`qos_domain_sel`)
 determines which domain's registers are visible to subsequent CSR reads and writes.
@@ -246,7 +246,7 @@ domains the implementation supports. Implementations with a fixed, small number 
 domains may expose them as flat CSR sets with domain-suffixed names; the domain-selector
 model is the architectural baseline.
 
-### 6.1 Domain descriptor array
+### 11.6.1 Domain descriptor array
 
 A read-only memory-mapped array, base address in `qos_domain_base`, with one
 descriptor per domain. Each descriptor holds:
@@ -261,7 +261,7 @@ descriptor per domain. Each descriptor holds:
 
 Software reads this array at boot to enumerate available I/O fabric domains.
 
-### 6.2 Domain-scoped CSRs
+### 11.6.2 Domain-scoped CSRs
 
 | CSR | Access | Purpose |
 |---|---|---|
@@ -278,7 +278,7 @@ Software reads this array at boot to enumerate available I/O fabric domains.
 
 ---
 
-## 7. QoS Instructions
+## 11.7 QoS Instructions
 
 All QoS instructions are privileged. They follow the naming scheme
 `qs.{i,o}{target}` (charter §6.1). QoS uses the subset `{r, t}`:
@@ -295,6 +295,8 @@ opaque domain handle (charter §6.2).
 ---
 
 ### `qs.ir` — Assign an I/O Contract to an ECID
+
+> `qs.ir` = I/O quality-of-service into resource (`qs` = QoS, `i` = into/assign, `r` = resource)
 
 * **Syntax**: `qs.ir rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
@@ -334,6 +336,8 @@ struct QOS_Contract_Params {
 
 ### `qs.or` — Revoke the I/O Contract from an ECID
 
+> `qs.or` = I/O quality-of-service out of resource (`qs` = QoS, `o` = out of/revoke, `r` = resource)
+
 * **Syntax**: `qs.or rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Target ECID.
@@ -355,6 +359,8 @@ struct QOS_Contract_Params {
 ---
 
 ### `qs.it` — Delegate a child I/O Contract to a child ECID
+
+> `qs.it` = I/O quality-of-service into tenant (`qs` = QoS, `i` = into/delegate, `t` = tenant/child ECID)
 
 * **Syntax**: `qs.it rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
@@ -401,6 +407,8 @@ struct QOS_Delegation_Params {
 
 ### `qs.ot` — Revoke a child I/O Contract back to the parent
 
+> `qs.ot` = I/O quality-of-service out of tenant (`qs` = QoS, `o` = out of/revoke, `t` = tenant/child ECID)
+
 * **Syntax**: `qs.ot rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Child ECID whose Contract is being revoked.
@@ -417,9 +425,9 @@ struct QOS_Delegation_Params {
 
 ---
 
-## 8. Arbitration
+## 11.8 Arbitration
 
-### 8.1 Per-access arbitration (CN slots)
+### 11.8.1 Per-access arbitration (CN slots)
 
 Within each CN slot on a given domain, the fabric arbiter selects one requesting EC
 using the following rule, executed in O(1) hardware:
@@ -434,12 +442,12 @@ using the following rule, executed in O(1) hardware:
 Best-effort requesters (`lat_class = 0`) are not eligible in CN slots; they wait for
 the next BE slot.
 
-### 8.2 Per-access arbitration (BE slots)
+### 11.8.2 Per-access arbitration (BE slots)
 
 All requesters with a pending request on this domain are eligible. Arbitration is
 round-robin. Burst size is implementation-defined.
 
-### 8.3 Admission control
+### 11.8.3 Admission control
 
 Each domain independently prevents over-commitment of its CN slot budget. On every
 `qs.ir` or `qs.it` call, hardware checks:
@@ -452,19 +460,19 @@ new_sum ≤ total_cn_budget(domain)
 If the check fails, the instruction returns `QOS_ERR_SYSTEM_FULL` and no state changes.
 This check is O(1): a single addition and comparison, per domain.
 
-### 8.4 Group caps
+### 11.8.4 Group caps
 
-Group caps (§5.2) are enforced on every `qs.ir` and `qs.it` call as described there.
+Group caps (§11.5.2) are enforced on every `qs.ir` and `qs.it` call as described there.
 No runtime per-access group check is needed: once admitted, the per-hart or per-channel
 registers already encode the correct class bits.
 
 ---
 
-## 9. Scheduling Window
+## 11.9 Scheduling Window
 
 QoS operates with a rolling **scheduling window** per domain — a period over which
 bandwidth guarantees are measured. The window length is implementation-defined and
-exposed in the domain descriptor array (§6.1) as `window_slots` per domain.
+exposed in the domain descriptor array (§11.6.1) as `window_slots` per domain.
 
 At the end of each window:
 
@@ -481,7 +489,7 @@ smooth bursty workloads. Typical values are 16–256 slots per domain.
 
 ---
 
-## 10. Interaction with CME, CPE, and MSE
+## 11.10 Interaction with CME, CPE, and MSE
 
 **CME.** On every `ec.ob` (context restore), CME atomically loads the new EC's full
 bank state. The CP field in the bank (chapter 0 §0.6) carries the QoS Contract
@@ -519,7 +527,7 @@ latency_max(end-to-end) = (K + 1) × qos_slot_ns(DMA domain)   // I/O side
 
 ---
 
-## 11. Error Codes
+## 11.11 Error Codes
 
 | Code | Value | Meaning |
 |---|---|---|
@@ -538,15 +546,15 @@ All error codes are returned in `rd` or in `qos_status`. Silent failure is prohi
 
 ---
 
-## 12. Instruction Encoding
+## 11.12 Instruction Encoding
 
 All CE Suite instructions share the same R-type format and custom-0 opcode
-(`0001011`). See Chapter 3 §10.1–§10.2 for the bitfield diagram and the
+(`0001011`). See Chapter 3 §3.10.1–§3.10.2 for the bitfield diagram and the
 funct3 extension-selector table.
 
 **QoS uses funct3 = `011`.**
 
-### 12.1 QoS instruction encoding (funct3 = `011`)
+### 11.12.1 QoS instruction encoding (funct3 = `011`)
 
 | funct7      | Mnemonic | rd field | rs1 field   | rs2 field                 |
 |-------------|----------|----------|-------------|---------------------------|
@@ -561,7 +569,7 @@ Unlike CPE and MSE, all four QoS instructions use all three register fields — 
 are no rs2=`00000` cases. `qs.or` and `qs.ot` carry a domain selector in rs2
 (0 = revoke all domains simultaneously) per charter §6.7.
 
-### 12.2 Encoding examples
+### 11.12.2 Encoding examples
 
 `qs.ir a0, a1, a2` — assign I/O Contract (parameters in a2) to ECID in a1,
 result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
@@ -586,7 +594,7 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ---
 
-## 13. Out of Scope for v1
+## 11.13 Out of Scope for v1
 
 - **DRAM arbitration.** Covered by MSE (Chapter 9).
 - **L1/L2 cache isolation.** Covered by CPE (Chapter 7).
@@ -600,4 +608,4 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ---
 
-**Next:** Chapter 12 — QoS Usage Examples
+[Next: Chapter 12 — QoS Usage Examples](ch12-qos-usage-examples.md)

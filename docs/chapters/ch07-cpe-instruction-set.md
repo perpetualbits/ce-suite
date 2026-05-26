@@ -1,6 +1,6 @@
 # Chapter 7 — CPE Instruction Set Reference
 
-## 1. Overview
+## 7.1 Overview
 
 The **Cache Partitioning Extension (CPE)** provides hardware mechanisms for
 isolating and reserving per-hart private cache capacity (L1I, L1D, and
@@ -23,7 +23,7 @@ Three rules from the charter govern every CPE instruction:
 
 ---
 
-## 2. Instruction Naming
+## 7.2 Instruction Naming
 
 CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
@@ -36,17 +36,19 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
 ---
 
-## 3. Instruction Reference
+## 7.3 Instruction Reference
 
 ### `cp.ir` — Assign a cache partition to an ECID
 
+> `cp.ir` = cache partition into resource (`cp` = CPE, `i` = into/assign, `r` = resource)
+
 * **Syntax**: `cp.ir rd, rs1, rs2`
-  * `rd`: 0 on success; error code on failure (see §8).
+  * `rd`: 0 on success; error code on failure (see §7.8).
   * `rs1`: Target ECID.
-  * `rs2`: Partition descriptor — inline or pointer (see §4).
+  * `rs2`: Partition descriptor — inline or pointer (see §7.4).
 * **Semantics**:
   1. Validates `rs1` is an allocated ECID on this hart.
-  2. Validates the partition descriptor in `rs2` (see §4 and §6).
+  2. Validates the partition descriptor in `rs2` (see §7.4 and §7.6).
   3. Checks that assigned ways do not overlap with ways already assigned to
      other ECIDs at the same level. If overlap: returns `CPE_ERR_OVERLAP`.
   4. Checks that the assignment is consistent with any parent Contract the
@@ -58,11 +60,13 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
   7. If `rs1` is currently active on this hart, the change takes effect
      immediately (or on the next instruction boundary; implementation-defined).
 * **Cycles**: 1–8 (hardware writeback and invalidation of displaced lines may
-  extend latency; see §6 sanity rule 4).
+  extend latency; see §7.6 sanity rule 4).
 
 ---
 
 ### `cp.or` — Revoke all cache partitions from an ECID
+
+> `cp.or` = cache partition out of resource (`cp` = CPE, `o` = out of/revoke, `r` = resource)
 
 * **Syntax**: `cp.or rd, rs1`
   * `rd`: 0 on success; error code on failure.
@@ -71,7 +75,7 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
   1. Validates `rs1`.
   2. Revokes all partition assignments for ECID `rs1` at all cache levels.
   3. Invalidates all cache lines in the revoked ways that belong to `rs1`
-     (required for isolation; see §6 sanity rule 5).
+     (required for isolation; see §7.6 sanity rule 5).
   4. If `rs1` holds child CPE Contracts (delegated via `cp.it`), those are
      revoked first recursively (bounded by D ≤ 3). Always makes forward
      progress; cannot be stalled by a hostile child.
@@ -82,13 +86,15 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
 ### `cp.it` — Delegate a cache-partition sub-slice to a child ECID
 
+> `cp.it` = cache partition into tenant (`cp` = CPE, `i` = into/delegate, `t` = tenant/child ECID)
+
 * **Syntax**: `cp.it rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Parent ECID — must hold a CPE Contract (assigned via `cp.ir`).
-  * `rs2`: Delegation descriptor — child ECID plus way counts (see §5).
+  * `rs2`: Delegation descriptor — child ECID plus way counts (see §7.5).
 * **Semantics**:
   1. Validates `rs1` holds a CPE Contract on this hart.
-  2. Extracts `child_ecid`, `l1_ways`, `l2_ways` from `rs2` (see §5).
+  2. Extracts `child_ecid`, `l1_ways`, `l2_ways` from `rs2` (see §7.5).
   3. Verifies `child_ecid` is a child of `rs1` in the delegation tree and
      satisfies `EC[child_ecid].delegation_L < D`.
   4. Checks that `l1_ways + existing_l1_sum(children of rs1) ≤ l1_ways(rs1)`
@@ -101,6 +107,8 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 ---
 
 ### `cp.ot` — Revoke a delegated cache partition from a child ECID
+
+> `cp.ot` = cache partition out of tenant (`cp` = CPE, `o` = out of/revoke, `t` = tenant/child ECID)
 
 * **Syntax**: `cp.ot rd, rs1`
   * `rd`: 0 on success; error code on failure.
@@ -116,7 +124,7 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
 ---
 
-## 4. Partition Descriptor (`rs2` for `cp.ir`)
+## 7.4 Partition Descriptor (`rs2` for `cp.ir`)
 
 `rs2` is an XLEN-wide value that is either an inline descriptor or a pointer
 to a `CPE_Assignment_Params` struct:
@@ -157,7 +165,7 @@ bits return `CPE_ERR_ILLEGAL_FIELD`.
 
 ---
 
-## 5. Delegation Descriptor (`rs2` for `cp.it`)
+## 7.5 Delegation Descriptor (`rs2` for `cp.it`)
 
 `rs2` is an XLEN-wide value encoding the child ECID and the way counts
 to delegate:
@@ -187,7 +195,7 @@ struct CPE_Delegation_Params {
 
 ---
 
-## 6. Hardware Sanity Rules
+## 7.6 Hardware Sanity Rules
 
 The hardware enforces the following invariants on every `cp.ir` and `cp.it`
 call. Violations return an error code; no state changes on failure.
@@ -206,7 +214,7 @@ call. Violations return an error code; no state changes on failure.
 
 ---
 
-## 7. CPE CSRs
+## 7.7 CPE CSRs
 
 | CSR | Access | Purpose |
 |---|---|---|
@@ -226,7 +234,7 @@ call. Violations return an error code; no state changes on failure.
 
 ---
 
-## 8. Error Codes
+## 7.8 Error Codes
 
 | Code | Name | Meaning |
 |---|---|---|
@@ -241,7 +249,7 @@ call. Violations return an error code; no state changes on failure.
 
 ---
 
-## 9. Interaction with CME
+## 7.9 Interaction with CME
 
 CPE partition assignments are part of an ECID's architectural state.
 
@@ -255,7 +263,7 @@ CPE partition assignments are part of an ECID's architectural state.
 
 ---
 
-## 10. Instruction Timing Summary
+## 7.10 Instruction Timing Summary
 
 | Instruction | Cycles | Notes |
 |---|---|---|
@@ -266,15 +274,15 @@ CPE partition assignments are part of an ECID's architectural state.
 
 ---
 
-## 11. Instruction Encoding
+## 7.11 Instruction Encoding
 
 All CE Suite instructions share the same R-type format and custom-0 opcode
-(`0001011`). See Chapter 3 §10.1–§10.2 for the bitfield diagram and the
+(`0001011`). See Chapter 3 §3.10.1–§3.10.2 for the bitfield diagram and the
 funct3 extension-selector table.
 
 **CPE uses funct3 = `001`.**
 
-### 11.1 CPE instruction encoding (funct3 = `001`)
+### 7.11.1 CPE instruction encoding (funct3 = `001`)
 
 | funct7      | Mnemonic | rd field | rs1 field    | rs2 field               |
 |-------------|----------|----------|--------------|-------------------------|
@@ -287,7 +295,7 @@ funct7 values `0000100`–`1111111` (4–127) are reserved for future CPE instru
 
 `cp.or` and `cp.ot` carry no `rs2` operand; the rs2 field is encoded as `00000` (x0).
 
-### 11.2 Encoding examples
+### 7.11.2 Encoding examples
 
 `cp.ir a0, a1, a2` — assign partition (descriptor in a2) to ECID in a1, result in a0
 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):

@@ -657,3 +657,5 @@ Interrupt routing is implementation-defined.
 ---
 
 *End of Chapter 13.*
+
+[Next: Chapter 14 — CE Suite Privilege Model](ch14-privilege-model.md)

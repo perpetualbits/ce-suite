@@ -20,29 +20,35 @@ All CME instructions are privileged unless noted otherwise. The mnemonic scheme 
 `ec.<dir><target>` (Charter §6.1), where `<dir>` ∈ `{i, o}` and `<target>` is
 a letter naming the target or kind. CME uses the subset `{b, m, g, t, r, e, v}`:
 
-  | Letter | Target / kind | Instructions |
-  |--------|---------------|--------------|
-  | `b`    | bank          | `ec.ib`, `ec.ob` |
-  | `m`    | memory (ECS in RAM) | `ec.im`, `ec.om` |
-  | `g`    | group (bank assignment) | `ec.ig`, `ec.og` |
-  | `t`    | tenant (delegation) | `ec.it`, `ec.ot` |
-  | `r`    | resource (ECID lifecycle) | `ec.ir` |
-  | `e`    | existence (forced destroy) | `ec.oe` |
-  | `v`    | vault (sealed bank) | `ec.iv`, `ec.ov` |
+  | Letter | Target / kind | Full name | Instructions |
+  |--------|---------------|-----------|--------------|
+  | `b`    | bank          | bank      | `ec.ib`, `ec.ob` |
+  | `m`    | memory (ECS in RAM) | memory | `ec.im`, `ec.om` |
+  | `g`    | group (bank assignment) | group | `ec.ig`, `ec.og` |
+  | `t`    | tenant (delegation) | tenant | `ec.it`, `ec.ot` |
+  | `r`    | resource (ECID lifecycle) | resource | `ec.ir` |
+  | `e`    | existence (forced destroy) | existence | `ec.oe` |
+  | `v`    | vault (sealed bank) | vault | `ec.iv`, `ec.ov` |
 
-Staging banks (`s`) are hardware-internal; no software instruction targets them directly.
+The letter `s` (stream / staging bank) does not appear in CME software instructions —
+staging banks are entirely hardware-internal and have no direct software-visible
+instruction. `ec.or` does not exist as a current instruction: it was the original name
+for the forced-destroy operation, renamed first to `ec.od` (v0.7) and then to `ec.oe`
+(v0.8) for naming consistency. See §3.5 for details.
 
 ---
 
-## 1. Fast-Path Bank Operations
+## 3.1 Fast-Path Bank Operations
 
 These instructions operate through SRAM-resident staging banks and constitute the
 1–9 cycle context-switch path. They never touch ECS.
 
 ### `ec.ib` — Save current context into bank
 
+> `ec.ib` = ECID into bank (`ec` = CME/ECID, `i` = into, `b` = bank)
+
 * **Syntax**: `ec.ib rs1`
-  * `rs1`: Register mask — which register groups to save (see §7).
+  * `rs1`: Register mask — which register groups to save (see §3.7).
 * **Operand notes**: Operates on `current_ecid` implicitly. No explicit ECID argument.
   No `rd`: `ec.ib` always succeeds or raises a trap; no soft failure is possible.
 * **Side effects**: Writes state from the active register file into the bank associated
@@ -51,10 +57,12 @@ These instructions operate through SRAM-resident staging banks and constitute th
 
 ### `ec.ob` — Restore context from bank for target ECID
 
+> `ec.ob` = ECID out of bank (`ec` = CME/ECID, `o` = out of, `b` = bank)
+
 * **Syntax**: `ec.ob rd, rs1, rs2`
   * `rd`: 0 on success; error code if the target ECID is invalid or unbanked.
   * `rs1`: Target ECID number.
-  * `rs2`: Register mask — which register groups to restore (see §7).
+  * `rs2`: Register mask — which register groups to restore (see §3.7).
 * **Side effects**: Restores registers from the bank owned by ECID `rs1`. If the PC
   bit is set in the mask, execution jumps to the restored program counter on commit.
 * **Guaranteed cycles**: 1–3.
@@ -65,13 +73,15 @@ These instructions operate through SRAM-resident staging banks and constitute th
 
 ---
 
-## 2. DMA Spill/Fill Operations
+## 3.2 DMA Spill/Fill Operations
 
 These instructions transfer state between a bank and the ECS in RAM. The memory
 address is derived architecturally from `EC[rs1].ecs_ptr` (at offset 0 of the
 EC entry) — the instruction does not take a separate pointer operand.
 
 ### `ec.im` — Spill bank to memory
+
+> `ec.im` = ECID into memory (`ec` = CME/ECID, `i` = into, `m` = memory/ECS in RAM)
 
 * **Syntax**: `ec.im rd, rs1, rs2`
   * `rd`: 0 on success; error code on DMA fault or invalid ECID.
@@ -85,6 +95,8 @@ EC entry) — the instruction does not take a separate pointer operand.
 
 ### `ec.om` — Fill bank from memory
 
+> `ec.om` = ECID out of memory (`ec` = CME/ECID, `o` = out of, `m` = memory/ECS in RAM)
+
 * **Syntax**: `ec.om rd, rs1, rs2`
   * `rd`: 0 on success; error code if no free bank is available or ECID is invalid.
   * `rs1`: Target ECID number.
@@ -96,7 +108,7 @@ EC entry) — the instruction does not take a separate pointer operand.
 
 ---
 
-## 3. Bank–Group Assignment
+## 3.3 Bank–Group Assignment
 
 Banks belong to Groups; GroupID equals the owning ECID number (charter §4.1). These
 instructions assign or release banks from a given ECID's Group without touching the
@@ -104,6 +116,8 @@ ECID itself. The Group maintains no explicit member list; ownership is encoded i
 bank's up-pointer and checked at the bank (the reversal trick).
 
 ### `ec.ig` — Assign a free bank to an ECID's Group
+
+> `ec.ig` = ECID into group (`ec` = CME/ECID, `i` = into, `g` = group)
 
 * **Syntax**: `ec.ig rd, rs1`
   * `rs1`: Target ECID (GroupID = `rs1`).
@@ -113,6 +127,8 @@ bank's up-pointer and checked at the bank (the reversal trick).
 * **Cycles**: 1–4.
 
 ### `ec.og` — Release a bank from an ECID's Group
+
+> `ec.og` = ECID out of group (`ec` = CME/ECID, `o` = out of, `g` = group)
 
 * **Syntax**: `ec.og rd, rs1`
   * `rs1`: Target ECID (GroupID = `rs1`).
@@ -125,13 +141,15 @@ bank's up-pointer and checked at the bank (the reversal trick).
 
 ---
 
-## 4. Resource Delegation
+## 3.4 Resource Delegation
 
 These instructions delegate Group resources (banks, contracts, child ECIDs) from a
 parent ECID to a child, or revoke them. The delegation tree is bounded by depth D ≤ 3
 (charter §5).
 
 ### `ec.it` — Delegate one bank to a child ECID
+
+> `ec.it` = ECID into tenant (`ec` = CME/ECID, `i` = into, `t` = tenant)
 
 * **Syntax**: `ec.it rd, rs1, rs2`
   * `rd`: 0 on success; error code if `rs1` has no banks, privilege violation, or
@@ -149,6 +167,8 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 ### `ec.ot` — Revoke resources from a child ECID
 
+> `ec.ot` = ECID out of tenant (`ec` = CME/ECID, `o` = out of, `t` = tenant)
+
 * **Syntax**: `ec.ot rd, rs1`
   * `rd`: 0 on success; error code on privilege violation or invalid ECID.
   * `rs1`: Child ECID from which all resources are revoked.
@@ -159,9 +179,11 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 ---
 
-## 5. ECID Lifecycle
+## 3.5 ECID Lifecycle
 
 ### `ec.ir` — Allocate a child ECID
+
+> `ec.ir` = ECID into resource (`ec` = CME/ECID, `i` = into, `r` = resource)
 
 * **Syntax**: `ec.ir rd, rs1`
   * `rd`: New child ECID number, or 0 if allocation failed.
@@ -181,6 +203,8 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 ### `ec.oe` — Forced destroy of ECID and subtree
 
+> `ec.oe` = ECID out of existence (`ec` = CME/ECID, `o` = out of, `e` = existence)
+
 * **Syntax**: `ec.oe rs1`
   * `rs1`: Target ECID to destroy.
 * **Semantics** (per charter §6.5):
@@ -192,9 +216,17 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 * **Privileged**: Yes. The caller must be a parent or privileged ancestor of `rs1`.
 * **Cycles**: O(log N) average; proportional to subtree size.
 
+**Why there is no `ec.or`.** In the earliest drafts the forced-destroy instruction was
+named `ec.or` ("ECID out of resource"). It was renamed to `ec.od` at v0.7 to avoid
+visual ambiguity with bitwise OR, then renamed again to `ec.oe` at v0.8 to restore the
+convention that the trailing letter names the *target kind* rather than the operation
+(`e` = existence; the instruction takes an ECID *out of existence*). Charter §2.1
+lists both retired names. There is no current instruction named `ec.or`; the
+`r`-target is used only for the allocation direction (`ec.ir`).
+
 ---
 
-## 6. Secure Vault Operations
+## 3.6 Secure Vault Operations
 
 > **Status — instruction shells only.** `ec.iv` and `ec.ov` are defined as
 > instruction placeholders. The cryptographic semantics — key derivation, key
@@ -207,6 +239,8 @@ These operations seal and unseal banks under hardware-managed encryption.
 
 ### `ec.iv` — Seal a bank (encrypt)
 
+> `ec.iv` = ECID into vault (`ec` = CME/ECID, `i` = into, `v` = vault)
+
 * **Syntax**: `ec.iv rd, rs1, rs2`
   * `rd`: 0 on success; error code if the bank is already sealed or ECID is invalid.
   * `rs1`: Target ECID whose bank is to be sealed.
@@ -215,6 +249,8 @@ These operations seal and unseal banks under hardware-managed encryption.
   inaccessible except in a secure mode that can present the appropriate key.
 
 ### `ec.ov` — Unseal a bank (decrypt)
+
+> `ec.ov` = ECID out of vault (`ec` = CME/ECID, `o` = out of, `v` = vault)
 
 * **Syntax**: `ec.ov rd, rs1, rs2`
   * `rd`: 0 on success; error code if the bank is not sealed or authentication fails.
@@ -225,7 +261,7 @@ These operations seal and unseal banks under hardware-managed encryption.
 
 ---
 
-## 7. Register Mask Encoding
+## 3.7 Register Mask Encoding
 
 The mask is an XLEN-wide value held in one instruction operand register (32 bits
 on RV32, 64 bits on RV64). The coarse-grained group bits are:
@@ -256,7 +292,7 @@ illegal-operand trap. Silent ignore of reserved bits is prohibited.
 
 ---
 
-## 8. CSRs
+## 3.8 CSRs
 
 | CSR Name            | Purpose                                                         |
 |---------------------|-----------------------------------------------------------------|
@@ -275,7 +311,7 @@ each entry (charter §3.2).
 
 ---
 
-## 9. Instruction Timing Summary
+## 3.9 Instruction Timing Summary
 
 | Instruction | Fast path (banked) | DMA path | Vault path |
 |-------------|-------------------|----------|------------|
@@ -294,7 +330,7 @@ each entry (charter §3.2).
 
 ---
 
-## 10. Instruction Encoding
+## 3.10 Instruction Encoding
 
 > **Proposal encoding.** CE Suite instructions use RISC-V custom-0 opcode space
 > (`0001011`, 0x0B) for proposal and prototyping purposes. If CE Suite is ratified
@@ -303,7 +339,7 @@ each entry (charter §3.2).
 > change at that time. Everything else in this section (R-type format, funct3/funct7
 > scheme, register-field conventions) reflects the architectural intent.
 
-### 10.1 Instruction format
+### 3.10.1 Instruction format
 
 All CE Suite instructions are 32-bit R-type:
 
@@ -316,8 +352,8 @@ All CE Suite instructions are 32-bit R-type:
 ```
 
 * **opcode** = `0001011` (custom-0, 0x0B) for all CE Suite instructions.
-* **funct3** [14:12] selects the extension (see §10.2).
-* **funct7** [31:25] selects the instruction within that extension (see §10.3).
+* **funct3** [14:12] selects the extension (see §3.10.2).
+* **funct7** [31:25] selects the instruction within that extension (see §3.10.3).
 * **rd**, **rs1**, **rs2** are standard 5-bit RISC-V register fields.
 * Instructions that carry no `rd` operand encode rd = `00000` (x0).
 * Instructions that carry no `rs2` operand encode rs2 = `00000` (x0).
@@ -326,7 +362,7 @@ All variable-width operands (register masks, partition descriptors, delegation
 descriptors, contract parameters) are passed in registers — no I-type variants
 are needed.
 
-### 10.2 Extension selector (funct3)
+### 3.10.2 Extension selector (funct3)
 
 | funct3 | Extension | Prefix |
 |--------|-----------|--------|
@@ -336,10 +372,10 @@ are needed.
 | `011`  | QoS       | `qs.*` |
 | `100`–`111` | Reserved | — |
 
-CPE, MSE, and QoS instruction encoding tables are in chapters 7, 8, and 9
+CPE, MSE, and QoS instruction encoding tables are in chapters 7, 9, and 11
 respectively. This section covers CME (funct3 = `000`).
 
-### 10.3 CME instruction encoding (funct3 = `000`)
+### 3.10.3 CME instruction encoding (funct3 = `000`)
 
 | funct7      | Mnemonic | rd field      | rs1 field          | rs2 field          |
 |-------------|----------|---------------|--------------------|--------------------|
@@ -358,7 +394,7 @@ respectively. This section covers CME (funct3 = `000`).
 
 funct7 values `0001100`–`1111111` (12–127) are reserved for future CME instructions.
 
-### 10.4 Encoding examples
+### 3.10.4 Encoding examples
 
 `ec.ib a0` — save current context, mask in a0 (x10 = `01010`):
 
@@ -382,7 +418,7 @@ funct7 values `0001100`–`1111111` (12–127) are reserved for future CME instr
 
 ---
 
-## 11. Instruction Relationships
+## 3.11 Instruction Relationships
 
 | To accomplish…                                        | Use      |
 |-------------------------------------------------------|----------|
@@ -407,7 +443,7 @@ funct7 values `0001100`–`1111111` (12–127) are reserved for future CME instr
 
 ---
 
-## 12. Error and Exception Handling
+## 3.12 Error and Exception Handling
 
 Every CME instruction that can fail writes its result in `rd`: **0** = success,
 **non-zero** = error code. Callers who do not need the result write `rd = x0`.
@@ -430,9 +466,9 @@ Silent ignore is prohibited (charter §6.6).
 
 ---
 
-## 13. Diagrams
+## 3.13 Diagrams
 
-### 13.1 Fast-path context switch sequence
+### 3.13.1 Fast-path context switch sequence
 
 ```
   ┌───────────────────────────────────────────────────────────────────┐
@@ -463,7 +499,7 @@ Silent ignore is prohibited (charter §6.6).
     Bank[B] (owner B) ── now live in active reg file
 ```
 
-### 13.2 ECID operand lookup
+### 3.13.2 ECID operand lookup
 
 ```
   ┌───────────────────────────────────────────────────────────────────┐
@@ -494,7 +530,7 @@ Silent ignore is prohibited (charter §6.6).
                                                                         (restored per mask)
 ```
 
-### 13.3 `ec.oe` subtree walk
+### 3.13.3 `ec.oe` subtree walk
 
 ```
   ┌───────────────────────────────────────────────────────────────────┐

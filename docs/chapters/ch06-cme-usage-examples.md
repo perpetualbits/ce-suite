@@ -1,6 +1,6 @@
 # Chapter 6 — CME Usage Examples
 
-## 1. Overview
+## 6.1 Overview
 
 This chapter illustrates real-world usage patterns of the Context Management
 Extension (CME). Examples cover thread switching, interrupt delegation, secure
@@ -28,7 +28,7 @@ All examples assume:
 
 ---
 
-## 2. Basic Thread Context Switch
+## 6.2 Basic Thread Context Switch
 
 ### Scenario
 
@@ -36,6 +36,8 @@ Two threads are scheduled on the same hart. The currently running thread
 (`current_ecid`) is preempted; the next thread (`next_ecid`) is restored.
 
 ### Code
+
+> `ec.ib` = ECID into bank — `ec.ob` = ECID out of bank
 
 ```asm
 # Save current context to its bank (operates on current_ecid implicitly)
@@ -56,7 +58,7 @@ ec.ob  x0, next_ecid, FULL_MASK
 
 ---
 
-## 3. Interrupt Delegation and Reentry
+## 6.3 Interrupt Delegation and Reentry
 
 ### Scenario
 
@@ -102,7 +104,7 @@ ec.ob  x0, current_ecid, FULL_MASK
 
 ---
 
-## 4. Secure Enclave Launch
+## 6.4 Secure Enclave Launch
 
 ### Scenario
 
@@ -110,6 +112,8 @@ A secure process is run in an isolated vault context. Its register state is
 stored in a hardware-sealed bank that the OS cannot read.
 
 ### On Entry to the Enclave
+
+> `ec.ib` = ECID into bank — `ec.ov` = ECID out of vault (unseal)
 
 ```asm
 # Save calling context to its bank (current_ecid implicit)
@@ -120,6 +124,8 @@ ec.ov  x0, enclave_ecid, FULL_MASK
 ```
 
 ### On Exit from the Enclave
+
+> `ec.iv` = ECID into vault (seal) — `ec.ob` = ECID out of bank
 
 ```asm
 # Seal enclave state back into the vault bank
@@ -138,7 +144,7 @@ ec.ob  x0, user_ecid, FULL_MASK
 
 ---
 
-## 5. Nested Virtual Machine (VM) Launch
+## 6.5 Nested Virtual Machine (VM) Launch
 
 ### Scenario
 
@@ -184,7 +190,7 @@ ec.ob  x0, host_ecid, FULL_MASK  # restore host kernel
 
 ---
 
-## 6. Real-Time Audio DSP in a VM
+## 6.6 Real-Time Audio DSP in a VM
 
 ### Scenario
 
@@ -220,7 +226,7 @@ ec.ob  x0, dsp_ecid, FULL_MASK
 
 ---
 
-## 7. Nested Secure Enclave Inside VM
+## 6.7 Nested Secure Enclave Inside VM
 
 ### Scenario
 
@@ -249,7 +255,7 @@ ec.ob  x0, guest_ecid, FULL_MASK      # restore guest context
 
 ---
 
-## 8. Placeholder: Diagram — CME Save/Restore Flow
+## 6.8 Placeholder: Diagram — CME Save/Restore Flow
 
 **Description**: A flowchart showing context switching among thread, interrupt,
 VM, and enclave contexts using `ec.ib`/`ec.ob`/`ec.iv`/`ec.ov`, with arrows
@@ -257,7 +263,7 @@ labeled by the ECID names used in this chapter.
 
 ---
 
-## 9. Where to go next
+## 6.9 Where to go next
 
 **Chapter 7** covers the CPE instruction set: how to assign, modify, and revoke
 cache partitions per ECID, and the inline and pointer-based partition descriptor
@@ -265,3 +271,7 @@ encodings.
 
 **Appendix A** covers the ECID radix-tree data structure and the algorithms for
 allocation, delegation, and forced destruction (`ec.oe`).
+
+---
+
+[Next: Chapter 7 — CPE Instruction Set Reference](ch07-cpe-instruction-set.md)

@@ -1,6 +1,6 @@
 # Chapter 12 — QoS Usage Examples
 
-## 1. Overview
+## 12.1 Overview
 
 This chapter illustrates real-world usage patterns of the I/O Quality-of-Service
 Extension (QoS). Examples cover domain discovery, Contract assignment, DMA channel
@@ -19,7 +19,7 @@ All examples assume:
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   `x0` is used for `rd` to discard the result where the fast path is expected
   to succeed.
-- Inline `rs2` values use the encoding defined in Chapter 11 §7:
+- Inline `rs2` values use the encoding defined in Chapter 11 §11.7:
   - For `qs.ir`: bits 3:0 = `bw_class`, bits 7:4 = `lat_class`, bits 23:8 =
     `domain_id`, bit `[XLEN-1]` = 0 (inline form).
   - For `qs.it`: bits 15:0 = `child_ecid`, bits 19:16 = `child_bw_class`,
@@ -29,7 +29,7 @@ All examples assume:
 
 ---
 
-## 2. Discovering Fabric Domains
+## 12.2 Discovering Fabric Domains
 
 ### Scenario
 
@@ -42,7 +42,7 @@ properties for later Contract assignment decisions.
     csrr   t0, qos_domain_count  # number of domains present (RO)
     csrr   t1, qos_domain_base   # base address of domain descriptor array (RO)
 
-    # Walk domain descriptor array (each entry has a fixed stride; see ch09 §6.1).
+    # Walk domain descriptor array (each entry has a fixed stride; see Chapter 11 §11.6.1).
     li     t2, 0                 # domain index
 .domain_loop:
     bge    t2, t0, .domain_done
@@ -70,7 +70,7 @@ properties for later Contract assignment decisions.
 
 ---
 
-## 3. Assigning a Contract to a Real-Time Task
+## 12.3 Assigning a Contract to a Real-Time Task
 
 ### Scenario
 
@@ -78,6 +78,8 @@ A real-time NoC producer (`rt_ecid`) is assigned a QoS Contract on the NoC domai
 to guarantee bounded I/O latency for its data path.
 
 ### Code — inline descriptor
+
+> `qs.ir` = I/O quality-of-service into resource (`qs` = QoS, `i` = into/assign, `r` = resource)
 
 ```asm
     # Build inline qs.ir descriptor:
@@ -112,7 +114,7 @@ to guarantee bounded I/O latency for its data path.
 
 ---
 
-## 4. DMA Channel Binding
+## 12.4 DMA Channel Binding
 
 ### Scenario
 
@@ -157,7 +159,7 @@ that ECID's QoS Contract, giving the transfer a guaranteed I/O bandwidth share.
 
 ---
 
-## 5. Context Switch — QoS Contract Is Automatic (CPU Side)
+## 12.5 Context Switch — QoS Contract Is Automatic (CPU Side)
 
 ### Scenario
 
@@ -165,6 +167,8 @@ Two tasks share a hart. One holds a QoS Contract on the NoC domain (`rt_ecid`);
 the other is best-effort (`be_ecid`). The scheduler switches between them.
 
 ### Code
+
+> `ec.ib` = ECID into bank — `ec.ob` = ECID out of bank (QoS Contract restored automatically)
 
 ```asm
     ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
@@ -184,7 +188,7 @@ the other is best-effort (`be_ecid`). The scheduler switches between them.
 
 ---
 
-## 6. Multi-Domain Setup — NoC and DMA Together
+## 12.6 Multi-Domain Setup — NoC and DMA Together
 
 ### Scenario
 
@@ -225,11 +229,11 @@ are set up at task creation.
 - Admission control is per-domain and independent: the NoC and DMA domain budgets
   do not affect each other.
 - Revoke all Contracts at once with `qs.or x0, rt_ecid, 0` (rs2=0 = all domains).
-- See Chapter 11 §10 for the DMA end-to-end latency model combining QoS and MSE.
+- See Chapter 11 §11.10 for the DMA end-to-end latency model combining QoS and MSE.
 
 ---
 
-## 7. Delegating a Contract to a Guest vCPU
+## 12.7 Delegating a Contract to a Guest vCPU
 
 ### Scenario
 
@@ -237,6 +241,8 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 `bw_class=8`, `lat_class=1`. It delegates portions to two vCPUs.
 
 ### Delegate to first vCPU (RV64 inline form)
+
+> `qs.it` = I/O quality-of-service into tenant (`qs` = QoS, `i` = into/delegate, `t` = tenant/child ECID)
 
 ```asm
     # Build inline qs.it descriptor (RV64):
@@ -273,7 +279,7 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 
 - On RV32, `qs.it` cannot be encoded inline (domain_id occupies bits 39:24,
   which are unreachable). Use the pointer form (`QOS_Delegation_Params` struct,
-  Chapter 11 §7).
+  Chapter 11 §11.7).
 - After delegation, the vCPU's Contract is restored automatically by `ec.ob`
   on context switch — no per-switch `qs.it` needed.
 - `child_bw_class=0` and `child_lat_class=0` cause the child to inherit the
@@ -281,9 +287,11 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 
 ---
 
-## 8. Revocation and Teardown
+## 12.8 Revocation and Teardown
 
 ### Scenario A — revoke one domain before reassignment
+
+> `qs.or` = I/O quality-of-service out of resource — `qs.ot` = I/O quality-of-service out of tenant
 
 ```asm
     # Revoke rt_ecid's NoC Contract only, leaving DMA Contract intact.
@@ -324,7 +332,7 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 
 ---
 
-## 9. Error Handling
+## 12.9 Error Handling
 
 ### `QOS_ERR_ALREADY_BOUND` — duplicate Contract on same domain
 
@@ -368,11 +376,11 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 ### Notes
 
 - On any error, no state changes.
-- The full error code table is in Chapter 11 §11.
+- The full error code table is in Chapter 11 §11.11.
 
 ---
 
-## 10. Monitoring Contract Violations
+## 12.10 Monitoring Contract Violations
 
 ### Setup
 
@@ -405,14 +413,18 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 
 ---
 
-## 11. Where to go next
+## 12.11 Where to go next
 
 **Chapter 11** is the normative QoS reference: domain model, slot scheme, Contract
 parameters, arbitration rules, CSRs, DMA attribution, and error codes.
 
 **Chapter 9** and **Chapter 10** cover MSE and its usage examples. For DMA
-workloads, QoS (I/O side) and MSE (DRAM side) are used together — see §6 above
-and Chapter 11 §10 for the combined latency model.
+workloads, QoS (I/O side) and MSE (DRAM side) are used together — see §12.6 above
+and Chapter 11 §11.10 for the combined latency model.
 
 **Appendix A** covers ECID radix-tree algorithms, allocation, and forced-destruction
 sequences that underlie all of the teardown examples in this chapter.
+
+---
+
+[Next: Chapter 13 — CSR Reference](ch13-csr-reference.md)
