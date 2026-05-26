@@ -119,12 +119,16 @@ Direct per-bit N-way muxing from the live register file to any bank is area- and
 **Lane width:** 256 b (32 B)  
 **Effective width per beat:** 4096 b (512 B)
 
-| Bank type | Size (bits) | Beats | Save cycles   | Restore cycles |
-|-----------|-------------|-------|---------------|----------------|
-| NV        | 8 192       | 2     | 1 + 2 = **3** | 2 + 1 = **3**  |
-| VMT       | 32 768      | 8     | 1 + 8 = **9** | 8 + 1 = **9**  |
+| Bank type   | Size (bits) | Beats | Save cycles   | Restore cycles |
+|-------------|-------------|-------|---------------|----------------|
+| NV (RV64)   | 8 192       | 2     | 1 + 2 = **3** | 2 + 1 = **3**  |
+| NV (RV32)   | 4 096       | 1     | 1 + 1 = **2** | 1 + 1 = **2**  |
+| VMT         | 32 768      | 8     | 1 + 8 = **9** | 8 + 1 = **9**  |
 
-The "+1" on each end is the Live ↔ S/R wiring cycle.
+The "+1" on each end is the Live ↔ S/R wiring cycle. NV bank sizes follow
+Chapter 0 §0.6 (1 KB on RV64, 512 B on RV32, assuming the most common CE Suite
+profile — see the FLEN note in §0.6 for implementations where FLEN differs).
+VMT size is independent of XLEN and scales with vector width.
 
 ---
 
@@ -132,7 +136,8 @@ The "+1" on each end is the Live ↔ S/R wiring cycle.
 
 Each bank stores dirty/used bits per register group. On save or restore, only register groups with dirty = 1 are transferred. This saves cycles and power proportionally to the number of inactive groups.
 
-Example: GPR + PC only (~272 B in Option A) → 2 beats → save/restore = **3 cycles**.
+Example (RV64): GPR + PC only (~272 B in Option A) → 2 beats → save/restore = **3 cycles**.
+Example (RV32): GPR + PC only (~136 B in Option A) → 1 beat → save/restore = **2 cycles**.
 
 ---
 
