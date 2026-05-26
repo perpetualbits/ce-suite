@@ -18,18 +18,19 @@ every instruction in this chapter:
 
 All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
 `ec.<dir><target>` (Charter §6.1), where `<dir>` ∈ `{i, o}` and `<target>` is
-a letter naming the target or kind. CME uses the following subset:
+a letter naming the target or kind. CME uses the subset `{b, m, g, t, r, e, v}`:
 
-  | Letter | Target / kind |
-  |--------|---------------|
-  | `b`    | bank          |
-  | `m`    | memory (ECS in RAM) |
-  | `s`    | stream / staging bank |
-  | `v`    | vault (sealed bank) |
-  | `e`    | existence     |
+  | Letter | Target / kind | Instructions |
+  |--------|---------------|--------------|
+  | `b`    | bank          | `ec.ib`, `ec.ob` |
+  | `m`    | memory (ECS in RAM) | `ec.im`, `ec.om` |
+  | `g`    | group (bank assignment) | `ec.ig`, `ec.og` |
+  | `t`    | tenant (delegation) | `ec.it`, `ec.ot` |
+  | `r`    | resource (ECID lifecycle) | `ec.ir` |
+  | `e`    | existence (forced destroy) | `ec.oe` |
+  | `v`    | vault (sealed bank) | `ec.iv`, `ec.ov` |
 
-(`g`=group may be added if group-level instructions are defined; `r`, `t`, and
-other pool letters do not apply to CME.)
+Staging banks (`s`) are hardware-internal; no software instruction targets them directly.
 
 ---
 
