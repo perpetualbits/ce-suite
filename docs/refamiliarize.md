@@ -62,6 +62,7 @@ ownership layer that ties the other four together.
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
 | **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3 applied |
+| **Chapter 10** (CPE Usage Examples) | Done | cpe_caps informative caveat noted |
 | **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; F4 resolved |
 | **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2 resolved |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
@@ -123,13 +124,12 @@ All D items (D1–D4) and all F/G items except F8 and G3 are resolved. See work-
 All D items and most F/G items are resolved as of v0.12. Remaining items: F8 (binary
 encoding), G1 (diagrams), G3 (RV32 audit). See work-items.md for details.
 
-**Phase 2 — Usage examples chapters.** Now unblocked for CPE, MSE, and QoS.
-- Chapter 10 — CPE Usage Examples
+**Phase 2 — Usage examples chapters.**
+- ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
 - Chapter 11 — MSE Usage Examples
 - Chapter 12 — QoS Usage Examples
 
-Chapter 6 covers CME usage examples. The three above do not yet exist. They may now
-be started; the instruction definitions they illustrate are fully consistent.
+Chapter 6 covers CME usage examples.
 
 **Phase 3 — Remaining F/G items** (can be done in parallel with Phase 2):
 - **F8** — Binary encoding. Significant effort; one session per extension.

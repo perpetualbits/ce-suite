@@ -263,13 +263,11 @@ with a rationale.
 
 ---
 
-## Not started yet (after all above)
+## Usage example chapters
 
-- Chapter 10 — CPE Usage Examples
-- Chapter 11 — MSE Usage Examples
-- Chapter 12 — QoS Usage Examples
-
-These chapters must not be started until all D and F items above are resolved.
+- ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
+- Chapter 11 — MSE Usage Examples — not yet started
+- Chapter 12 — QoS Usage Examples — not yet started
 
 ---
 
