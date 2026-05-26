@@ -365,7 +365,11 @@ International and cannot be resolved by editing the spec alone.
   (ISA names, opcode, CSRs), full 24-instruction inventory with encoding tables,
   implementer cost summary, and a next-steps table. Ready to accompany a TG
   formation request.
-- `motivation.md` — use-case and value-proposition document *(in progress)*.
+- `motivation.md` — use-case and value-proposition document. Covers eight
+  compute classes (microcontrollers → wearables → mobile → laptops →
+  desktops/gaming → workstation servers → cloud → telco/NFV → safety
+  certification) plus a cross-cutting argument for foundation-level
+  standardization and RISC-V market alignment.
 
 ---
 
