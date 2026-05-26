@@ -197,18 +197,30 @@ opaque group ID (charter §6.2).
 ### `ms.ir` — Assign a memory Contract to an ECID
 
 * **Syntax**: `ms.ir rd, rs1, rs2`
-  * `rs1`: Target ECID.
-  * `rs2`: Contract parameters — `bw_class` and `lat_class` packed into low 8 bits
-    (bits 3:0 = `bw_class`, bits 7:4 = `lat_class`), or a pointer to an
-    `MSE_Contract_Params` struct if bit 63 of `rs2` is set.
   * `rd`: 0 on success; error code on failure.
+  * `rs1`: Target ECID.
+  * `rs2`: Contract parameters. Inline form (bit `[XLEN-1]` = 0): bits 3:0 =
+    `bw_class`, bits 7:4 = `lat_class`, bits `[XLEN-2]`:8 reserved (must be zero).
+    Pointer form (bit `[XLEN-1]` = 1): bits `[XLEN-2]`:0 are a pointer to an
+    `MSE_Contract_Params` struct (see below).
+* **Pointer form struct:**
+```c
+struct MSE_Contract_Params {
+    uint8_t  bw_class;    /* bandwidth class (0 = best-effort) */
+    uint8_t  lat_class;   /* latency class (0 = best-effort) */
+    uint16_t reserved;    /* must be zero */
+};
+```
 * **Semantics**:
   1. Checks that `rs1` is a valid, allocated ECID on this hart.
   2. Checks that `bw_class(rs2) + existing_sum(subtree(parent(rs1))) ≤ bw_cap(parent(rs1))`.
      If not, returns `MSE_ERR_CAP_EXCEEDED` in `rd`; no state changes.
   3. Sets `EC[rs1].bw_class` and `EC[rs1].lat_class`.
   4. Updates the running bandwidth sum for all ancestor groups up to the root.
-  5. The change takes effect on the next `ec.ob` that loads ECID `rs1`.
+  5. The change takes effect on the next `ec.ob` that loads ECID `rs1`. If ECID
+     `rs1` is currently running on this hart, the new Contract parameters are
+     applied immediately to the per-hart memory controller registers; the new
+     class values take effect at the next CN slot boundary.
 * **Cycles**: 1–4 (O(1) cap check; ancestor sum update is bounded by D ≤ 3).
 
 ---
@@ -216,8 +228,8 @@ opaque group ID (charter §6.2).
 ### `ms.or` — Revoke the memory Contract from an ECID
 
 * **Syntax**: `ms.or rd, rs1`
-  * `rs1`: Target ECID.
   * `rd`: 0 on success; error code on failure.
+  * `rs1`: Target ECID.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class = 0` and `EC[rs1].lat_class = 0`.
   2. Updates running bandwidth sums for ancestor groups.
@@ -233,21 +245,29 @@ opaque group ID (charter §6.2).
 ### `ms.it` — Delegate a child Contract to a child ECID
 
 * **Syntax**: `ms.it rd, rs1, rs2`
+  * `rd`: 0 on success; error code on failure.
   * `rs1`: Parent ECID — the source whose Contract is being split.
-  * `rs2`: Delegation descriptor — child ECID plus delegation parameters, laid out as:
-    * `rd`: 0 on success; error code on failure.
-
-  **`rs2` bitfield layout:**
+  * `rs2`: Delegation descriptor. Inline form (bit `[XLEN-1]` = 0):
 
   | Bits | Field | Meaning |
   |---|---|---|
   | 15:0 | `child_ecid` | Child ECID to receive the split Contract |
   | 19:16 | `child_bw_class` | Bandwidth class to delegate (0 = inherit parent's full class) |
   | 23:20 | `child_lat_class` | Latency class to delegate (0 = inherit parent's full class) |
-  | [XLEN-2]:24 | — | Reserved; must be zero |
-  | [XLEN-1] | `ptr` | If 1, rs2 bits [[XLEN-2]:0] are a pointer to an `MSE_Delegation_Params` struct instead |
+  | `[XLEN-2]`:24 | — | Reserved; must be zero |
+  | `[XLEN-1]` | `ptr` | 1 = pointer form; bits `[XLEN-2]`:0 point to `MSE_Delegation_Params` |
 
-  The `child_ecid` must satisfy `EC[child_ecid].delegation_L < D`.
+  Pointer form struct:
+```c
+struct MSE_Delegation_Params {
+    uint16_t child_ecid;       /* child ECID to receive the split Contract */
+    uint8_t  child_bw_class;   /* bandwidth class to delegate (0 = inherit parent's) */
+    uint8_t  child_lat_class;  /* latency class to delegate (0 = inherit parent's) */
+    uint32_t reserved;         /* must be zero */
+};
+```
+
+  `child_ecid` must satisfy `EC[child_ecid].delegation_L < D`.
 
 * **Semantics**:
   1. Verifies `child_ecid` is a child of `rs1` in the delegation tree.
