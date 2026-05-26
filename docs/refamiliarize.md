@@ -45,16 +45,15 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.12 of the charter)
+### A.3 Chapter status (as of v0.13 of the charter)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
-> decisions. The table below shows high-level state. Do not start usage-example chapters
-> (ch10–ch12) until all D and F items in work-items.md are resolved.
+> decisions. The table below shows high-level state.
 
 | Chapter | State | Notes |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.12 — current | D1–D4 locked; F1–F10 resolved |
-| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.12 |
+| **Charter** (Project Instructions) | v0.13 — current | D1–D4 locked; F1–F10, G1–G3 resolved |
+| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added |
@@ -68,7 +67,10 @@ ownership layer that ties the other four together.
 | **Chapter 11** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Chapter 12** (QoS Usage Examples) | Done | qs.it inline requires RV64; pointer form noted |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
-| **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs across CME/CPE/MSE/QoS; provisional addresses 0x7C0–0x7CE and 0xFC0–0xFCF |
+| **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs; provisional addresses 0x7C0–0x7CF and 0xFC0–0xFCF |
+| **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); all 24 instructions × 6 privilege levels |
+| **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table |
+| **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
 
@@ -116,34 +118,22 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
-All D, F, and G items are resolved (v0.13). The active work items are now
-the **P series** — gaps between the written spec and a submittable RISC-V
-International extension proposal. See work-items.md §P for the full list.
+P1–P4 are resolved. The remaining active P-series items are:
+
+- **P5** — Memory ordering (independent; any time)
+- **P6** — Opcode/name allocation (process item; engage RISC-V International)
+- **P7** — AsciiDoc conversion (mechanical; do last)
+- **P8** — Sail formal model (large separate project; deferred)
 
 ### A.6 What's *next* (the suggested work order)
 
-All internal consistency work (D/F/G) and usage examples are done. The
-remaining sessions fill proposal-readiness gaps (P series):
+P1 (CSR chapter, ch13), P2 (privilege model, ch14), P3 (trap table, ch15),
+and P4 (discovery mechanism, ch16) are all done. The next authoring item is:
 
-**P1 — CSR chapter** *(highest priority — blocks P2 and P4)*
-Define all CSR addresses, bit-fields, access control, and reset values for
-every CSR mentioned across the spec. Likely a new ch13 or a major new section.
-
-**P2 — Privilege model integration** *(depends on P1)*
-Specify which instructions are legal at which privilege level (M/S/U/VS/VU),
-H-extension interaction with the delegation model, and any CE-enable CSRs.
-
-**P3 — Trap/exception table** *(can start in parallel with P1)*
-For each instruction × each error condition: trap or return code in `rd`?
-Numeric values for any new mcause/scause causes. medeleg delegatability.
-
-**P4 — Discovery mechanism** *(depends on P1)*
-ISA string extension names (Xce, Xcecme, …) and a top-level capability CSR
-or Unified Discovery pointer.
-
-**P5 — Memory ordering** *(independent; any time)*
-Ordering guarantees for ec.ib/ec.ob, DMA ops (ec.im/ec.om), Contract
-assignments on other harts.
+**P5 — Memory ordering** *(independent; no dependencies)*
+What ordering guarantees do CE Suite instructions carry? Fence requirements
+around `ec.ib`/`ec.ob`, `ec.im`/`ec.om` DMA ops, and Contract assignments
+(`ms.ir`, `cp.ir`, `qs.ir`) on other harts. Likely a new ch17.
 
 **P6–P8 — Process and mechanical items** (P6: opcode allocation via RISC-V
 International; P7: AsciiDoc conversion; P8: Sail formal model — large effort).

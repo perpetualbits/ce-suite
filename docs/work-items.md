@@ -278,50 +278,50 @@ unnamed), `cme_status.VMT_RDY` bit (VMT-ready flag, previously unnamed in ch04).
 
 ---
 
-### P2 · Privilege model integration — M/S/U/VS/VU per instruction
+### P2 · Privilege model integration — M/S/U/VS/VU per instruction ✓ RESOLVED
 
-**Affects:** ch00 §0.9, each ISR chapter (ch03, ch07, ch09, ch11).
+**Affects:** `docs/chapters/ch14-privilege-model.md` (new chapter).
 
-For each CE Suite instruction: which privilege levels may execute it? Under what
-conditions does a lower-privilege invocation trap vs. succeed? Specific open questions:
+Per-instruction privilege table for all 24 CE Suite instructions across M/HS/S/VS/U/VU.
+Two new CSRs: `cme_priv_ctl` (0x7CF, M-mode RW, `S_EN` bit) enabling S/HS-mode CE
+access, and `hcme_ctrl` (0x6C0, HS-mode RW, `VS_EN` bit) enabling VS-mode CE access.
+Delegation level derivation: M-mode creates L=0 ECIDs; S/HS creates L=1; VS creates
+L=2; nested VS creates L=3 (the leaf level for D ≤ 3). H-extension VM entry/exit
+protocol specified in §14.8. Boot sequence showing firmware enablement in §14.9.
 
-- Does `ec.ir` from S-mode create L0 or L1 ECIDs?
-- Can VS-mode hold L1 ECIDs directly, or must all CE operations go through HS-mode?
-- Is there a per-privilege CE-enable bit (analogous to mie/sie)?
-- How does the H-extension (VS-mode, VU-mode) compose with the delegation depth D?
-
-**Depends on:** P1 (privilege control CSRs need addresses first).
-
----
-
-### P3 · Complete trap/exception table
-
-**Affects:** ch00 §0.9, each ISR chapter.
-
-For each instruction × each documented error condition: is the outcome a synchronous
-exception (trap) or a return code in `rd`? Currently the spec says "trap or return
-code" without always specifying which. Needed:
-
-- A unified table covering all 24 instructions and all defined error codes.
-- Numeric values for any new mcause/scause exception causes added by CE Suite.
-- Whether CE faults are delegatable to S-mode via `medeleg`.
+**Depends on:** P1 ✓.
 
 ---
 
-### P4 · Discovery mechanism
+### P3 · Complete trap/exception table ✓ RESOLVED
 
-**Affects:** ch00, new section; ch03 §1 (CME overview).
+**Affects:** `docs/chapters/ch15-trap-table.md` (new chapter).
 
-Software needs a standard way to probe: is CE Suite present? Which sub-extensions
-(CME/CPE/MSE/QoS)? What implementation parameters (E_max, max D, bank count)?
+Unified trap-vs-`rd` outcome model for all 24 instructions. Universal trap conditions
+(privilege check, reserved encoding, CE not implemented). Memory-access faults from
+pointer operands use standard RISC-V causes 5/7/13/15. All other error conditions
+return codes in `rd`. New exception cause: `CE_EXC_BANK_FAULT` (cause 16, in the
+custom range) for `ec.ib`/`ec.ob` bank SRAM errors. Normative CME error code table
+(CME_OK through CME_ERR_NOT_SEALED, values 0–7) defined here for the first time.
+`medeleg`/`hedeleg` delegation guidance in §15.6.
 
-Requires:
-- Proposed ISA string extension names (e.g., `Xce`, `Xcecme`, `Xcecpe`, `Xcemse`,
-  `Xceqos`) following RISC-V naming conventions.
-- A top-level capability CSR or pointer to a Unified Discovery structure.
-- Alignment with the existing per-extension capability probing (`cpe_caps`, etc.).
+---
 
-**Depends on:** P1 (capability CSR needs an address).
+### P4 · Discovery mechanism ✓ RESOLVED
+
+**Affects:** `docs/chapters/ch16-discovery.md` (new chapter).
+
+New CSR: `ce_present` (0xFD0, M-mode RO), bits 0–3 = CME/CPE/MSE/QoS present, bit 4
+= H-extension CE integration present (`hcme_ctrl` exists). Reads 0 when CE is disabled
+(per ch13 §2 rule); traps as illegal instruction when CE hardware is entirely absent.
+ISA string extension names: `Xce` (umbrella), `Xcecme`, `Xcecpe`, `Xcemse`, `Xceqos`
+(provisional `X`-prefix names; subject to RISC-V International registration).
+M-mode boot probe sequence with trap-handler pattern. S-mode reads the firmware-
+published value from the capability table (ch14 §14.9 mechanism). Device-tree
+`riscv,isa` advertisement requirements. Relationship to per-extension capability CSRs
+in ch13.
+
+**Depends on:** P1 ✓.
 
 ---
 
@@ -376,9 +376,9 @@ and is noted here for completeness. Not a near-term authoring task.
 ## Proposal-readiness priority order
 
 1. ~~**P1** — CSR chapter (blocks P2 and P4).~~ — **DONE** (ch13).
-2. **P2** — Privilege model (depends on P1 ✓).
-3. **P3** — Trap/exception table (can start in parallel with P2).
-4. **P4** — Discovery mechanism (depends on P1 ✓).
+2. ~~**P2** — Privilege model (depends on P1 ✓).~~ — **DONE** (ch14).
+3. ~~**P3** — Trap/exception table (can start in parallel with P2).~~ — **DONE** (ch15).
+4. ~~**P4** — Discovery mechanism (depends on P1 ✓).~~ — **DONE** (ch16).
 5. **P5** — Memory ordering (independent; can be done any time).
 6. **P6** — Opcode/name allocation (process item; engage RISC-V International).
 7. **P7** — AsciiDoc conversion (mechanical; do last).
