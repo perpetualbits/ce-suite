@@ -355,9 +355,17 @@ Custom-0 (`0001011`) is used as a placeholder. Real submission requires:
 - Formal extension names registered with RISC-V International.
 - Allocated opcode space (or confirmation that custom-0 is appropriate for the
   proposal stage).
+- Formal CSR address allocation (31 CSRs currently in provisional custom ranges).
 
 This is a process item, not an authoring item — it requires engagement with RISC-V
 International and cannot be resolved by editing the spec alone.
+
+**Submission materials prepared** (`docs/submission/`):
+- `submission-brief.md` — technical brief covering the three allocation requests
+  (ISA names, opcode, CSRs), full 24-instruction inventory with encoding tables,
+  implementer cost summary, and a next-steps table. Ready to accompany a TG
+  formation request.
+- `motivation.md` — use-case and value-proposition document *(in progress)*.
 
 ---
 
