@@ -13,7 +13,7 @@ This chapter describes the hardware that implements the Context Management Exten
 - Masked transfers, the VMT-ready flag, and the DMA slow path.
 - The radix-tree lookup path: the relationship between the kernel's ECID allocator and the flat `EC[e]` array visible to hardware.
 
-This chapter assumes the foundational definitions from Chapter 0 and the instruction semantics from Chapter 2. Three invariants govern all hardware decisions:
+This chapter assumes the foundational definitions from Chapter 0 and the instruction semantics from Chapter 3. Three invariants govern all hardware decisions:
 
 - Every bank belongs to exactly one ECID. The bank tag records the owning ECID number directly; GroupID = ECID (Chapter 0 §0.5).
 - Ownership is verified at the resource via an up-pointer, not by walking a membership list. This is the O(1) enforcement property.

@@ -56,17 +56,17 @@ ownership layer that ties the other four together.
 | **Charter** (Project Instructions) | v0.12 — current | D1–D4 locked; F1–F10 resolved |
 | **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.12 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
-| **Chapter 2** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added |
-| **Chapter 3** (Bank/Group/Delegation Semantics) | Done | D2 applied |
+| **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
+| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added |
 | **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
 | **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3/F8 applied |
-| **Chapter 10** (CPE Usage Examples) | Done | cpe_caps informative caveat noted |
-| **Chapter 11** (MSE Usage Examples) | Done | — |
+| **Chapter 8** (CPE Usage Examples) | Done | cpe_caps informative caveat noted |
+| **Chapter 9** (MSE) | Done | ms.{ir,or,it,ot}; F4/F8 resolved |
+| **Chapter 10** (MSE Usage Examples) | Done | — |
+| **Chapter 11** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Chapter 12** (QoS Usage Examples) | Done | qs.it inline requires RV64; pointer form noted |
-| **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; F4/F8 resolved |
-| **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
@@ -126,8 +126,8 @@ All D items and all F/G items except F8 and G3 are resolved as of v0.12. Remaini
 F8 (binary encoding) and G3 (RV32 audit). See work-items.md for details.
 
 **Phase 2 — Usage examples chapters.**
-- ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
-- ~~Chapter 11 — MSE Usage Examples~~ — **DONE**
+- ~~Chapter 8 — CPE Usage Examples~~ — **DONE**
+- ~~Chapter 10 — MSE Usage Examples~~ — **DONE**
 - ~~Chapter 12 — QoS Usage Examples~~ — **DONE**
 
 Chapter 6 covers CME usage examples.
@@ -146,16 +146,16 @@ docs/
 ├── chapters/                        # normative spec content
 │   ├── ch00-fundamental-structure.md
 │   ├── ch01-execution-context-model.md
-│   ├── ch02-cme-instruction-set.md
-│   ├── ch03-bank-group-delegation.md
+│   ├── ch02-bank-group-delegation.md
+│   ├── ch03-cme-instruction-set.md
 │   ├── ch04-hardware-microarch.md
 │   ├── ch05-linux-integration.md
 │   ├── ch06-cme-usage-examples.md
 │   ├── ch07-cpe-instruction-set.md
-│   ├── ch08-mse-memory-scheduling.md
-│   ├── ch09-qos-io-quality-of-service.md
-│   ├── ch10-cpe-usage-examples.md
-│   ├── ch11-mse-usage-examples.md
+│   ├── ch08-cpe-usage-examples.md
+│   ├── ch09-mse-memory-scheduling.md
+│   ├── ch10-mse-usage-examples.md
+│   ├── ch11-qos-io-quality-of-service.md
 │   ├── ch12-qos-usage-examples.md
 │   └── appendix-a-ecid.md
 ├── reference/

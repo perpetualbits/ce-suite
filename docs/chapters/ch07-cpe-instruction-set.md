@@ -269,7 +269,7 @@ CPE partition assignments are part of an ECID's architectural state.
 ## 11. Instruction Encoding
 
 All CE Suite instructions share the same R-type format and custom-0 opcode
-(`0001011`). See Chapter 2 §10.1–§10.2 for the bitfield diagram and the
+(`0001011`). See Chapter 3 §10.1–§10.2 for the bitfield diagram and the
 funct3 extension-selector table.
 
 **CPE uses funct3 = `001`.**
@@ -312,4 +312,4 @@ funct7 values `0000100`–`1111111` (4–127) are reserved for future CPE instru
 
 ---
 
-[Next: Chapter 8 — MSE Memory Scheduling Extension](ch08-mse-memory-scheduling.md)
+[Next: Chapter 8 — CPE Usage Examples](ch08-cpe-usage-examples.md)

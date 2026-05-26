@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.12
+**Version:** 0.13
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -347,7 +347,7 @@ instruction (`ec.oe`).
 
 ## 6. CME instruction principles
 
-Full instruction definitions are in Chapter 2. This section fixes the
+Full instruction definitions are in Chapter 3. This section fixes the
 **global rules** that all CME (and by extension, CPE, MSE, QoS) instructions
 must obey.
 
@@ -544,12 +544,12 @@ IDs without an ECID mapping are incomplete and not architectural.
 
 - **Chapter 1 (Execution Context Model).** Lead with the ECID and `EC[e]`
   model. The old "context bank-centric" framing is obsolete.
-- **Chapter 2 (Instruction Set Reference).** Operands are ECID numbers
-  and masks (per §6.2). Include `ec.oe`. Retire `ec.or` and `ec.od`. The
-  instruction mask encoding follows Chapter 0 §0.9.
-- **Chapter 3 (Bank/Group/Delegation Semantics).** Tie all delegation
+- **Chapter 2 (Bank/Group/Delegation Semantics).** Tie all delegation
   to the ECID radix tree (§3.5). Drop the separate 6-bit group ID
   numbering; GroupID = ECID throughout.
+- **Chapter 3 (Instruction Set Reference).** Operands are ECID numbers
+  and masks (per §6.2). Include `ec.oe`. Retire `ec.or` and `ec.od`. The
+  instruction mask encoding follows Chapter 0 §0.9.
 - **Chapter 4 (Hardware Microarchitecture Overview).** Use the REVISED
   version (S/R staging banks, copy engine, VMT-ready flag). Add the
   SRAM-vs-RAM residency story for `EC[e]` (§3.4) and the radix-tree
@@ -608,9 +608,13 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.12 (this version).** B: CME subset corrected to `{b,m,g,t,r,e,v}` —
+- **v0.13 (this version).** Structural renumbering: ch02 ↔ ch03 swapped so that
+  Bank/Group/Delegation Semantics precedes the CME Instruction Set Reference;
+  CPE/MSE/QoS usage examples and ISRs renumbered (ch08 = CPE examples, ch09 = MSE ISR,
+  ch10 = MSE examples, ch11 = QoS ISR). §7.3 updated; all cross-references propagated.
+- **v0.12.** B: CME subset corrected to `{b,m,g,t,r,e,v}` —
   `s` removed (staging banks are hardware-internal; no software instructions);
-  `g`, `t`, `r` confirmed (already defined in ch02). Per-extension subset table
+  `g`, `t`, `r` confirmed (already defined in ch03). Per-extension subset table
   added to §6.1. D4 resolved: `qs.or`/`qs.ot` domain selector passed in `rs2`
   (0 = all domains); reading from `rd` prohibited (§6.7 added).
 - **v0.11.** D3 resolved — CPE Contracts are delegatable; `cp.it`
@@ -618,7 +622,7 @@ the rest of the spec.
   this. Full instruction semantics deferred to Chapter 7 (F1). This unblocks F1.
 - **v0.10.** D2 resolved — `ec.it` delegates Banks only, one per
   call; Contract delegation is extension-owned (`ms.it`, `qs.it`, `cp.it` per D3);
-  stated in §4.3 item 7. Propagated to ch02 §4 and ch03 §3.4.
+  stated in §4.3 item 7. Propagated to ch03 §4 and ch02 §3.4.
 - **v0.9.** D1 resolved — unified error/status policy (§6.6):
   every CE Suite instruction that can fail writes 0 (success) or a non-zero
   error code in `rd`; `x0` discards the result. Status CSRs (`cme_status`,

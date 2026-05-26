@@ -18,7 +18,7 @@ All examples assume:
   means "into" (save/seal) and `o` means "out of" (restore/unseal), and the
   trailing letter names the target or kind: `b`=bank, `m`=memory, `v`=vault,
   `e`=existence. Examples: `ec.ib` saves to a bank, `ec.ob` restores
-  from a bank, `ec.om` restores from memory. The full table is in Chapter 2.
+  from a bank, `ec.om` restores from memory. The full table is in Chapter 3.
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   In examples below, `x0` is used for `rd` to discard the result — the fast path
   is expected to succeed. `ec.ib` carries no `rd` (it always succeeds or traps).

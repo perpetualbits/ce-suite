@@ -352,12 +352,12 @@ it or delete it (rare, see Rule 4.3) immediately.
 
 ### 5.5 MSE and QoS chapters now exist
 
-`docs/chapters/ch08-mse-memory-scheduling.md` and
-`docs/chapters/ch09-qos-io-quality-of-service.md` both exist and are
+`docs/chapters/ch09-mse-memory-scheduling.md` and
+`docs/chapters/ch11-qos-io-quality-of-service.md` both exist and are
 the normative reference for their extensions. The `scratchpads/mse/`
 material has been superseded; treat it as archive only.
 
-Known open items for ch08 and ch09 are tracked in `docs/work-items.md`
+Known open items for ch09 and ch11 are tracked in `docs/work-items.md`
 (F4 for ms.it encoding; D4/F2 for qs.or/qs.ot domain selector).
 
 ---

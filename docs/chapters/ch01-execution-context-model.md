@@ -32,7 +32,7 @@ overhead per core.
 
 This chapter is the conceptual introduction. It explains what each core object
 is and why the design is shaped the way it is. Byte-level layouts are in
-Chapter 0. Instruction definitions are in Chapter 2.
+Chapter 0. Instruction definitions are in Chapter 3.
 
 ---
 
@@ -252,7 +252,7 @@ also bounds the worst-case depth of a forced revocation tree walk.
 Forced revocation — destroying an ECID and all its descendants, reclaiming all
 their resources — must always succeed. A destroyed EC cannot stall its own
 reclamation. The instruction `ec.oe` provides this guarantee; its semantics are
-defined in Chapter 2.
+defined in Chapter 3.
 
 ECID allocation uses a kernel-side radix tree that provides prefix ownership
 and per-prefix quotas. The architectural view of ECIDs is still `EC[e]`; the
@@ -293,7 +293,7 @@ structure, the Bank field layouts for RV32 and RV64, the Context Restore Mask
 encoding, and the ECS header. Read Chapter 0 before working with instruction
 semantics.
 
-**Chapter 2** defines the CME instruction set: `ec.ib`, `ec.ob`, `ec.im`,
+**Chapter 3** defines the CME instruction set: `ec.ib`, `ec.ob`, `ec.im`,
 `ec.om`, `ec.oe`, and the rest. Instruction operands are ECID numbers and
 masks; the encoding follows Chapter 0 §0.9.
 

@@ -320,7 +320,7 @@ code in `rd`. Silent ignore is prohibited.
 | `ec.iv` | Seal Bank under hardware encryption |
 | `ec.ov` | Unseal Bank for a secure enclave |
 
-Full instruction definitions are in Chapter 2.
+Full instruction definitions are in Chapter 3.
 
 ---
 

@@ -15,11 +15,11 @@ All examples assume:
 - The `qs.*` instruction set uses the `{qs}.{i,o}{target}` format, where `i`
   means "into" (assign/delegate) and `o` means "out of" (revoke). Target
   letters: `r`=resource (Contract), `t`=tenant (delegation). The full reference
-  is in Chapter 9.
+  is in Chapter 11.
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   `x0` is used for `rd` to discard the result where the fast path is expected
   to succeed.
-- Inline `rs2` values use the encoding defined in Chapter 9 §7:
+- Inline `rs2` values use the encoding defined in Chapter 11 §7:
   - For `qs.ir`: bits 3:0 = `bw_class`, bits 7:4 = `lat_class`, bits 23:8 =
     `domain_id`, bit `[XLEN-1]` = 0 (inline form).
   - For `qs.it`: bits 15:0 = `child_ecid`, bits 19:16 = `child_bw_class`,
@@ -225,7 +225,7 @@ are set up at task creation.
 - Admission control is per-domain and independent: the NoC and DMA domain budgets
   do not affect each other.
 - Revoke all Contracts at once with `qs.or x0, rt_ecid, 0` (rs2=0 = all domains).
-- See Chapter 9 §10 for the DMA end-to-end latency model combining QoS and MSE.
+- See Chapter 11 §10 for the DMA end-to-end latency model combining QoS and MSE.
 
 ---
 
@@ -273,7 +273,7 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 
 - On RV32, `qs.it` cannot be encoded inline (domain_id occupies bits 39:24,
   which are unreachable). Use the pointer form (`QOS_Delegation_Params` struct,
-  Chapter 9 §7).
+  Chapter 11 §7).
 - After delegation, the vCPU's Contract is restored automatically by `ec.ob`
   on context switch — no per-switch `qs.it` needed.
 - `child_bw_class=0` and `child_lat_class=0` cause the child to inherit the
@@ -368,7 +368,7 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 ### Notes
 
 - On any error, no state changes.
-- The full error code table is in Chapter 9 §11.
+- The full error code table is in Chapter 11 §11.
 
 ---
 
@@ -407,12 +407,12 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 
 ## 11. Where to go next
 
-**Chapter 9** is the normative QoS reference: domain model, slot scheme, Contract
+**Chapter 11** is the normative QoS reference: domain model, slot scheme, Contract
 parameters, arbitration rules, CSRs, DMA attribution, and error codes.
 
-**Chapter 8** and **Chapter 11** cover MSE and its usage examples. For DMA
+**Chapter 9** and **Chapter 10** cover MSE and its usage examples. For DMA
 workloads, QoS (I/O side) and MSE (DRAM side) are used together — see §6 above
-and Chapter 9 §10 for the combined latency model.
+and Chapter 11 §10 for the combined latency model.
 
 **Appendix A** covers ECID radix-tree algorithms, allocation, and forced-destruction
 sequences that underlie all of the teardown examples in this chapter.

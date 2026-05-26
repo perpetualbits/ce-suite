@@ -246,8 +246,8 @@ an illegal-instruction trap); silent ignore prohibited.
 
 ## Usage example chapters
 
-- ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
-- ~~Chapter 11 — MSE Usage Examples~~ — **DONE**
+- ~~Chapter 8 — CPE Usage Examples~~ — **DONE**
+- ~~Chapter 10 — MSE Usage Examples~~ — **DONE**
 - ~~Chapter 12 — QoS Usage Examples~~ — **DONE**
 
 ---
