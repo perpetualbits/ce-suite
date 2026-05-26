@@ -63,6 +63,7 @@ ownership layer that ties the other four together.
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
 | **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3 applied |
 | **Chapter 10** (CPE Usage Examples) | Done | cpe_caps informative caveat noted |
+| **Chapter 11** (MSE Usage Examples) | Done | — |
 | **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; F4 resolved |
 | **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2 resolved |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
@@ -126,7 +127,7 @@ encoding), G1 (diagrams), G3 (RV32 audit). See work-items.md for details.
 
 **Phase 2 — Usage examples chapters.**
 - ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
-- Chapter 11 — MSE Usage Examples
+- ~~Chapter 11 — MSE Usage Examples~~ — **DONE**
 - Chapter 12 — QoS Usage Examples
 
 Chapter 6 covers CME usage examples.
