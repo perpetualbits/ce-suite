@@ -188,6 +188,21 @@ The Group ID occupies the slot where x0 would otherwise appear. x0 is
 architecturally always zero and carries no register state; reusing its slot for
 the Group ID wastes nothing.
 
+**FLEN note.** FPR size depends on FLEN (the floating-point register width), not
+on XLEN. The tables above assume FLEN = 64 (D extension) for RV64 and FLEN = 32
+(F extension without D) for RV32 — the most common CE Suite implementation profile.
+On implementations with a different FLEN, adjust the FPR row:
+FPR field size = FLEN/8 × 32 registers. Examples:
+
+| FLEN | FPR field | Adjusted bank total |
+|------|-----------|---------------------|
+| 32 (F only) | 128 B | RV64: 896 B; RV32: 512 B |
+| 64 (D)      | 256 B | RV64: 1024 B; RV32: 640 B |
+| 128 (Q)     | 512 B | RV64: 1280 B; RV32: 896 B |
+
+CE Suite does not mandate a specific FLEN; the bank size is implementation-defined
+wherever FLEN ≠ the value assumed in the table above.
+
 ### VMT banks
 
 VMT banks hold vector, matrix, and tensor register files. Their size scales
