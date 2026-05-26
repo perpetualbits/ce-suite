@@ -1,218 +1,132 @@
-
-CME INSTRUCTION REFERENCE CARD
-Legend for Types:
-rd: Destination register
-
-rs1, rs2: Source registers
-
-imm: Immediate field (used for masks, addresses, etc.)
-
-mask: Register or imm, selects register groups (GPR/FPR/VEC/PC/CSR/etc.)
-
-All group/bank IDs are assumed 6 bits (for 64 max), can be extended.
-
-1. CONTEXT BANK OPERATIONS
-ec.ib
-Store (save) current execution context into a context bank (partial or full)
-
-Type: System, privileged/user (configurable)
-
-Encoding: ec.ib rd, rs1 (bank_id in rd, mask in rs1)
-
-Side effects: Overwrites bank; updates cme_status, cme_next_free if new alloc
-
-Guaranteed cycles: 1 (banked), ≤3 (if features disabled by mask)
-
-DMA fallback: n/a
-
-Affected CSRs: cme_status, cme_last_bank, cme_reg_mask
-
-ec.ob
-Restore context from a context bank into the CPU (partial or full)
-
-Type: System, privileged/user
-
-Encoding: ec.ob rd, rs1 (bank_id in rd, mask in rs1)
-
-Side effects: Overwrites live registers, may jump if PC bit set
-
-Guaranteed cycles: 1 (banked), ≤3
-
-DMA fallback: n/a
-
-Affected CSRs: cme_status, cme_last_bank, cme_reg_mask
-
-2. DMA (MEMORY) SPILL/FILL
-ec.im
-Spill (save) bank to memory (DMA, for migration, swap, suspend)
-
-Type: System, privileged only
-
-Encoding: ec.im rs1, rs2, imm (bank_id, mem_ptr, mask)
-
-Side effects: Bank→memory write; triggers migration; bank may be freed
-
-Guaranteed cycles: Variable; ≤(ctx_size / DMA_width) + setup (max set by implementation, e.g., 128 cycles)
-
-DMA fallback: Required if no bank space
-
-Affected CSRs: cme_status, cme_dma_addr, cme_reg_mask
-
-ec.om
-Fetch (load) context from memory into bank (DMA, for migration, resume)
-
-Type: System, privileged only
-
-Encoding: ec.om rd, rs1, imm (bank_id, mem_ptr, mask)
-
-Side effects: memory→bank read; raises fault if no bank free
-
-Guaranteed cycles: Variable; ≤(ctx_size / DMA_width) + setup
-
-DMA fallback: Required for migration
-
-Affected CSRs: cme_status, cme_dma_addr, cme_reg_mask
-
-3. GROUP MANAGEMENT
-ec.ig
-Create a bank group (for delegation)
-
-Type: Privileged only
-
-Encoding: ec.ig rd (returns group_id in rd)
-
-Side effects: Allocates new group, sets up group table, updates CSRs
-
-Guaranteed cycles: 1–2
-
-Affected CSRs: cme_group_map, cme_status
-
-ec.og
-Disband a bank group (returns banks to parent group)
-
-Type: Privileged only
-
-Encoding: ec.og rs1 (group_id in rs1)
-
-Side effects: Pops group from banks, releases group table, notifies child VMs
-
-Guaranteed cycles: (Banks_in_group / CAM_width) (O(1) with wide CAM)
-
-Affected CSRs: cme_group_map, cme_status
-
-ec.it
-Assign (delegate) group to tenant (process/VM)
-
-Type: Privileged only
-
-Encoding: ec.it rs1, rs2 (group_id in rs1, tenant_id in rs2)
-
-Side effects: Updates group mapping, sets group ID in tenant CSRs
-
-Guaranteed cycles: 2–3
-
-Affected CSRs: cme_group_map, cme_status
-
-ec.ot
-Revoke group from tenant
-
-Type: Privileged only
-
-Encoding: ec.ot rs1 (group_id in rs1)
-
-Side effects: Triggers forced revoke if in use, pops stack, notifies all affected
-
-Guaranteed cycles: (Banks_in_group / CAM_width)
-
-Affected CSRs: cme_group_map, cme_status
-
-4. SECURE ENCLAVE/VAULT OPS
-ec.iv
-Seal context into secure vault
-
-Type: Privileged only
-
-Encoding: ec.iv rs1, rs2 (bank_id, mask)
-
-Side effects: Bank data is sealed, encrypted, write-protected
-
-Guaranteed cycles: Device dependent; ≤16 (if AES in hardware)
-
-Affected CSRs: cme_status, cme_seal_key
-
-ec.ov
-Unseal context from secure vault
-
-Type: Privileged only
-
-Encoding: ec.ov rd, rs1 (bank_id in rd, mask in rs1)
-
-Side effects: Unseals bank, restores context, access checks
-
-Guaranteed cycles: Device dependent; ≤16
-
-Affected CSRs: cme_status, cme_seal_key
-
-5. REGISTER MASK FIELD
-Present in almost all instructions (as mask or immediate).
-
-Bits:
-
-Bit	Reg Group	Meaning
-0	GPR	Integer registers
-1	FPR	Floating point
-2	VEC	Vector (RVV)
-3	MAT	Matrix/Tensor (future)
-4	PC	Program Counter
-5	CSR	Critical CSRs
-6–7	Reserved	
-
-If PC bit set for restore:
-
-Loads PC and atomically jumps to it.
-
-6. CSRs
-CSR Name	Purpose	Notes
-cme_bank_count	Number of banks in system	Read-only
-cme_next_free	Next available bank (alloc)	Read-only
-cme_status	Last op status/error codes	Set/cleared by CME instructions
-cme_reg_mask	Last mask value used	For debugging/tracing
-cme_group_map	Bank/group mapping table	R/W
-cme_dma_addr	DMA memory pointer	R/W
-cme_seal_key	Key for sealing/unsealing banks	R/W, secure privilege
-
-7. Programmer Notes / Side Effects
-Exception on illegal access: All CME ops check group/bank privilege; trap if access denied.
-
-All migration (DMA) ops may block or raise exception if memory bus is busy.
-
-Group revoke triggers exceptions/interrupts to affected harts (bank revoke protocol).
-
-Seal/unseal: May take multiple cycles (crypto), are privileged, and may fault if hardware is locked down.
-
-8. Max Cycle Table (Per Instruction Class, Approximate)
-Instruction	Normal Path (Banked)	DMA Path (Mem)	Secure Path
-ec.ib/ob	1–3	n/a	n/a
-ec.im/om	n/a	10–128*	n/a
-ec.ig/og	1–4	n/a	n/a
-ec.iv/ov	n/a	n/a	8–16
-
-* Depends on register file size and bus width (e.g., 4K context / 32B DMA = 128 cycles worst-case)
-
-9. Instruction Bitfield Encoding (Sketch)
-Opcode: 8 bits (e.g., 1101_zzzz)
-
-Major function: 4 bits (cat/dir/type)
-
-Bank/group fields: 6 bits each
-
-Mask: 8 bits (or immediate)
-
-Address (DMA): 32–64 bits
-
-Tenant/VM ID: 12–16 bits (as needed)
-
-Example (pseudo-binary):
-[opcode][func][rd][rs1][rs2][imm/mask][...address...]
-
-
+# CE Suite — Instruction Quick Reference
+
+All 24 CE Suite instructions are R-type, encoded under RISC-V custom-0
+opcode (`0001011`). **funct3** selects the extension; **funct7** selects
+the instruction within that extension.
+
+**Error convention.** Every instruction that can fail writes `0` (success)
+or a non-zero error code in `rd`. Two exceptions carry no `rd`: `ec.ib`
+(always succeeds or traps) and `ec.oe` (always succeeds).
+
+---
+
+## CME — Context Management Extension (funct3 = `000`)
+
+| funct7    | Mnemonic | Syntax                  | rd          | rs1              | rs2           | Description |
+|-----------|----------|-------------------------|-------------|------------------|---------------|-------------|
+| `0000000` | `ec.ib`  | `ec.ib rs1`             | *(none)*    | mask register    | —             | Save running context to on-chip bank |
+| `0000001` | `ec.ob`  | `ec.ob rd, rs1, rs2`    | result      | target ECID      | mask register | Restore context from bank (fast switch) |
+| `0000010` | `ec.im`  | `ec.im rd, rs1, rs2`    | result      | target ECID      | mask register | Save context to ECS in RAM (synchronous DMA) |
+| `0000011` | `ec.om`  | `ec.om rd, rs1, rs2`    | result      | target ECID      | mask register | Restore context from ECS in RAM (synchronous DMA) |
+| `0000100` | `ec.ig`  | `ec.ig rd, rs1`         | result      | target ECID      | —             | Assign a free bank to an ECID's group |
+| `0000101` | `ec.og`  | `ec.og rd, rs1`         | result      | target ECID      | —             | Release a bank from an ECID's group |
+| `0000110` | `ec.it`  | `ec.it rd, rs1, rs2`    | result      | source ECID      | child ECID    | Delegate one bank to a child ECID |
+| `0000111` | `ec.ot`  | `ec.ot rd, rs1`         | result      | child ECID       | —             | Revoke a delegated bank from a child ECID |
+| `0001000` | `ec.ir`  | `ec.ir rd, rs1`         | new ECID/0  | leaf flag (0/1)  | —             | Allocate a new child ECID |
+| `0001001` | `ec.oe`  | `ec.oe rs1`             | *(none)*    | target ECID      | —             | Forced destroy: remove ECID and entire delegation subtree |
+| `0001010` | `ec.iv`  | `ec.iv rd, rs1, rs2`    | result      | target ECID      | mask register | Seal a bank (vault — cryptographically protected) |
+| `0001011` | `ec.ov`  | `ec.ov rd, rs1, rs2`    | result      | target ECID      | mask register | Unseal a bank (vault) |
+
+**Notes.**
+- `ec.ib` and `ec.oe` take no `rd`; unused fields encode as `00000`.
+- `ec.ir`: `rs1 = 0` → leaf child (cannot delegate further); `rs1 = 1` →
+  delegating child (delegation_L = parent_L + 1, requires parent_L < D).
+- `ec.it` delegates **one bank** per call, implementation-chosen from the
+  parent's group. To delegate N banks, call `ec.it` N times.
+- `ec.iv`/`ec.ov` are specified as instruction shells; full key-derivation
+  and sealing-format semantics await resolution of charter §8.6.
+
+---
+
+## CPE — Cache Partitioning Extension (funct3 = `001`)
+
+| funct7    | Mnemonic | Syntax                 | rd     | rs1          | rs2                    | Description |
+|-----------|----------|------------------------|--------|--------------|------------------------|-------------|
+| `0000000` | `cp.ir`  | `cp.ir rd, rs1, rs2`   | result | target ECID  | partition descriptor   | Assign a cache partition to an ECID |
+| `0000001` | `cp.or`  | `cp.or rd, rs1`        | result | target ECID  | —                      | Revoke a cache partition from an ECID |
+| `0000010` | `cp.it`  | `cp.it rd, rs1, rs2`   | result | parent ECID  | delegation descriptor  | Delegate a CPE contract to a child ECID |
+| `0000011` | `cp.ot`  | `cp.ot rd, rs1`        | result | child ECID   | —                      | Revoke a CPE contract from a child ECID |
+
+**Notes.**
+- `cp.or` and `cp.ot` carry no rs2 operand; the rs2 field encodes as `00000`.
+- Full `cp.it`/`cp.ot` delegation semantics are in Chapter 7.
+
+---
+
+## MSE — Memory Scheduling Extension (funct3 = `010`)
+
+| funct7    | Mnemonic | Syntax                 | rd     | rs1          | rs2                        | Description |
+|-----------|----------|------------------------|--------|--------------|----------------------------|-------------|
+| `0000000` | `ms.ir`  | `ms.ir rd, rs1, rs2`   | result | target ECID  | contract parameters        | Assign a memory bandwidth/latency contract to an ECID |
+| `0000001` | `ms.or`  | `ms.or rd, rs1`        | result | target ECID  | —                          | Revoke a memory contract from an ECID |
+| `0000010` | `ms.it`  | `ms.it rd, rs1, rs2`   | result | parent ECID  | delegation descriptor      | Delegate an MSE contract to a child ECID |
+| `0000011` | `ms.ot`  | `ms.ot rd, rs1`        | result | child ECID   | —                          | Revoke a delegated MSE contract from a child ECID |
+
+**Notes.**
+- `ms.it` rs2 encoding: bits 15:0 = child_ecid, 19:16 = child_bw_class,
+  23:20 = child_lat_class, bit[XLEN-1] = pointer flag. See Chapter 9 §9.7.
+- `ms.or` and `ms.ot` carry no rs2 operand; the rs2 field encodes as `00000`.
+
+---
+
+## QoS — I/O Quality-of-Service Extension (funct3 = `011`)
+
+| funct7    | Mnemonic | Syntax                 | rd     | rs1          | rs2               | Description |
+|-----------|----------|------------------------|--------|--------------|-------------------|-------------|
+| `0000000` | `qs.ir`  | `qs.ir rd, rs1, rs2`   | result | target ECID  | contract params   | Assign an I/O bandwidth/latency contract to an ECID |
+| `0000001` | `qs.or`  | `qs.or rd, rs1, rs2`   | result | target ECID  | domain selector   | Revoke an I/O contract from an ECID |
+| `0000010` | `qs.it`  | `qs.it rd, rs1, rs2`   | result | parent ECID  | delegation desc   | Delegate a QoS contract to a child ECID |
+| `0000011` | `qs.ot`  | `qs.ot rd, rs1, rs2`   | result | child ECID   | domain selector   | Revoke a delegated QoS contract from a child ECID |
+
+**Notes.**
+- `qs.or` and `qs.ot`: rs2 = domain_id; `0` = revoke all domains
+  simultaneously (charter §6.7). All four QoS instructions use all three
+  register fields.
+- `qs.it` inline form (rs2 = delegation descriptor directly in a register)
+  requires RV64 on many-field encodings; pointer form available for RV32.
+
+---
+
+## Encoding summary
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│  funct7 │  rs2   │  rs1   │ fn3  │   rd   │ opcode  │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  7 bits    5 bits   5 bits  3 bits  5 bits   7 bits
+```
+
+| funct3 | Extension | Instructions assigned |
+|--------|-----------|-----------------------|
+| `000`  | CME       | 12 (funct7 0–11; 12–127 reserved) |
+| `001`  | CPE       | 4  (funct7 0–3;  4–127 reserved)  |
+| `010`  | MSE       | 4  (funct7 0–3;  4–127 reserved)  |
+| `011`  | QoS       | 4  (funct7 0–3;  4–127 reserved)  |
+| `100`–`111` | *(reserved)* | Future CE Suite extensions |
+
+opcode = `0001011` (custom-0, 0x0B) — **provisional**; subject to formal
+allocation by RISC-V International.
+
+---
+
+## Approximate cycle costs
+
+| Instruction class   | Fast path        | Notes |
+|---------------------|------------------|-------|
+| `ec.ib`             | 1 cycle          | Save to on-chip bank (SRAM) |
+| `ec.ob`             | 1–4 cycles       | Restore from bank; staging-bank handoff |
+| `ec.im`             | variable         | Synchronous DMA write to ECS in RAM |
+| `ec.om`             | variable         | Synchronous DMA read from ECS in RAM |
+| `ec.ig` / `ec.og`   | 1–4 cycles       | SRAM table update |
+| `ec.it` / `ec.ot`   | 1–4 cycles       | SRAM ownership update |
+| `ec.ir`             | 1–8 cycles       | ECID slot allocation |
+| `ec.oe`             | O(subtree) SRAM  | Forced destroy; always succeeds |
+| `ec.iv` / `ec.ov`   | impl-defined     | Crypto path; instruction shells only |
+| `cp.*` / `ms.*` / `qs.*` | 1–8 cycles | Per-ECID partition/contract table update |
+
+---
+
+*Quick reference only. For normative operand semantics, trap conditions, and
+error codes, see Chapters 3 (CME), 7 (CPE), 9 (MSE), 11 (QoS), 13 (CSRs),
+and 15 (traps).*

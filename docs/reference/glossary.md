@@ -36,19 +36,22 @@ file.
 | **EECIDG** | ECID + `hart_id` + generation | Same. |
 | **CPE pool, CME pool** | Per-ECID explicit assignment | Pooling was rejected for per-hart resources. |
 | **Resource-attached flag** | Presence/absence of a Contract binding in `EC[e]` | Subsumed. |
-| **`ec.or`** | `ec.od` | Renamed to avoid visual collision with boolean `or` and to make destruction's finality explicit. |
+| **`ec.or`** | `ec.oe` | Renamed to `ec.od` (v0.7), then to `ec.oe` (v0.8). Both intermediate names are retired. |
+| **`ec.od`** | `ec.oe` | Renamed in v0.8: trailing `e`=existence restores the rule that the trailing letter names the target kind, not the operation. |
 | **6-bit Group ID** | GroupID = ECID number (16 bits) | Group IDs no longer have a separate namespace. |
 
 ## Instruction naming convention
 
 ```
-{ec, cp, ms, qs} . {i, o} {b, m, s, g, t, v, d, r}
+{ec, cp, ms, qs} . {i, o} {b, m, g, t, v, e, r}
 ```
 
 - Extension prefix: `ec` (CME), `cp` (CPE), `ms` (MSE), `qs` (QoS).
 - Direction: `i` = "into" (save/seal/create/assign-in), `o` = "out of"
   (restore/unseal/destroy/revoke).
-- Target/kind: `b`=bank, `m`=memory, `s`=stream/staging, `g`=group,
-  `t`=tenant, `v`=vault, `d`=destroy, `r`=resource/region.
+- Target/kind: `b`=bank, `m`=memory, `g`=group, `t`=tenant, `v`=vault,
+  `e`=existence, `r`=resource/region.
+- Each extension uses only the subset applicable to it; the full cross-product
+  is not valid. See charter §6.1 for the per-extension subset table.
 
-New verbs require a charter change.
+New letters or new extension prefixes require a charter change.
