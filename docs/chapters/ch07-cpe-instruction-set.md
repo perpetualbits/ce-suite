@@ -266,4 +266,50 @@ CPE partition assignments are part of an ECID's architectural state.
 
 ---
 
+## 11. Instruction Encoding
+
+All CE Suite instructions share the same R-type format and custom-0 opcode
+(`0001011`). See Chapter 2 §10.1–§10.2 for the bitfield diagram and the
+funct3 extension-selector table.
+
+**CPE uses funct3 = `001`.**
+
+### 11.1 CPE instruction encoding (funct3 = `001`)
+
+| funct7      | Mnemonic | rd field | rs1 field    | rs2 field               |
+|-------------|----------|----------|--------------|-------------------------|
+| `0000000`   | `cp.ir`  | result   | target ECID  | partition descriptor    |
+| `0000001`   | `cp.or`  | result   | target ECID  | `00000`                 |
+| `0000010`   | `cp.it`  | result   | parent ECID  | delegation descriptor   |
+| `0000011`   | `cp.ot`  | result   | child ECID   | `00000`                 |
+
+funct7 values `0000100`–`1111111` (4–127) are reserved for future CPE instructions.
+
+`cp.or` and `cp.ot` carry no `rs2` operand; the rs2 field is encoded as `00000` (x0).
+
+### 11.2 Encoding examples
+
+`cp.ir a0, a1, a2` — assign partition (descriptor in a2) to ECID in a1, result in a0
+(a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000000 │ 01100  │ 01011  │ 001  │ 01010  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  cp.ir      rs2=a2   rs1=a1   CPE    rd=a0   custom-0
+```
+
+`cp.or a0, a1` — revoke all partitions from ECID in a1, result in a0:
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000001 │ 00000  │ 01011  │ 001  │ 01010  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  cp.or      rs2=x0   rs1=a1   CPE    rd=a0   custom-0
+```
+
+---
+
 [Next: Chapter 8 — MSE Memory Scheduling Extension](ch08-mse-memory-scheduling.md)
