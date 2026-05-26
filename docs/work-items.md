@@ -198,17 +198,15 @@ Items where the spec is silent and content needs to be created.
 
 ---
 
-### G1 · Context switch sequence diagram (ch02 §13 placeholder)
+### G1 · Context switch sequence diagram (ch02 §13 placeholder) ✓ RESOLVED
 
-**Affects:** ch02 §13 "Placeholder: Diagrams."
+**Affects:** ch02 §13.
 
-Three diagrams are called out but not drawn:
-1. `ec.ib` → `ec.ob` context switch sequence showing `current_ecid` transition.
-2. ECID operand lookup: how `ec.ob rs1` locates the bank via `EC[rs1]`.
-3. `ec.oe` subtree walk with generation-counter increments.
-
-**Done when:** All three diagrams (ASCII or otherwise) appear in ch02 §13 and the
-"Placeholder" heading is removed.
+All three ASCII diagrams drawn: (1) fast-path context switch sequence showing Bank[A]/Bank[B]
+data flow and `current_ecid` transition, (2) ECID operand lookup via
+`cme_ec_table_base + e × stride` with ownership check, (3) `ec.oe` depth-first subtree
+walk with generation-counter increments and stale-reference guarantee.
+"Placeholder" heading removed.
 
 ---
 
@@ -259,8 +257,8 @@ with a rationale.
 12. ~~**F9** (CPE QUERY)~~ — **DONE** (resolved in F1).
 13. ~~**F10** (working notes stale note)~~ — **DONE**.
 14. ~~**G2** (reserved-bit policy)~~ — **DONE**.
-15. **F8** (binary encoding) — significant effort; own session(s) per extension.
-16. **G1** (diagrams) — own session; ch02 is now stable enough.
+15. ~~**G1** (diagrams)~~ — **DONE**.
+16. **F8** (binary encoding) — significant effort; own session(s) per extension.
 17. **G3** (RV32 width audit) — systematic sweep; lowest urgency.
 
 ---

@@ -56,7 +56,7 @@ ownership layer that ties the other four together.
 | **Charter** (Project Instructions) | v0.12 — current | D1–D4 locked; F1–F10 resolved |
 | **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.12 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
-| **Chapter 2** (CME Instruction Set Reference) | Done | D1 applied; F3/F7/G2 resolved; G1 open (diagrams) |
+| **Chapter 2** (CME Instruction Set Reference) | Done | D1 applied; F3/F7/G1/G2 resolved |
 | **Chapter 3** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 4** (HW Microarchitecture) | Done | — |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
@@ -113,10 +113,9 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 **`docs/work-items.md` remaining open items** (specification-level):
 
 - **F8** — Binary encoding (all extensions; significant effort; own session per extension)
-- **G1** — ch02 §13 diagrams (three ASCII diagrams; ch02 is now stable)
 - **G3** — RV32/RV64 width audit (systematic sweep; lowest urgency)
 
-All D items (D1–D4) and all other F/G items are resolved. See work-items.md for details.
+All D items (D1–D4) and all F/G items except F8 and G3 are resolved. See work-items.md for details.
 
 ### A.6 What's *next* (the suggested work order)
 
@@ -134,7 +133,6 @@ be started; the instruction definitions they illustrate are fully consistent.
 
 **Phase 3 — Remaining F/G items** (can be done in parallel with Phase 2):
 - **F8** — Binary encoding. Significant effort; one session per extension.
-- **G1** — Diagrams for ch02 §13. ch02 is stable; diagrams can be drawn.
 - **G3** — RV32 width audit. Systematic; lowest urgency.
 
 ### A.7 Where things live

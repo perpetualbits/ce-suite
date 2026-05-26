@@ -359,11 +359,104 @@ Silent ignore is prohibited (charter §6.6).
 
 ---
 
-## 13. Placeholder: Diagrams
+## 13. Diagrams
 
-* **Context switch sequence**: `ec.ib` → `ec.ob`, showing `current_ecid` transition.
-* **ECID operand lookup**: how `ec.ob rd, rs1, rs2` locates the bank via `EC[rs1]`.
-* **`ec.oe` subtree walk**: radix-tree traversal and generation-counter increments.
+### 13.1 Fast-path context switch sequence
+
+```
+  ┌───────────────────────────────────────────────────────────────────┐
+  │                    FAST-PATH CONTEXT SWITCH                       │
+  └───────────────────────────────────────────────────────────────────┘
+
+  State before:
+    current_ecid CSR  ── A
+    Active reg file   ── [A's GPRs, FPRs, PC, ...]
+    Bank[A] (owner A) ── empty / stale
+    Bank[B] (owner B) ── [B's GPRs, FPRs, PC, ...]   ← waiting in SRAM
+
+  ─── Step 1: ec.ib mask ─────────────────────────────────────────────
+    Active reg file  ──→  Bank[A]         (state saved to SRAM)
+    current_ecid unchanged  (still A)
+    No rd; always succeeds or traps.
+
+  ─── Step 2: ec.ob x0, B, mask ──────────────────────────────────────
+    EC[B].bank_ref   ──→  Bank[B] located
+    Bank[B]          ──→  Active reg file  (state restored from SRAM)
+    current_ecid     ──→  B               (updated on commit)
+    If PC bit set in mask: execution jumps to restored PC immediately.
+
+  State after:
+    current_ecid CSR  ── B
+    Active reg file   ── [B's GPRs, FPRs, PC, ...]
+    Bank[A] (owner A) ── [A's GPRs, FPRs, PC, ...]   ← waiting in SRAM
+    Bank[B] (owner B) ── now live in active reg file
+```
+
+### 13.2 ECID operand lookup
+
+```
+  ┌───────────────────────────────────────────────────────────────────┐
+  │             ECID OPERAND LOOKUP  (ec.ob rd, rs1, rs2)            │
+  └───────────────────────────────────────────────────────────────────┘
+
+  rs1 ── ECID number e (e.g. 42)
+    │
+    │  entry_addr = cme_ec_table_base + e × stride
+    ▼
+  ┌────────────────────────────────────┐
+  │  EC[42]  (SRAM-resident entry)     │
+  │  offset 0: ecs_ptr  → ECS in RAM  │
+  │            generation  = 7        │
+  │            delegation_L = 1       │
+  │            parent_ecid = 0        │
+  │            bank_ref  ─────────────┼──────────────────────────────→ Bank[42]
+  └────────────────────────────────────┘                               ┌──────────────┐
+                                                                        │ owner  = 42  │
+  Ownership check (O(1) via up-pointer):                               │ GPRs         │
+    bank.owner == rs1  ?                                               │ FPRs         │
+      yes → proceed with restore                                       │ PC, CSRs     │
+      no  → rd = CME_ERR_PERMISSION                                    │ SATP, CP     │
+                                                                        └──────────────┘
+                                                                               │
+                                                                               ▼
+                                                                        Active reg file
+                                                                        (restored per mask)
+```
+
+### 13.3 `ec.oe` subtree walk
+
+```
+  ┌───────────────────────────────────────────────────────────────────┐
+  │              ec.oe SUBTREE WALK  (forced destroy of A)           │
+  └───────────────────────────────────────────────────────────────────┘
+
+  Delegation tree before ec.oe A:
+
+            A  (L=0, gen=5)
+           / \
+          B   C   (L=1, gen=3 each)
+         / \
+        D   E     (L=2, gen=1 each)
+
+  Walk order — depth-first, leaves first — bounded by D ≤ 3:
+
+    ① D  revoke Contracts → free Banks → gen[D]++ → slot free
+    ② E  revoke Contracts → free Banks → gen[E]++ → slot free
+    ③ B  revoke Contracts → free Banks → gen[B]++ → slot free
+    ④ C  revoke Contracts → free Banks → gen[C]++ → slot free
+    ⑤ A  revoke Contracts → free Banks → gen[A]++ → slot free
+
+  Delegation tree after ec.oe A:
+
+            (all five slots freed; Banks/Contracts returned to A's parent)
+
+  Invariants:
+    • Always succeeds — a hostile or zombie child cannot stall any step.
+    • All freed Banks returned to the parent Group of A.
+    • Any stale reference (hart, ECID, old_gen) is detectable:
+        EC[e].generation no longer matches → reference is invalid.
+    • Detection requires no lock; it is a single load-and-compare.
+```
 
 ---
 
