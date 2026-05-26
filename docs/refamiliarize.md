@@ -56,17 +56,17 @@ ownership layer that ties the other four together.
 | **Charter** (Project Instructions) | v0.12 — current | D1–D4 locked; F1–F10 resolved |
 | **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.12 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
-| **Chapter 2** (CME Instruction Set Reference) | Done | D1 applied; F3/F7/G1/G2 resolved |
+| **Chapter 2** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added |
 | **Chapter 3** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 4** (HW Microarchitecture) | Done | — |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
-| **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3 applied |
+| **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3/F8 applied |
 | **Chapter 10** (CPE Usage Examples) | Done | cpe_caps informative caveat noted |
 | **Chapter 11** (MSE Usage Examples) | Done | — |
 | **Chapter 12** (QoS Usage Examples) | Done | qs.it inline requires RV64; pointer form noted |
-| **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; F4 resolved |
-| **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2 resolved |
+| **Chapter 8** (MSE) | Done | ms.{ir,or,it,ot}; F4/F8 resolved |
+| **Chapter 9** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
@@ -115,7 +115,6 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
-- **F8** — Binary encoding (all extensions; significant effort; own session per extension)
 - **G3** — RV32/RV64 width audit (systematic sweep; lowest urgency)
 
 All D items (D1–D4) and all F/G items except F8 and G3 are resolved. See work-items.md for details.
@@ -134,7 +133,7 @@ F8 (binary encoding) and G3 (RV32 audit). See work-items.md for details.
 Chapter 6 covers CME usage examples.
 
 **Phase 3 — Remaining F/G items** (can be done in parallel with Phase 2):
-- **F8** — Binary encoding. Significant effort; one session per extension.
+- ~~**F8** — Binary encoding.~~ **DONE.**
 - **G3** — RV32 width audit. Systematic; lowest urgency.
 
 ### A.7 Where things live

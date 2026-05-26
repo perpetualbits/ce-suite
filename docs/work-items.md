@@ -146,31 +146,20 @@ specified.
 
 ---
 
-### F8 · Ch02 §10 — binary encoding is a placeholder
+### F8 · Binary encoding for all extensions ✓ RESOLVED
 
-**Affects:** ch02 §10 "Instruction Encoding Sketch."
+**Affects:** ch02 §10, ch07 §11, ch08 §11, ch09 §12.
 
-**Problem:** §10 currently reads:
+**Decision:** Single custom-0 opcode (`0001011`). All 24 CE Suite instructions are
+R-type. funct3 selects extension (CME=000, CPE=001, MSE=010, QoS=011). funct7
+selects instruction within extension. Unused rd/rs2 fields encoded as `00000`.
+All variable-width operands (masks, descriptors, contract params) passed in
+registers — no I-type variants needed. Actual opcode assignment subject to
+RISC-V International ratification; custom-0 is used for proposal purposes.
 
-> Opcode: 8 bits. Function: 4 bits. Operands: rd, rs1, rs2. Mask/Imm: 8 bits.
-> Full binary encoding is deferred to the formal opcode assignment stage.
-
-This is not RISC-V encoding. RISC-V custom instructions use:
-- One of the custom-opcode spaces (custom-0 through custom-3)
-- Fixed-position 5-bit register fields for rd, rs1, rs2
-- funct3 and funct7 fields for instruction discrimination within an opcode
-
-**Scope:** A full binary encoding requires:
-1. Selecting which custom opcode(s) to use (one block may not be enough for all four
-   extensions).
-2. Assigning funct3/funct7 values to each instruction.
-3. Handling instructions with no rd or no rs2 (set those fields to 00000 in the encoding).
-4. For instructions that need an immediate (e.g. a mask), deciding whether to use
-   I-type or pass the mask in a register.
-
-**Done when:** §10 contains an actual RISC-V binary encoding table for each CME
-instruction, following the RISC-V ISA spec custom-opcode conventions. Equivalent
-sections in ch07, ch08, ch09 likewise completed.
+**Encoding tables added to:** ch02 §10 (CME, 12 instructions), ch07 §11 (CPE,
+4 instructions), ch08 §11 (MSE, 4 instructions), ch09 §12 (QoS, 4 instructions).
+Each section includes two worked bit-pattern examples.
 
 ---
 
@@ -258,7 +247,7 @@ with a rationale.
 13. ~~**F10** (working notes stale note)~~ — **DONE**.
 14. ~~**G2** (reserved-bit policy)~~ — **DONE**.
 15. ~~**G1** (diagrams)~~ — **DONE**.
-16. **F8** (binary encoding) — significant effort; own session(s) per extension.
+16. ~~**F8** (binary encoding)~~ — **DONE**.
 17. **G3** (RV32 width audit) — systematic sweep; lowest urgency.
 
 ---
