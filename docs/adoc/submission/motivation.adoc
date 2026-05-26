@@ -1,0 +1,513 @@
+== CE Suite — Motivation and Use Cases
+
+*Version:* 0.1 (draft) *Date:* 2026-05-26 *Companion document:*
+`submission-brief.md` (technical encoding and allocation request)
+
+'''''
+
+=== 1. The problem CE solves
+
+Every computing system, regardless of size, runs multiple concurrent
+activities. Those activities share hardware resources: caches, DRAM
+buses, interconnects. In most systems, the sharing is unmanaged — any
+activity can consume any fraction of any shared resource at any moment.
+This is _non-determinism_, and it has costs.
+
+On a microcontroller, it means a motor control loop may miss a 1 ms
+deadline because an interrupt handler evicted its working set from
+cache. On a phone, it means the camera drops a frame because a
+background application claimed the memory bandwidth the ISP needed. On a
+gaming PC, it means frame pacing jitter — not low frame rate, but
+_uneven_ frame rate — because an OS service briefly claimed the game
+thread’s cache partition. On a cloud server, it means the noisy-neighbor
+problem: one tenant’s bulk job degrades every other tenant’s latency
+SLA, with no hardware mechanism to prevent it.
+
+In each case, the existing engineering response is the same:
+*over-provision*. Add more cache. Add more DRAM bandwidth. Add more
+cores. Leave headroom. Run safety-critical workloads on dedicated
+hardware, isolated from everything else. Over-provisioning works, but it
+is wasteful by definition — the headroom exists to absorb worst-case
+interference that, most of the time, does not occur.
+
+CE Suite provides the hardware substrate to eliminate managed
+non-determinism. With CE, a privileged actor (firmware, kernel, or
+hypervisor) can assign each execution context a guaranteed slice of
+cache, a guaranteed DRAM bandwidth budget, a guaranteed I/O throughput
+window, and a context-switch cost measured in single-digit cycles rather
+than hundreds. The headroom that was previously spent absorbing
+worst-case interference can instead be returned to the workload as
+sustained throughput.
+
+This is not a niche feature for a specific market. Every compute class
+from a 32-bit sensor node to a many-core cloud server runs mixed
+workloads, shares hardware resources, and pays the over-provisioning
+tax. The sections below work through each compute class in turn.
+
+'''''
+
+=== 2. CE Suite at a glance
+
+CE Suite is five coordinated RISC-V extensions. For readers of this
+document, the relevant capabilities are:
+
+* *CME (Context Management Extension):* context switches in 1–9 cycles
+via on-chip register banks. No RAM access on the critical path.
+* *CPE (Cache Partitioning Extension):* hardware-enforced assignment of
+L1 and L2-private cache ways to specific execution contexts. A noisy
+neighbor cannot evict the ways allocated to another context.
+* *MSE (Memory Scheduling Extension):* deterministic DRAM arbitration.
+Each context holds a Contract specifying its bandwidth class and latency
+bound; the memory controller enforces it cycle by cycle.
+* *QoS (I/O Quality-of-Service Extension):* the same contract mechanism
+applied to the on-chip interconnect, DMA engines, and peripheral fabric.
+* *ECID/Group/Contract substrate:* the shared identity and delegation
+layer that the four extensions above share. Execution contexts (threads,
+VMs, interrupt handlers, enclaves) are named by hardware-managed
+identifiers that cannot be forged or self-modified by the contexts they
+identify.
+
+Not every use case needs all five extensions. A microcontroller may
+implement only CME and CPE. A server may prioritize MSE and QoS. The
+extensions compose when present and do nothing when absent.
+
+'''''
+
+=== 3. Use cases by compute class
+
+==== 3.1 Microcontrollers — RV32 embedded control
+
+*Context.* RISC-V is already a major presence in the microcontroller
+market. Industrial motor drives, PLC controllers, servo systems, sensor
+nodes, and safety-critical actuators increasingly use RISC-V 32-bit
+cores. These devices run real-time control loops with hard deadlines — 1
+ms, 100 µs, sometimes 10 µs — alongside interrupt-driven communication
+stacks and, increasingly, small inference workloads.
+
+*The problem.* A shared cache between a control loop and its interrupt
+handlers means the handler’s prologue may evict the control loop’s
+working set on every interrupt. The first iteration of the loop after
+the handler returns pays cache-miss latency that does not appear in
+nominal timing analysis. This _cache cold-start jitter_ is a primary
+source of WCET pessimism in embedded real-time systems. Current
+mitigations — cache lockdown, scratchpad RAM allocation, interrupt
+latency padding — are static, non-composable, and require
+per-application hand-tuning.
+
+*What CE provides.* - *CPE* assigns dedicated cache ways to the control
+loop. The interrupt handler uses its own partition; it cannot displace
+the loop’s lines. Cache behavior becomes predictable by construction,
+not by analysis. - *CME* makes the context switch from loop to handler
+cost a fixed number of cycles regardless of register pressure. The
+loop’s register state is preserved in an on-chip bank; reload on return
+is equally deterministic. - For devices with external DRAM, *MSE* bounds
+the memory access latency seen by the control task, preventing a
+communication stack’s bulk transfer from delaying a time-critical sensor
+read.
+
+*Certification angle.* IEC 61508 (functional safety), ISO 26262
+(automotive ASIL D), and IEC 62443 (industrial security) all require
+demonstrable WCET bounds. CE makes those bounds tight, stable, and
+hardware-enforced rather than conservative and analysis-dependent.
+Safety cases become smaller and more defensible.
+
+'''''
+
+==== 3.2 Wearables — smart watches and health devices
+
+*Context.* A modern smartwatch runs four to eight concurrent workloads
+simultaneously: a heart-rate or SpO₂ sensor sampler (25–100 Hz), a
+motion classifier (accelerometer {plus} gyroscope), a wireless stack
+(BLE, sometimes ANT{plus}), a display compositor, an always-on watchface
+renderer, and opportunistic background sync. All of this runs on a power
+budget measured in milliwatts.
+
+*The problem.* Power management and real-time scheduling are in tension.
+DVFS (dynamic voltage/frequency scaling) decisions must be made faster
+than the scheduler’s view of per-task resource consumption. Cache
+sharing between the BLE stack and the sensor sampler means that a burst
+of BLE traffic can push the sampler’s critical path off the fast path.
+Missing a heart-rate sample causes a gap in health data; on a
+medical-grade device, it may trigger a false alert.
+
+*What CE provides.* - *CME’s* 1–9 cycle context switches reduce the OS
+overhead of multiplexing eight workloads, directly extending battery
+life: cycles not spent saving and restoring register state are cycles
+not charging a capacitor. - *CPE* partitions the cache between the
+always-on sensor path and bursty activities, so BLE traffic does not
+cold-start the sampler’s working set. - The *ECID substrate* provides
+per-task resource accounting at hardware speed, enabling the power
+manager to make DVFS decisions based on the actual resource consumption
+of each named context rather than heuristic estimates.
+
+*Scale note.* Wearables are among the highest-volume compute devices
+manufactured. CE’s opt-in design means a wearable SoC vendor can
+implement CME and CPE alone, omitting MSE/QoS if there is no DRAM
+controller, at a cost profile well within the margins already allocated
+to always-on sensor engines.
+
+'''''
+
+==== 3.3 Mobile — smartphones and tablets
+
+*Context.* A smartphone SoC runs three distinct criticality tiers
+simultaneously: hard-real-time (cellular modem, audio DSP, camera ISP),
+soft-real-time (touch response, GPU rendering, video encode/decode), and
+best-effort (background sync, machine learning inference, app
+execution). These tiers share the same DRAM bus and on-chip
+interconnect.
+
+*The problem — camera.* A camera ISP processing a 4K/60fps stream must
+consume 16.7 ms of continuous DRAM bandwidth per frame. A
+memory-bandwidth spike from a background app — an ML inference job
+loading a model, a browser pre-rendering a tab — can steal enough bus
+time to cause a frame drop. Current mitigation is a dedicated DRAM
+channel for the ISP, which costs silicon area and power even when the
+camera is off.
+
+*The problem — audio.* A smartphone audio subsystem targets latency
+under 20 ms end-to-end (Android audio path). Achieving this on a shared
+CPU with a power-managed DRAM bus requires keeping an audio processing
+core in an elevated power state at all times — a measurable battery
+penalty.
+
+*The problem — cellular.* An LTE/5G modem has 1 ms timing slots (LTE
+subframe) and 0.125 ms slots (5G NR). Missing a slot causes
+retransmission and degrades network throughput. Modem firmware shares
+the application processor’s cache hierarchy on many integrated designs.
+
+*What CE provides.* - *MSE* gives the camera ISP, audio DSP, and modem
+each a bandwidth Contract. The memory controller enforces their
+allocations; a background inference job can only use what remains. The
+ISP’s dedicated DRAM channel becomes unnecessary — MSE provides the
+isolation guarantee in software- managed hardware rather than in fixed
+routing. - *CPE* prevents the ML inference model load from evicting the
+modem’s L2 working set. - *CME* reduces the overhead of frequent
+OS-managed power-state transitions; register state is preserved in banks
+during power gating, avoiding a full save-to-DRAM cycle on wake.
+
+*Market size.* Smartphone SoC volumes are approximately 1.5 billion
+units per year. A RISC-V application processor in this space that
+advertises CE support enables the kind of per-tier QoS guarantees
+currently implemented with bespoke NoC and DRAM scheduling logic in
+every vendor’s proprietary SoC architecture. CE standardizes that
+substrate.
+
+'''''
+
+==== 3.4 Portable computing — laptops
+
+*Context.* A laptop running a general-purpose OS is simultaneously: a
+productivity machine (latency-sensitive UI), a communication device
+(video calls with real-time encode), an audio workstation (browser
+audio, podcast playback), and a background compute platform (indexing,
+sync, antivirus scanning). All of these compete on one shared cache
+hierarchy.
+
+*The audio problem.* The Linux and macOS audio subsystems target
+callback delivery under 10 ms for consumer use and under 2 ms for
+professional use. A single callback miss causes an audible glitch — a
+click or pop that is immediately perceptible to the listener. The
+current engineering response is to run audio threads at elevated
+priority and pin them to isolated CPUs. This works, but it permanently
+removes those CPUs from the general-purpose pool, wasting capacity.
+
+*The video-call problem.* A video conference application runs a
+real-time encode thread (H.264/H.265, must produce a frame every 33 ms),
+a network thread (must respond to packet arrivals within jitter bounds),
+and a UI thread. These three threads share the L2 cache. When the
+background indexer or antivirus scanner runs a large sequential scan, it
+displaces the encode thread’s working set, causing encode jitter. The
+visible result is pixelation and audio dropout on the remote end.
+
+*What CE provides.* - *CPE* assigns the audio callback thread and the
+encode thread each a guaranteed cache partition. Background tasks use
+whatever is left. Audio glitches caused by cache eviction become
+structurally impossible. - *MSE* ensures the encode thread’s DRAM
+bandwidth is not stolen by the indexer. - *CME* reduces the cost of the
+OS scheduler’s high-frequency interrupts (the scheduler tick, network
+interrupts, storage completions) that currently cause the cache
+cold-start behavior that is responsible for the worst tail-latency
+events.
+
+*Laptop adoption path.* RISC-V laptop and tablet SoCs are an active
+development area. CE provides the infrastructure that makes a RISC-V
+laptop a competitive choice for professional audio and video work —
+markets where macOS currently has a significant latency advantage due to
+its audio subsystem and Apple Silicon’s hardware QoS features. CE
+provides a standardized, OS-portable mechanism for the same guarantees.
+
+'''''
+
+==== 3.5 Desktop computers — gaming and creative workstations
+
+*Context.* A desktop running an AAA title simultaneously sustains: a
+main game thread (60–144 Hz), a physics simulation thread (fixed
+timestep, may be 240 Hz), an audio mixing thread (64–256 sample buffer
+at 48 kHz = 1.3–5.3 ms), a GPU driver thread (responding to GPU
+completion interrupts), an OS service layer, and background system
+processes. Frame pacing — the _consistency_ of frame delivery interval —
+is as important to perceived smoothness as raw throughput.
+
+*The frame pacing problem.* A game rendering at an average of 120 fps
+with ±2 ms jitter is perceived as smoother than a game rendering at 144
+fps with ±8 ms jitter. The 8 ms variance is caused by intermittent cache
+evictions and DRAM bandwidth spikes from other threads. Existing
+mitigations (CPU affinity, process priority, NUMA-aware allocation) are
+software best-efforts that do not compose reliably under OS load.
+
+*The audio workstation problem.* A Digital Audio Workstation (DAW)
+running at a 64-sample buffer at 48 kHz has a 1.33 ms process window.
+Within that window it must invoke every active plugin, mix every active
+track, and deliver the output to the audio interface. A cache eviction
+by a background process in the middle of that window causes an XRUN — a
+hard failure that interrupts recording or playback. Professional audio
+on Windows and Linux has required real-time kernel patches
+(PREEMPT_RT) and careful system tuning for decades, precisely
+because the hardware provides no mechanism to guarantee cache residency.
+
+*The video production problem.* A video editor applying a 4K HDR grade
+in real-time while simultaneously encoding a proxy uses two
+compute-intensive paths that compete for DRAM bandwidth. Dropping frames
+during playback requires re-rendering; this is expensive in both user
+time and compute cycles.
+
+*What CE provides.* - *CPE* assigns dedicated cache ways to the audio
+thread, game render thread, and GPU driver thread. Background activity
+cannot cause XRUNs or frame drops by evicting those partitions. - *MSE*
+places the audio thread and game thread in a bandwidth Contract that is
+enforced by the memory controller. The background video encode job uses
+what remains; it does not starve the interactive path. - *CME* makes the
+audio callback context switch deterministic: the callback thread’s
+register state is preserved in a bank across OS interrupts, and re-entry
+costs a fixed single-digit cycle count. - Together, these capabilities
+make the OS able to offer the application layer a _hardware-backed
+latency guarantee_ rather than a scheduling policy. The DAW no longer
+needs PREEMPT_RT; the game no longer needs CPU pinning.
+
+'''''
+
+==== 3.6 Workstation servers and rendering farms
+
+*Context.* A rendering farm node or scientific workstation runs parallel
+compute jobs (ray tracing, fluid simulation, ML training) alongside
+real-time management tasks (job scheduler, monitoring agent, network
+fabric daemon). The management tasks are small but latency-sensitive;
+the compute jobs are large and cache-hungry.
+
+*The problem.* A ray-trace job that fills the shared L3 cache does so by
+design — it is optimizing for reuse. But it also evicts the management
+daemon’s working set, causing the daemon to serve a job-completion
+notification with a multi-millisecond cache-cold delay. In a cluster of
+10,000 nodes, this tail latency adds up to measurable makespan.
+
+*What CE provides.* CPE reserves a small fixed partition for the
+management daemon. MSE reserves a small bandwidth Contract for the
+network fabric daemon. The compute job gets everything else. The result
+is that compute density per node is not reduced (the job has most of the
+hardware), but management latency becomes bounded. Cluster scheduling
+can exploit tighter completion- time confidence intervals.
+
+'''''
+
+==== 3.7 Cloud servers and hypervisors
+
+*Context.* A cloud host runs dozens of VMs, each belonging to a
+different tenant, each with a performance SLA. The SLA may be expressed
+in vCPU counts, memory bandwidth, and network throughput. The hypervisor
+attempts to enforce these SLAs through CPU scheduling, but the cache
+hierarchy and DRAM bus are shared across all VMs with no enforcement
+mechanism. A tenant running a memory-bandwidth-intensive workload
+degrades every other tenant on the same host.
+
+*The noisy-neighbor problem.* "`Noisy neighbor`" is the cloud industry’s
+term for this: a co-tenant whose workload consumes more shared resource
+than its nominal allocation, at the expense of other co-tenants. Cloud
+providers currently mitigate noisy neighbor through static
+over-allocation (fewer VMs per host than the hardware could support),
+cache coloring (OS-level NUMA tricks that partially separate memory
+streams), and vendor-specific QoS features in memory controllers. None
+of these mechanisms are standardized, composable, or transparent to the
+hypervisor.
+
+*What CE provides — per-VM resource contracts.* - *MSE* allows the
+hypervisor to assign each VM a bandwidth/latency Contract. A tenant
+running a memory scan gets its contracted bandwidth; it cannot exceed
+that budget at the expense of other tenants. Cloud providers can
+advertise memory bandwidth SLAs with hardware-backed enforcement for the
+first time on a standardized ISA. - *CPE* partitions the shared LLC (or
+the L2-private caches) per VM. A tenant’s working set occupies its
+allocated ways; eviction by another tenant is structurally prevented. -
+*QoS* applies the same treatment to the interconnect and DMA paths: a
+tenant running high-throughput network I/O cannot saturate the NoC at
+the expense of a latency-sensitive storage-I/O tenant. - *CME* reduces
+the hypervisor’s VM-switch overhead. A VM context switch currently
+requires a full register file save to RAM (hundreds of cycles). CME
+reduces this to a bank swap (1–9 cycles), improving VM density and
+reducing the overhead of frequent VM-entry/exit on workloads that mix
+compute and I/O.
+
+*The virtualization depth angle.* CE Suite’s delegation model supports
+up to four levels (L0 host kernel → L1 hypervisor → L2 nested hypervisor
+→ L3 guest), matching the nesting depth of realistic cloud deployments.
+A cloud provider running a Type-1 hypervisor, each tenant running their
+own Type-2, each tenant VM running containers — that is exactly three
+delegation levels. CE’s hierarchy was designed for this.
+
+*Security.* The ECID opacity property (an execution context cannot read
+or forge its own identifier) means that the isolation guarantees are not
+bypassable from within a VM. A malicious tenant cannot discover or
+manipulate the ECID assignments of other tenants. This is a security
+property, not just a performance property.
+
+'''''
+
+==== 3.8 Telecommunications and network infrastructure
+
+*Context.* Network functions virtualization (NFV) runs packet-processing
+pipelines (firewall, DPI, load balancer, NAT) as software on
+general-purpose servers. Packet processing has hard latency
+requirements: for 100 Gbps line rate, a 64-byte packet arrives every
+5.12 ns; a 1500-byte packet arrives every 120 ns. At these rates, a
+cache miss on the packet processing path adds tens of nanoseconds of
+latency that accumulates to microseconds of jitter across a burst.
+
+DPDK-style packet processing currently mitigates this by dedicating
+entire cores to polling (busy-wait), preventing any other work from
+touching those cores’ caches. This works but wastes CPU capacity.
+
+*What CE provides.* - *CPE* allows a packet-processing context to hold
+its forwarding tables and ring buffer descriptors in dedicated cache
+ways. Interrupt-driven management traffic (BGP, SNMP, health checks)
+uses separate partitions and cannot evict the forwarding path’s working
+set. - *MSE* gives the packet-processing path a bandwidth Contract on
+the DRAM bus, ensuring that a burst of management-plane activity (e.g.,
+a routing table update loading a large prefix list) does not stall the
+data plane. - The result: packet-processing pipelines can share cores
+with management functions without polling, recovering the CPU capacity
+currently wasted on busy-wait isolation.
+
+'''''
+
+==== 3.9 Safety-critical systems and certification
+
+*Context.* DO-178C (avionics), FDA Class III (medical devices), and ISO
+26262 ASIL D (automotive) require software developers to provide
+evidence that safety-critical functions meet their timing requirements
+under all operating conditions. This evidence is typically produced via
+static WCET analysis tools (e.g., OTAWA, aiT, Chronos) that model the
+processor pipeline and cache behavior and compute a safe upper bound on
+execution time.
+
+*The certification problem.* Multi-core processors and shared caches
+make WCET analysis intractable. The analysis must bound every possible
+cache interaction between the safety-critical function and every other
+thread running concurrently on other cores. The state space is enormous.
+In practice, certification authorities require either (a) running
+safety-critical functions on dedicated cores with no shared resources
+(expensive, wasteful), or (b) accepting very conservative WCET estimates
+with large safety margins (also expensive, in both design time and
+hardware cost).
+
+*What CE provides.* - *CPE* eliminates inter-core cache interference as
+a WCET uncertainty source: the safety-critical function’s cache
+partition is hardware-enforced and cannot be stolen. The WCET analysis
+only needs to model interference within the assigned ways, not across
+the entire shared cache. - *MSE* eliminates DRAM latency uncertainty:
+the function’s bandwidth Contract is enforced cycle by cycle by the
+memory controller. - Together, these reduce the WCET analysis to a
+single-partition problem even on a multi-core SoC: the safety-critical
+function sees a predictable cache and a predictable DRAM bus,
+independently of what other cores are doing. The complexity reduction in
+the safety case is substantial.
+
+CE is not a certification shortcut — it does not replace analysis. It
+_shrinks the analysis problem_ by replacing hardware uncertainty with
+hardware guarantees. The safety margins can be tighter because the
+interference they were guarding against is now bounded by hardware
+rather than estimated by analysis.
+
+*Applicable standards summary:*
+
+[width="100%",cols="34%,25%,41%",options="header",]
+|===
+|Standard |Domain |CE relevance
+|IEC 61508 |Industrial functional safety |SIL 3/4 WCET evidence
+
+|ISO 26262 |Automotive |ASIL D WCET, freedom from interference
+
+|DO-178C / DO-254 |Avionics |DAL A determinism requirements
+
+|FDA 21 CFR Part 820 / Class III |Medical devices |Hard RT guarantees
+for life-critical monitoring
+
+|IEC 62443 |Industrial cybersecurity |ECID-based isolation prevents
+lateral movement
+|===
+
+'''''
+
+=== 4. Why CE is a foundation-level extension
+
+Most RISC-V extensions solve one compute class’s problem: the V
+extension solves the HPC/ML throughput problem; the H extension solves
+the virtualization problem; the B extension solves the bit-manipulation
+problem for cryptography and codecs.
+
+CE solves a problem that is present in every compute class: _unmanaged
+resource sharing causes non-determinism, and non-determinism is paid for
+in over-provisioning_. This means CE is relevant to every RISC-V market
+segment simultaneously:
+
+* Embedded and industrial RISC-V (where CE enables IEC 61508 and ISO
+26262 certification)
+* Mobile RISC-V (where CE enables the ISP and modem QoS currently done
+with bespoke SoC logic)
+* Consumer RISC-V (where CE enables professional audio and gaming
+workloads competitive with proprietary solutions)
+* Server RISC-V (where CE provides the memory and I/O QoS substrate that
+cloud SLAs require)
+* Network RISC-V (where CE enables software-defined forwarding without
+dedicated-core waste)
+
+CE is not appropriate as a vendor extension (`X`-prefix) precisely
+because its value depends on _interoperability_: an OS that understands
+CE can use it on any CE-capable core. A kernel scheduler that manages
+ECID delegation works identically on a microcontroller and a server. A
+hypervisor that assigns MSE Contracts to VMs is not re-written per
+vendor. Standardization is the mechanism that turns hardware capability
+into software ecosystem.
+
+'''''
+
+=== 5. Alignment with RISC-V’s market trajectory
+
+RISC-V International’s stated goal is to be the dominant open ISA across
+all compute classes by the mid-2030s. The markets that most require an
+open-ISA alternative to ARM and x86 are precisely the markets where
+determinism matters most:
+
+* *Automotive:* RISC-V is already mandated in several next-generation
+vehicle programs. ASIL D certification requires hardware-enforced WCET.
+CE is the missing piece.
+* *Industrial:* RISC-V is displacing ARM Cortex-M in new embedded
+designs. IEC 61508 SIL 3/4 requirements are the certification gate. CE
+clears it.
+* *Mobile:* RISC-V application processors are entering the smartphone
+SoC market. The camera, modem, and audio QoS infrastructure that
+differentiates high-end SoCs is currently bespoke. CE standardizes it.
+* *Cloud:* RISC-V server chips are in production at multiple vendors.
+The noisy-neighbor problem and memory-bandwidth SLA requirements are the
+barriers to replacing x86 in multi-tenant workloads. CE addresses both.
+* *Consumer:* RISC-V laptops and gaming handhelds are entering the
+market. Competing with x86 and ARM for gaming and creative professional
+workloads requires the latency guarantees that CE provides.
+
+CE Suite is not a feature for a future version of RISC-V. It is the
+hardware substrate that makes the current generation of RISC-V
+deployments viable in the markets that define RISC-V’s growth
+trajectory.
+
+'''''
+
+_End of CE Suite Motivation and Use Cases._

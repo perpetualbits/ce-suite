@@ -1,0 +1,111 @@
+== CE Suite Glossary
+
+A standalone copy of the normative glossary from charter §2, plus the
+list of retired terms, for quick lookup. *If this file disagrees with
+the charter, the charter wins.* If you notice a disagreement, fix this
+file.
+
+=== Current terms
+
+[width="100%",cols="50%,50%",options="header",]
+|===
+|Term |Definition
+|*EC* |_Execution Context._ Any schedulable unit: thread, process, vCPU,
+container task, interrupt handler, secure enclave. The unit the OS
+scheduler dispatches.
+
+|*ECID* |_Execution Context Identifier._ A hart-local, hardware-managed
+identity token denoting one EC currently bound to that hart. Opaque to
+software running as that EC. 16 bits.
+
+|*`current_ecid`* |The ECID of the EC currently executing on a hart.
+Held in a CSR.
+
+|*`EC[e]`* |The architectural per-hart ECID entry indexed by
+ECID number `e`.
+
+|*ECS* |_Execution Context Structure._ A memory-resident structure
+describing the saved/saveable state of one EC. Reachable via
+`EC[e].ecs_ptr` (offset 0).
+
+|*Group* |An ECID’s inventory of resources (banks, contracts, child
+ECIDs). Every ECID has exactly one Group; GroupID = ECID number.
+
+|*Bank* |A hardware register-state container (non-VMT or VMT) owned by
+exactly one Group.
+
+|*Contract* |A slice of a global, multiplexed resource (memory
+bandwidth/latency for MSE, I/O bandwidth/latency for QoS, cache
+ways/percent for CPE) bound to an ECID’s Group.
+
+|*Delegation level (L)* |An ECID’s depth in the delegation tree, 0 ≤ L ≤
+D. `L ++<++ D` permits delegation; `L = D` does not.
+
+|*D* |The implementation’s maximum delegation depth. D ≤ 3
+(architectural maximum).
+
+|*Generation counter* |A small counter per `EC[e]` slot,
+incremented on every reuse of the slot, used to detect stale references
+(ABA safety).
+
+|*Hart* |Standard RISC-V hardware thread. CE state is per-hart.
+
+|*Privileged actor* |M-mode firmware, S-mode kernel, or HS-mode
+hypervisor. The only actors permitted to create or destroy ECIDs.
+
+|*CME* |Context Management Extension. The CME instruction prefix is
+`ec.*`.
+
+|*CPE* |Cache Partitioning Extension. Instruction prefix `cp.*`.
+
+|*MSE* |Memory Scheduling Extension. Instruction prefix `ms.*`.
+
+|*QoS* |I/O Quality-of-Service Extension. Instruction prefix `qs.*`.
+|===
+
+=== Retired terms (do not use)
+
+[width="100%",cols="34%,33%,33%",options="header",]
+|===
+|Retired term |Use instead |Why
+|*Pool* |Contract |Pools were always bound 1:1 to Contracts; the layer
+was redundant.
+
+|*EECID* |ECID {plus} `hart_id` (named explicitly when needed)
+|Avoid invented tuple types.
+
+|*EECIDG* |ECID {plus} `hart_id` {plus} generation |Same.
+
+|*CPE pool, CME pool* |Per-ECID explicit assignment |Pooling was
+rejected for per-hart resources.
+
+|*Resource-attached flag* |Presence/absence of a Contract binding in
+`EC[e]` |Subsumed.
+
+|*`ec.or`* |`ec.oe` |Renamed to `ec.od` (v0.7), then to `ec.oe` (v0.8).
+Both intermediate names are retired.
+
+|*`ec.od`* |`ec.oe` |Renamed in v0.8: trailing `e`=existence restores
+the rule that the trailing letter names the target kind, not the
+operation.
+
+|*6-bit Group ID* |GroupID = ECID number (16 bits) |Group IDs no longer
+have a separate namespace.
+|===
+
+=== Instruction naming convention
+
+....
+{ec, cp, ms, qs} . {i, o} {b, m, g, t, v, e, r}
+....
+
+* Extension prefix: `ec` (CME), `cp` (CPE), `ms` (MSE), `qs` (QoS).
+* Direction: `i` = "`into`" (save/seal/create/assign-in), `o` = "`out
+of`" (restore/unseal/destroy/revoke).
+* Target/kind: `b`=bank, `m`=memory, `g`=group, `t`=tenant, `v`=vault,
+`e`=existence, `r`=resource/region.
+* Each extension uses only the subset applicable to it; the full
+cross-product is not valid. See charter §6.1 for the per-extension
+subset table.
+
+New letters or new extension prefixes require a charter change.

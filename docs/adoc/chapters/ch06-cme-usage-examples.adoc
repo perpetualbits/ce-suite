@@ -1,0 +1,310 @@
+== Chapter 6 — CME Usage Examples
+
+=== 6.1 Overview
+
+This chapter illustrates real-world usage patterns of the Context
+Management Extension (CME). Examples cover thread switching, interrupt
+delegation, secure enclaves, nested virtual machines, and real-time
+contexts. Each example names ECIDs explicitly — `current_ecid`,
+`interrupt_ecid`, `enclave_ecid`, and so on — and shows how
+`ec.*` instructions operate on those identifiers.
+
+All examples assume:
+
+* The kernel has pre-allocated an ECID for each context shown and has
+set up the corresponding `EC[e]` entry (ECS pointer, delegation
+level, bank assignment) before the sequence begins.
+* Context banks are allocated and delegated in advance by the kernel.
+* The `ec.*` instruction set uses the
+`++{++ec}.++{++i,o}++{++target}` format, where `i` means "`into`"
+(save/seal) and `o` means "`out of`" (restore/unseal), and the trailing
+letter names the target or kind: `b`=bank, `m`=memory, `v`=vault,
+`e`=existence. Examples: `ec.ib` saves to a bank, `ec.ob` restores from
+a bank, `ec.om` restores from memory. The full table is in Chapter 3.
+* Instructions that can fail write 0 (success) or a non-zero error code
+in `rd`. In examples below, `x0` is used for `rd` to discard the result
+— the fast path is expected to succeed. `ec.ib` carries no `rd` (it
+always succeeds or traps).
+* Instruction operands are ECID numbers — 16-bit hart-local identifiers.
+They are not pointers to kernel structs. How the kernel stored or
+retrieved an ECID number is a Linux convention described in Chapter 5,
+not an architectural rule.
+
+'''''
+
+=== 6.2 Basic Thread Context Switch
+
+==== Scenario
+
+Two threads are scheduled on the same hart. The currently running thread
+(`current_ecid`) is preempted; the next thread (`next_ecid`) is
+restored.
+
+==== Code
+
+____
+`ec.ib` = ECID into bank — `ec.ob` = ECID out of bank
+____
+
+[source,asm]
+----
+# Save current context to its bank (operates on current_ecid implicitly)
+ec.ib  FULL_MASK
+
+# Restore next context from its bank; hardware updates current_ecid
+ec.ob  x0, next_ecid, FULL_MASK
+----
+
+==== Notes
+
+* `current_ecid` and `next_ecid` are ECID numbers held in
+registers, not pointers.
+* `ec.ob` causes the hardware to set `current_ecid` to
+`next_ecid`. After the instruction completes, the hart is executing
+as `next_ecid`.
+* No ECS access occurs on this path; only the bank and
+`current_ecid` CSR are touched.
+
+'''''
+
+=== 6.3 Interrupt Delegation and Reentry
+
+==== Scenario
+
+A hardware interrupt fires while a thread is running. CME switches
+execution to a pre-allocated interrupt-handler context, then returns to
+the interrupted thread.
+
+==== Setup (one-time, at boot or driver init)
+
+The kernel allocates an ECID for the interrupt handler
+(`interrupt_ecid`), initialises `EC[interrupt_ecid]`
+with an ECS pointer and a dedicated bank, and sets the delegation level
+appropriately. No CME instruction is needed for this setup — ECID
+creation is a privileged software operation that writes into the
+`EC[e]` table. The bank is assigned to `interrupt_ecid`’s
+Group before the first interrupt fires.
+
+==== On Interrupt
+
+[source,asm]
+----
+# Save interrupted context to its bank (current_ecid implicit)
+ec.ib  FULL_MASK
+
+# Restore interrupt handler context; hardware sets current_ecid = interrupt_ecid
+ec.ob  x0, interrupt_ecid, FULL_MASK
+----
+
+==== On Return from Interrupt
+
+[source,asm]
+----
+# Optionally save interrupt handler state (if it may be preempted itself)
+ec.ib  FULL_MASK
+
+# Restore interrupted context
+ec.ob  x0, current_ecid, FULL_MASK
+----
+
+==== Notes
+
+* `interrupt_ecid` is a fixed ECID number chosen by the kernel at
+setup time and stored wherever the interrupt dispatch path can reach it
+(e.g., in a CSR or a per-hart kernel variable).
+* Because the bank was pre-assigned to `interrupt_ecid`’s Group, the
+hardware ownership check at `ec.ob` succeeds in one comparison.
+
+'''''
+
+=== 6.4 Secure Enclave Launch
+
+==== Scenario
+
+A secure process is run in an isolated vault context. Its register state
+is stored in a hardware-sealed bank that the OS cannot read.
+
+==== On Entry to the Enclave
+
+____
+`ec.ib` = ECID into bank — `ec.ov` = ECID out of vault (unseal)
+____
+
+[source,asm]
+----
+# Save calling context to its bank (current_ecid implicit)
+ec.ib  FULL_MASK
+
+# Unseal secure bank and restore enclave state; hardware sets current_ecid = enclave_ecid
+ec.ov  x0, enclave_ecid, FULL_MASK
+----
+
+==== On Exit from the Enclave
+
+____
+`ec.iv` = ECID into vault (seal) — `ec.ob` = ECID out of bank
+____
+
+[source,asm]
+----
+# Seal enclave state back into the vault bank
+ec.iv  x0, enclave_ecid, FULL_MASK
+
+# Restore calling context
+ec.ob  x0, user_ecid, FULL_MASK
+----
+
+==== Notes
+
+* `ec.iv`/`ec.ov` provide hardware-backed sealing. The vault bank is
+protected from software running at any privilege level except the
+enclave itself.
+* `enclave_ecid` is separate from `user_ecid`; the hardware
+enforces that `user_ecid` cannot access the vault bank.
+
+'''''
+
+=== 6.5 Nested Virtual Machine (VM) Launch
+
+==== Scenario
+
+A host kernel (L0) launches a guest hypervisor (L1), which in turn
+launches a nested guest (L2). The delegation chain is `host_ecid` →
+`l1_ecid` → `l2_ecid`, matching the three delegation levels (L =
+0, 1, 2).
+
+==== Code: L0 → L1 (host to guest hypervisor)
+
+[source,asm]
+----
+ec.ib  FULL_MASK                  # save host context (current_ecid implicit)
+ec.ob  x0, l1_ecid, FULL_MASK    # restore guest hypervisor
+----
+
+==== Code: L1 → L2 (guest hypervisor to nested guest)
+
+[source,asm]
+----
+ec.ib  FULL_MASK                  # save guest hypervisor context
+ec.ob  x0, l2_ecid, FULL_MASK    # restore nested guest
+----
+
+==== Code: L2 → L1 (nested guest exits to guest hypervisor)
+
+[source,asm]
+----
+ec.ib  FULL_MASK                  # save nested guest context
+ec.ob  x0, l1_ecid, FULL_MASK    # restore guest hypervisor
+----
+
+==== Code: L1 → L0 (guest hypervisor exits to host)
+
+[source,asm]
+----
+ec.ib  FULL_MASK                  # save guest hypervisor context
+ec.ob  x0, host_ecid, FULL_MASK  # restore host kernel
+----
+
+==== Notes
+
+* Each ECID’s delegation level L is stored in
+`EC[e].delegation_L`. The L1 ECID must have L ++<++ D to be
+permitted to delegate `l2_ecid` (see Chapter 1, §1.9 and the charter
+§5.1).
+* From `l2_ecid`’s perspective its Group appears as Group 0; it
+cannot observe the host-level ECID numbers above it in the delegation
+tree.
+
+'''''
+
+=== 6.6 Real-Time Audio DSP in a VM
+
+==== Scenario
+
+A real-time audio engine runs inside a guest VM. Context switching must
+meet hard real-time deadlines (e.g., a 1 ms audio buffer period).
+
+==== Strategy
+
+CME, CPE, and MSE are used together:
+
+* *CME*: context state fits in a pre-assigned bank; switch path never
+touches RAM.
+* *CPE*: `dsp_ecid`’s cache partition is pinned, preventing eviction
+by other ECs on the same hart.
+* *MSE*: `dsp_ecid`’s Contract guarantees memory bandwidth and
+latency needed by the audio pipeline.
+
+==== Code
+
+[source,asm]
+----
+# Preempt non-DSP VM task (current_ecid implicit)
+ec.ib  FULL_MASK
+
+# Restore DSP audio handler; hardware enforces CPE partition and MSE Contract
+ec.ob  x0, dsp_ecid, FULL_MASK
+----
+
+==== Notes
+
+* The CPE and MSE settings for `dsp_ecid` are applied once at setup
+and enforced automatically by hardware on every `ec.ob`. No per-switch
+CPE or MSE instruction is needed for a context that stays resident.
+
+'''''
+
+=== 6.7 Nested Secure Enclave Inside VM
+
+==== Scenario
+
+A secure enclave runs within a guest VM’s address space.
+
+==== On Entry (guest to enclave)
+
+[source,asm]
+----
+ec.ib  FULL_MASK                       # save guest context (current_ecid implicit)
+ec.ov  x0, secure_ecid, FULL_MASK     # unseal enclave bank and restore
+----
+
+==== On Return (enclave to guest)
+
+[source,asm]
+----
+ec.iv  x0, secure_ecid, FULL_MASK     # seal enclave bank
+ec.ob  x0, guest_ecid, FULL_MASK      # restore guest context
+----
+
+==== Notes
+
+* `secure_ecid` is sealed with `ec.iv`/`ec.ov`; the guest VM cannot
+read its bank contents.
+* ECID separation between `guest_ecid` and `secure_ecid` is
+enforced by hardware: the guest cannot forge a reference to the
+enclave’s resources.
+
+'''''
+
+=== 6.8 Placeholder: Diagram — CME Save/Restore Flow
+
+*Description*: A flowchart showing context switching among thread,
+interrupt, VM, and enclave contexts using
+`ec.ib`/`ec.ob`/`ec.iv`/`ec.ov`, with arrows labeled by the ECID names
+used in this chapter.
+
+'''''
+
+=== 6.9 Where to go next
+
+*Chapter 7* covers the CPE instruction set: how to assign, modify, and
+revoke cache partitions per ECID, and the inline and pointer-based
+partition descriptor encodings.
+
+*Appendix A* covers the ECID radix-tree data structure and the
+algorithms for allocation, delegation, and forced destruction (`ec.oe`).
+
+'''''
+
+link:ch07-cpe-instruction-set.md[Next: Chapter 7 — CPE Instruction Set
+Reference]

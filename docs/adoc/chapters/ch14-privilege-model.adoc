@@ -1,0 +1,516 @@
+== Chapter 14 — CE Suite Privilege Model
+
+=== 14.1 Overview
+
+This chapter defines which RISC-V privilege levels may execute CE Suite
+instructions, under what conditions lower-privilege access is allowed,
+and how CE Suite interacts with the RISC-V H extension (virtualization).
+
+Before this chapter (P2 work item), every CE Suite instruction and CSR
+was M-mode only (Chapter 13 §13.7). P2 introduces two new control CSRs
+that let M-mode and HS-mode relax access to lower privilege levels,
+enabling an OS kernel (S/HS-mode) and a guest OS (VS-mode) to manage
+their own ECID hierarchies without trapping into firmware on every
+context switch.
+
+*Resolved questions (from the P2 work item):*
+
+[arabic]
+. `ec.ir` from S-mode creates L=1 ECIDs — the delegation level of a
+newly allocated ECID is always `parent_L {plus} 1`, and M-mode is
+the tree root.
+. VS-mode holds L=1 ECIDs directly; it does not need to go through
+HS-mode for every CE operation.
+. Per-privilege CE-enable: `cme_priv_ctl.S_EN` (M-mode RW,
+0x7CF) enables S/HS-mode; `hcme_ctrl.VS_EN` (HS-mode RW, 0x6C0)
+enables VS-mode.
+. The H-extension nesting hierarchy maps cleanly to delegation depth D ≤
+3 (§14.8).
+
+'''''
+
+=== 14.2 Privilege Levels and CE Suite
+
+==== 14.2.1 Privilege-level summary
+
+RISC-V defines six active privilege levels relevant to CE Suite:
+
+[width="100%",cols="25%,25%,25%,25%",options="header",]
+|===
+|Level |Name |CE access (default) |CE access (enabled)
+|M |Machine |Always |— (never restricted)
+
+|HS |Hypervisor-extended Supervisor |Illegal instruction |When
+`S_EN = 1`
+
+|S |Supervisor (no H extension) |Illegal instruction |When
+`S_EN = 1`
+
+|VS |Virtual Supervisor |Illegal instruction |When `S_EN = 1` *and*
+`VS_EN = 1`
+
+|U |User |Never |— (no enable path)
+
+|VU |Virtual User |Never |— (no enable path)
+|===
+
+S-mode and HS-mode are treated identically by CE Suite: both require
+`S_EN = 1` and differ only in the stack of delegation levels they
+operate within (§14.3).
+
+U-mode and VU-mode have no CE enable path. A CE instruction executed
+from U or VU always traps as an illegal instruction regardless of
+`S_EN` or `VS_EN`.
+
+==== 14.2.2 Default state at reset
+
+Both `S_EN` and `VS_EN` reset to 0. At boot, all CE Suite
+instructions are M-mode only. M-mode firmware explicitly opts in lower
+privilege levels by writing `cme_priv_ctl` (§14.4.1) and, if the
+H extension is present, `hcme_ctrl` (§14.4.2).
+
+'''''
+
+=== 14.3 Delegation-Level Assignment
+
+When `ec.ir` allocates a new ECID, the delegation level of the child is
+hardware-derived from the calling context’s current ECID level plus one
+(Chapter 3 §3.5). M-mode is the delegation root: ECIDs created by M-mode
+are at level L = 0.
+
+[cols=",,",options="header",]
+|===
+|Privilege level |Current ECID level |`ec.ir` creates at
+|M |(root — M is the tree root) |L = 0
+|S / HS |L = 0 (assigned by M) |L = 1
+|VS |L = 1 (assigned by HS) |L = 2
+|Nested VS (guest hypervisor) |L = 2 |L = 3
+|===
+
+The constraint D ≤ 3 (Chapter 2 §2.4) caps the nesting depth at four
+levels (L = 0–3), which is sufficient for the four-layer hierarchy:
+firmware → OS → hypervisor → nested guest.
+
+*Subtree isolation.* Each privilege level operates only within its own
+delegation subtree. S-mode cannot allocate or manipulate ECIDs that
+belong to M-mode’s L=0 tree other than through delegated sub-slices.
+VS-mode cannot manipulate ECIDs that belong to HS-mode’s L=0 or L=1 tree
+unless explicitly delegated. Attempting to target an ECID outside the
+caller’s subtree returns `CME_ERR_PERMISSION` (or equivalent per
+extension).
+
+'''''
+
+=== 14.4 Per-Privilege CE-Enable Mechanism
+
+==== 14.4.1 `cme_priv_ctl` — M-mode privilege control (0x7CF)
+
+*Address:* 0x7CF — M-mode read/write (next free slot after
+`qos_violation_en` at 0x7CE; Chapter 13 §13.8.1).
+
+*Reset value:* 0x0 (all bits clear; S-mode CE disabled).
+
+[width="100%",cols="25%,25%,25%,25%",options="header",]
+|===
+|Bit |Name |Access |Description
+|0 |`S_EN` |RW |1 = enable CE instruction access from S-mode and
+HS-mode
+
+|XLEN−1:1 |— |WPRI |Reserved; read as zero; writes ignored
+|===
+
+*Semantics.* When `S_EN = 0` (default), any CE Suite instruction
+executed from S-mode or HS-mode traps as an illegal instruction. When
+`S_EN = 1`, CE instructions may execute from S-mode and HS-mode
+subject to the per- instruction rules in §14.5.
+
+Setting `S_EN = 1` does not automatically enable VS-mode;
+`hcme_ctrl.VS_EN` governs VS-mode independently (§14.4.2).
+
+*Access.* Only M-mode may read or write `cme_priv_ctl`. Access
+from lower privilege levels traps as illegal instruction. This
+restriction is absolute and is not relaxed by `S_EN` itself.
+
+==== 14.4.2 `hcme_ctrl` — HS-mode privilege control (0x6C0)
+
+*Address:* 0x6C0 — HS-mode read/write (in the custom HS-mode CSR range;
+only exists when the H extension is present).
+
+*Reset value:* 0x0 (VS-mode CE disabled).
+
+[cols=",,,",options="header",]
+|===
+|Bit |Name |Access |Description
+|0 |`VS_EN` |RW |1 = enable CE instruction access from VS-mode
+|XLEN−1:1 |— |WPRI |Reserved; read as zero; writes ignored
+|===
+
+*Semantics.* `VS_EN = 1` enables CE instruction access from VS-mode,
+but only when `S_EN = 1` is also set. If `S_EN = 0`, VS-mode CE
+access is denied regardless of `VS_EN`.
+
+HS-mode uses `hcme_ctrl` to grant or revoke its guest VMs’ CE access
+independently of each other — a hypervisor may set `VS_EN = 0`
+before scheduling an untrusted VM and `VS_EN = 1` before scheduling
+a trusted one.
+
+*Access.* M-mode and HS-mode may read and write `hcme_ctrl`.
+VS-mode, S-mode (without H), and lower privilege levels trap when
+accessing `hcme_ctrl`.
+
+When the H extension is not present, `hcme_ctrl` does not exist;
+access causes an illegal instruction regardless of `S_EN`.
+
+==== 14.4.3 Enable logic
+
+The combined enable condition evaluated by hardware before executing any
+CE instruction is:
+
+....
+allowed(M)   ← always true
+allowed(HS)  ← cme_priv_ctl.S_EN = 1
+allowed(S)   ← cme_priv_ctl.S_EN = 1
+allowed(VS)  ← cme_priv_ctl.S_EN = 1  AND  hcme_ctrl.VS_EN = 1
+allowed(U)   ← false
+allowed(VU)  ← false
+....
+
+The check is performed before any instruction-level authorization checks
+(e.g., parent–child relationship, ECID ownership). A privilege denial
+traps before the instruction reads any state.
+
+'''''
+
+=== 14.5 Per-Instruction Privilege Table
+
+Tables use the following notation:
+
+[cols=",",options="header",]
+|===
+|Symbol |Meaning
+|✓ |Always permitted at this privilege level
+|S |Permitted when `cme_priv_ctl.S_EN = 1`
+|V |Permitted when `S_EN = 1` AND `hcme_ctrl.VS_EN = 1`
+|✗ |Never permitted; always traps as illegal instruction
+|===
+
+==== 14.5.1 CME instructions (funct3 = `000`)
+
+[cols=",,,,,,",options="header",]
+|===
+|Instruction |M |HS |S |VS |U |VU
+|`ec.ib` |✓ |S |S |V |✗ |✗
+|`ec.ob` |✓ |S |S |V |✗ |✗
+|`ec.im` |✓ |S |S |V |✗ |✗
+|`ec.om` |✓ |S |S |V |✗ |✗
+|`ec.ig` |✓ |S |S |V |✗ |✗
+|`ec.og` |✓ |S |S |V |✗ |✗
+|`ec.it` |✓ |S |S |V |✗ |✗
+|`ec.ot` |✓ |S |S |V |✗ |✗
+|`ec.ir` |✓ |S |S |V |✗ |✗
+|`ec.oe` |✓ |S |S |V |✗ |✗
+|`ec.iv` |✓ |✗ |✗ |✗ |✗ |✗
+|`ec.ov` |✓ |✗ |✗ |✗ |✗ |✗
+|===
+
+*`ec.iv` / `ec.ov` — M-mode only.* The vault seal and unseal operations
+use `cme_seal_key` (0x7C3), which is M-mode only regardless of
+P2 relaxations (Chapter 13 §13.3.9). There is no enable path for these
+instructions from lower privilege levels.
+
+==== 14.5.2 CPE instructions (funct3 = `001`)
+
+[cols=",,,,,,",options="header",]
+|===
+|Instruction |M |HS |S |VS |U |VU
+|`cp.ir` |✓ |S |S |V |✗ |✗
+|`cp.or` |✓ |S |S |V |✗ |✗
+|`cp.it` |✓ |S |S |V |✗ |✗
+|`cp.ot` |✓ |S |S |V |✗ |✗
+|===
+
+==== 14.5.3 MSE instructions (funct3 = `010`)
+
+[cols=",,,,,,",options="header",]
+|===
+|Instruction |M |HS |S |VS |U |VU
+|`ms.ir` |✓ |S |S |V |✗ |✗
+|`ms.or` |✓ |S |S |V |✗ |✗
+|`ms.it` |✓ |S |S |V |✗ |✗
+|`ms.ot` |✓ |S |S |V |✗ |✗
+|===
+
+==== 14.5.4 QoS instructions (funct3 = `011`)
+
+[cols=",,,,,,",options="header",]
+|===
+|Instruction |M |HS |S |VS |U |VU
+|`qs.ir` |✓ |S |S |V |✗ |✗
+|`qs.or` |✓ |S |S |V |✗ |✗
+|`qs.it` |✓ |S |S |V |✗ |✗
+|`qs.ot` |✓ |S |S |V |✗ |✗
+|===
+
+'''''
+
+=== 14.6 CSR Accessibility by Privilege Level
+
+==== 14.6.1 M-mode (always accessible)
+
+M-mode may read and write all CE Suite CSRs without restriction. This is
+unconditional and not affected by `S_EN` or `VS_EN`.
+
+==== 14.6.2 S-mode / HS-mode (when `S_EN = 1`)
+
+When `cme_priv_ctl.S_EN = 1`, S-mode and HS-mode gain
+read-only access to `current_ecid` (0xFC0). This is the only CE
+Suite CSR accessible below M-mode; all others remain M-mode only.
+
+[width="100%",cols="34%,33%,33%",options="header",]
+|===
+|CSR |Address |S/HS access when `S_EN = 1`
+|`current_ecid` |0xFC0 |Read-only
+|All other CE Suite CSRs |0x7C0–0x7CE, 0xFC1–0xFCF |Illegal instruction
+|`cme_priv_ctl` |0x7CF |Illegal instruction (M-mode only always)
+|`hcme_ctrl` |0x6C0 |M and HS only (§14.4.2)
+|===
+
+`current_ecid` exposes the ECID number currently bound to this hart.
+S-mode reads it to obtain its own ECID number for context-switch
+bookkeeping (e.g., to pass as `rs1` to `ec.ib`). The value is read-only;
+writes trap.
+
+Capability CSRs (`cpe_caps`, `mse_slot_ns`,
+`mse_max_nesting`, etc.) remain M-mode only. M-mode firmware is
+expected to read these at boot and publish the values in a shared memory
+region (e.g., the device tree or a firmware-provided table) for use by
+S-mode.
+
+==== 14.6.3 VS-mode (when `S_EN = 1` and `VS_EN = 1`)
+
+VS-mode receives the same CSR access as S-mode when both enable bits are
+set: read-only access to `current_ecid` (0xFC0) only.
+
+==== 14.6.4 U-mode / VU-mode (never accessible)
+
+No CE Suite CSR is accessible from U-mode or VU-mode. Access always
+traps as an illegal instruction regardless of `S_EN` or `VS_EN`.
+
+'''''
+
+=== 14.7 Illegal-Access Behavior
+
+A CE Suite access denied by the privilege model raises a synchronous
+exception with the standard RISC-V illegal instruction cause
+(`mcause`/`scause` = 2).
+
+The following actions are denied and raise illegal instruction:
+
+[width="100%",cols="50%,50%",options="header",]
+|===
+|Access |Condition that denies it
+|CE instruction from S or HS |`cme_priv_ctl.S_EN = 0`
+
+|CE instruction from VS |`S_EN = 0` or `VS_EN = 0`
+
+|CE instruction from U or VU |Always
+
+|`ec.iv` / `ec.ov` from any non-M level |Always (vault instructions are
+M-mode only)
+
+|Any CE CSR read/write from S/HS (except `current_ecid`) |Always
+
+|Any CE CSR read/write from VS (except `current_ecid`) |Always
+
+|Any CE CSR read/write from U/VU |Always
+
+|`cme_priv_ctl` access from below M-mode |Always
+
+|`hcme_ctrl` access from VS, S, U, VU |Always
+
+|CE instruction targeting an ECID outside the caller’s subtree
+|`CME_ERR_PERMISSION` (returned in `rd`, not a trap)
+|===
+
+*Privilege denial vs. per-instruction error codes.* A privilege denial
+(wrong mode, enable bit clear) raises a trap before the instruction
+executes and before `rd` is written. A per-instruction authorization
+failure (e.g., targeting an ECID in a different subtree) does execute
+the instruction and returns an error code in `rd`. These are distinct
+mechanisms.
+
+*Delegation by `medeleg`.* CE Suite illegal-instruction exceptions use
+standard RISC-V cause 2. M-mode may delegate cause 2 to S-mode via
+`medeleg` if it wishes S-mode to handle its own CE trap reporting. The
+privilege check itself is still performed in hardware before delegation.
+
+'''''
+
+=== 14.8 CE Suite and the RISC-V H Extension
+
+==== 14.8.1 Role mapping
+
+When the H extension is active, each privilege level has a natural CE
+role:
+
+[cols=",,,",options="header",]
+|===
+|Privilege level |CE role |ECID level held |`ec.ir` creates
+|M |Firmware / root CE manager |(root; no ECID needed) |L = 0
+|HS |Hypervisor |L = 0 |L = 1
+|VS |Guest OS |L = 1 |L = 2
+|VU |Guest user |None |—
+|===
+
+HS-mode acts as the CE authority for its guests: it allocates L=1 ECIDs
+for each VM, assigns bank pools, CPE partitions, and MSE Contracts, then
+hands the L=1 ECID to the VM’s vCPU context. VS-mode inherits that L=1
+ECID and manages its own processes (L=2 ECIDs) without further
+involvement from HS.
+
+The H extension does not add a new layer of CE policy — it uses the
+existing delegation-depth mechanism. One level of H-extension nesting
+consumes one delegation level.
+
+==== 14.8.2 VM entry and VM exit
+
+On VM entry (transition from HS to VS):
+
+[arabic]
+. HS calls `ec.ib` to save its own ECID context (L=0 ECID).
+. HS calls `ec.ob` to restore the guest’s L=1 ECID context.
+. Hardware restores the full bank, including CPE partitions and MSE/QoS
+Contracts held by the L=1 ECID.
+. HS sets `hcme_ctrl.VS_EN = 1` if it wants the guest to use CE
+instructions.
+
+On VM exit (trap from VS to HS):
+
+[arabic]
+. Hardware saves VS-mode register state (standard H-extension behavior).
+. HS calls `ec.ib` to save the guest’s L=1 ECID context.
+. HS calls `ec.ob` to restore its own L=0 ECID context.
+. HS may set `hcme_ctrl.VS_EN = 0` to deny CE access to the next
+VM it schedules, if that VM is untrusted.
+
+The CE context switch during VM entry/exit is identical in structure to
+a normal OS context switch. No new instructions or CSRs are needed
+beyond `ec.ib` and `ec.ob`.
+
+==== 14.8.3 Nested virtualization
+
+A guest hypervisor running in VS-mode may use `ec.ir` to create L=2
+ECIDs for its own nested VMs, provided VS-mode CE access is enabled
+(`S_EN = 1`, `VS_EN = 1`). Nested VMs run at L=2 and may
+themselves create L=3 ECIDs (the deepest level permitted by D ≤ 3).
+
+The table below shows the nesting ceiling at each level:
+
+[cols=",,,",options="header",]
+|===
+|Level |Runs at |May create |May delegate
+|M |(root) |L = 0 |Yes (to HS/S)
+|HS / S |L = 0 |L = 1 |Yes (to VS or tasks)
+|VS |L = 1 |L = 2 |Yes (to nested VMs)
+|Nested VS |L = 2 |L = 3 (leaf) |No (D = 3 cap)
+|L = 3 ECID |L = 3 |— |No
+|===
+
+At L = 3, `ec.ir rs1=1` (delegating child) fails with
+`CME_ERR_CAP_DEPTH`. `ec.ir rs1=0` (leaf child) succeeds and
+creates an L=3 leaf ECID.
+
+'''''
+
+=== 14.9 Boot and Initialization Sequence
+
+The following sequence shows how M-mode firmware enables CE access for
+an OS kernel and, optionally, for VMs under a type-1 hypervisor.
+
+==== System without hypervisor (S-mode kernel only)
+
+[source,asm]
+----
+    # 1. M-mode initializes the ECID table and allocates an L=0 ECID for
+    #    the OS kernel.
+    csrw  cme_ec_table_base, kernel_ec_table  # set up EC[] array
+    li    a1, 1                               # delegating child
+    ec.ir a0, a1                              # a0 = new L=0 ECID for kernel
+
+    # 2. Configure the kernel's ECID: assign banks, set slot ratio, etc.
+    #    (ec.ig, ms.ir, cp.ir as needed — M-mode, always permitted)
+
+    # 3. Enable S-mode CE access.
+    li    t0, 1
+    csrw  cme_priv_ctl, t0                   # S_EN = 1
+
+    # 4. Publish capability CSR values in shared memory for S-mode to read.
+    csrr  t0, cpe_caps
+    sw    t0, firmware_caps_table + CPE_CAPS_OFFSET(x0)
+    csrr  t0, mse_slot_ns
+    sw    t0, firmware_caps_table + MSE_SLOT_NS_OFFSET(x0)
+    # ... repeat for other capability CSRs ...
+
+    # 5. Jump to S-mode; S-mode can now use CE instructions and read
+    #    current_ecid (0xFC0) to obtain its own ECID number.
+    mret
+----
+
+==== System with hypervisor (HS-mode {plus} VS-mode)
+
+[source,asm]
+----
+    # M-mode: allocate L=0 ECID for the hypervisor (same as above), then:
+    li    t0, 1
+    csrw  cme_priv_ctl, t0                   # S_EN = 1; HS-mode CE active
+
+    # HS-mode: before entering a trusted VM, allocate an L=1 ECID for it.
+    li    a1, 1
+    ec.ir a0, a1                              # a0 = new L=1 ECID for VM
+    # assign banks, MSE Contract, CPE partition to a0 as needed ...
+
+    # HS-mode: enable CE for this VM before VM entry.
+    li    t0, 1
+    csrw  hcme_ctrl, t0                      # VS_EN = 1
+    ec.ob x0, vm_ecid, FULL_MASK             # restore VM's ECID context
+    hret                                      # enter VS-mode
+
+    # On VM exit back to HS-mode:
+    ec.ib  FULL_MASK                         # save VS ECID
+    li    t0, 0
+    csrw  hcme_ctrl, t0                      # VS_EN = 0 (revoke next VM's CE)
+    ec.ob  x0, hs_ecid, FULL_MASK           # restore HS ECID
+----
+
+==== Notes
+
+* `cme_priv_ctl` should be written once at boot and left stable.
+Toggling `S_EN` at runtime is safe but creates a window where
+in-flight S-mode CE instructions may trap; software must ensure
+quiescence before clearing `S_EN`.
+* `hcme_ctrl.VS_EN` may be toggled per VM entry/exit with no
+quiescence requirement; the check is performed per-instruction.
+* M-mode is responsible for publishing capability CSR values in shared
+memory at boot. S-mode and VS-mode must not rely on direct CSR access to
+capability registers (those accesses will trap).
+
+'''''
+
+=== 14.10 Where to go next
+
+*Chapter 13* is the normative CSR reference. It lists all CE Suite CSR
+addresses, bit-fields, and access control; Chapter 14 defines the P2
+relaxations that extend some access to lower privilege levels.
+
+*Chapter 3* (CME instruction set) and *Chapter 7* (CPE instruction set)
+are the normative instruction references. Each instruction’s semantics
+apply at all permitted privilege levels; the authorization checks
+described here are a pre-condition, not a replacement for
+per-instruction error handling.
+
+*P3* (trap/exception table, not yet written) will enumerate every CE
+Suite exception cause code and specify which are delegatable to S-mode
+via `medeleg`.
+
+link:ch15-trap-table.md[Next: Chapter 15 — CE Suite Trap and Exception
+Table]

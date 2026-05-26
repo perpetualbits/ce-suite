@@ -1,0 +1,60 @@
+= CE Suite RISC-V Extension Specification
+Roland Nagtegaal <perpetualbits@gmail.com>
+:doctype: book
+:toc: left
+:toclevels: 4
+:sectnums:
+:sectnumlevels: 4
+:source-highlighter: rouge
+:rouge-style: github
+:icons: font
+:xrefstyle: full
+:chapter-label: Chapter
+:appendix-caption: Appendix
+
+// Provisional status notice
+[NOTE]
+====
+This specification is at proposal stage.
+All CSR addresses, opcode assignments, and ISA string names are provisional,
+pending formal allocation by RISC-V International.
+====
+
+include::chapters/ch00-fundamental-structure.adoc[leveloffset=+0]
+
+include::chapters/ch01-execution-context-model.adoc[leveloffset=+0]
+
+include::chapters/ch02-bank-group-delegation.adoc[leveloffset=+0]
+
+include::chapters/ch03-cme-instruction-set.adoc[leveloffset=+0]
+
+include::chapters/ch04-hardware-microarch.adoc[leveloffset=+0]
+
+include::chapters/ch05-linux-integration.adoc[leveloffset=+0]
+
+include::chapters/ch06-cme-usage-examples.adoc[leveloffset=+0]
+
+include::chapters/ch07-cpe-instruction-set.adoc[leveloffset=+0]
+
+include::chapters/ch08-cpe-usage-examples.adoc[leveloffset=+0]
+
+include::chapters/ch09-mse-memory-scheduling.adoc[leveloffset=+0]
+
+include::chapters/ch10-mse-usage-examples.adoc[leveloffset=+0]
+
+include::chapters/ch11-qos-io-quality-of-service.adoc[leveloffset=+0]
+
+include::chapters/ch12-qos-usage-examples.adoc[leveloffset=+0]
+
+include::chapters/ch13-csr-reference.adoc[leveloffset=+0]
+
+include::chapters/ch14-privilege-model.adoc[leveloffset=+0]
+
+include::chapters/ch15-trap-table.adoc[leveloffset=+0]
+
+include::chapters/ch16-discovery.adoc[leveloffset=+0]
+
+include::chapters/ch17-memory-ordering.adoc[leveloffset=+0]
+
+[appendix]
+include::chapters/appendix-a-ecid.adoc[leveloffset=+0]
