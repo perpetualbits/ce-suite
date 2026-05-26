@@ -1,4 +1,4 @@
-# Chapter 11 — MSE Usage Examples
+# Chapter 10 — MSE Usage Examples
 
 ## 1. Overview
 
@@ -15,11 +15,11 @@ All examples assume:
 - The `ms.*` instruction set uses the `{ms}.{i,o}{target}` format, where `i`
   means "into" (assign/delegate) and `o` means "out of" (revoke). Target
   letters: `r`=resource (Contract), `t`=tenant (delegation). The full reference
-  is in Chapter 8.
+  is in Chapter 9.
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   `x0` is used for `rd` to discard the result where the fast path is expected
   to succeed.
-- Inline `rs2` values use the encoding defined in Chapter 8 §5:
+- Inline `rs2` values use the encoding defined in Chapter 9 §5:
   - For `ms.ir`: bits 3:0 = `bw_class`, bits 7:4 = `lat_class`, bit `[XLEN-1]` = 0.
   - For `ms.it`: bits 15:0 = `child_ecid`, bits 19:16 = `child_bw_class`,
     bits 23:20 = `child_lat_class`, bit `[XLEN-1]` = 0.
@@ -98,7 +98,7 @@ minimum memory bandwidth and bounded latency. The ECID is not currently running.
 - An ECID with `bw_class=0` and `lat_class=0` is best-effort and does not
   participate in CN slot arbitration. Assigning both to zero via `ms.ir` has
   the same effect as `ms.or`.
-- `ms.ir` checks two admission conditions before committing (Chapter 8 §5, §7.3):
+- `ms.ir` checks two admission conditions before committing (Chapter 9 §5, §7.3):
   the group bandwidth cap and the system-wide CN budget. If either fails, `rd`
   holds the error code and no state changes.
 
@@ -345,15 +345,15 @@ does not receive its guaranteed CN slots in a scheduling window.
 - `mse_violation` is sticky: it accumulates until explicitly cleared by writing 1.
 - A violation means the hardware detected that a Contract holder did not receive
   its guaranteed `bw_class` worth of CN slots in the last scheduling window
-  (Chapter 8 §8). This can indicate system overload or a mis-configured slot ratio.
+  (Chapter 9 §8). This can indicate system overload or a mis-configured slot ratio.
 - The slot ratio is adjustable via `mse_slot_ratio` (bits 7:0, where 128=50%).
-  The BE fraction must remain ≥ 25 % and the CN fraction ≥ 25 % (Chapter 8 §2.1).
+  The BE fraction must remain ≥ 25 % and the CN fraction ≥ 25 % (Chapter 9 §2.1).
 
 ---
 
 ## 10. Where to go next
 
-**Chapter 8** is the normative MSE reference: slot scheme, Contract parameters,
+**Chapter 9** is the normative MSE reference: slot scheme, Contract parameters,
 arbitration rules, CSRs, and error codes.
 
 **Chapter 7** covers CPE (cache partitioning), which composes with MSE for
@@ -362,4 +362,4 @@ end-to-end bounded memory latency (see §5 above).
 **Chapter 12** covers QoS usage examples: how I/O and NoC bandwidth Contracts
 compose with MSE for workloads that span both DRAM and peripheral interconnect.
 
-[Next: Chapter 12 — QoS Usage Examples](ch12-qos-usage-examples.md)
+[Next: Chapter 11 — QoS: I/O Quality-of-Service Extension](ch11-qos-io-quality-of-service.md)

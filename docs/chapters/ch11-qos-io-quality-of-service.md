@@ -1,9 +1,9 @@
-# Chapter 9 — QoS: I/O Quality-of-Service Extension
+# Chapter 11 — QoS: I/O Quality-of-Service Extension
 
 ## 1. Overview
 
 The **I/O Quality-of-Service Extension (QoS)** applies the same arbitration philosophy
-as MSE (Chapter 8) to the on-chip I/O fabric: the Network-on-Chip (NoC), DMA engines,
+as MSE (Chapter 9) to the on-chip I/O fabric: the Network-on-Chip (NoC), DMA engines,
 and peripheral interconnect. Its purpose is to make Worst-Case Execution Time for
 I/O-bound workloads *provable* — the same guarantee MSE provides for DRAM access.
 
@@ -23,13 +23,13 @@ QoS is per-system (the I/O fabric is a shared resource), but all software intera
 are per-hart and ECID-first: QoS instructions take ECID numbers as operands, never raw
 pointers or opaque identifiers.
 
-**Relationship to MSE.** MSE governs DRAM arbitration (Chapter 8); QoS governs I/O
+**Relationship to MSE.** MSE governs DRAM arbitration (Chapter 9); QoS governs I/O
 fabric arbitration (this chapter). The two are complementary: a DMA transfer exercises
 both — QoS on the I/O side, MSE on the DRAM side. Neither subsumes the other.
 
 **What QoS does not cover:**
 
-- DRAM arbitration — MSE (Chapter 8).
+- DRAM arbitration — MSE (Chapter 9).
 - L1/L2 cache isolation — CPE (Chapter 7).
 - Multi-resource Contracts spanning memory and I/O — open item (charter §8.2).
 - Software slow-path when hardware Contract slots are exhausted — open item (charter §8.3).
@@ -541,7 +541,7 @@ All error codes are returned in `rd` or in `qos_status`. Silent failure is prohi
 ## 12. Instruction Encoding
 
 All CE Suite instructions share the same R-type format and custom-0 opcode
-(`0001011`). See Chapter 2 §10.1–§10.2 for the bitfield diagram and the
+(`0001011`). See Chapter 3 §10.1–§10.2 for the bitfield diagram and the
 funct3 extension-selector table.
 
 **QoS uses funct3 = `011`.**
@@ -588,7 +588,7 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ## 13. Out of Scope for v1
 
-- **DRAM arbitration.** Covered by MSE (Chapter 8).
+- **DRAM arbitration.** Covered by MSE (Chapter 9).
 - **L1/L2 cache isolation.** Covered by CPE (Chapter 7).
 - **Multi-resource Contracts.** Whether a single Contract can span multiple I/O domains
   or span I/O and memory is open (charter §8.2).
@@ -600,4 +600,4 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ---
 
-**Next:** Appendix A — ECID: Radix Tree, Allocation, and Forced-Destruction Algorithms
+**Next:** Chapter 12 — QoS Usage Examples

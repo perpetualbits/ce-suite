@@ -1,4 +1,4 @@
-# Chapter 10 — CPE Usage Examples
+# Chapter 8 — CPE Usage Examples
 
 ## 1. Overview
 
@@ -338,8 +338,8 @@ destination hart after migration.
 semantics, descriptor encoding tables, hardware sanity rules, CSRs, and error
 codes.
 
-**Chapter 11** covers MSE usage examples: how to assign and delegate memory
+**Chapter 10** covers MSE usage examples: how to assign and delegate memory
 bandwidth and latency Contracts, and how MSE and CPE compose for hard real-time
 workloads.
 
-[Next: Chapter 11 — MSE Usage Examples](ch11-mse-usage-examples.md)
+[Next: Chapter 9 — MSE: Memory Scheduling Extension](ch09-mse-memory-scheduling.md)

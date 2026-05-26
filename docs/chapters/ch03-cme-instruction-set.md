@@ -1,4 +1,4 @@
-# Chapter 2 — CME Instruction Set Reference
+# Chapter 3 — CME Instruction Set Reference
 
 ## Overview
 
@@ -531,4 +531,4 @@ Silent ignore is prohibited (charter §6.6).
 
 ---
 
-[Next: Chapter 3 — Bank, Group, and Delegation Semantics](ch03-bank-group-delegation.md)
+[Next: Chapter 4 — Hardware Microarchitecture Overview](ch04-hardware-microarch.md)

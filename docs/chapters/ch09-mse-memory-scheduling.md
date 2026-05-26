@@ -1,4 +1,4 @@
-# Chapter 8 — MSE: Memory Scheduling Extension
+# Chapter 9 — MSE: Memory Scheduling Extension
 
 ## 1. Overview
 
@@ -25,7 +25,7 @@ software interactions are per-hart and ECID-first: MSE instructions take ECID nu
 as operands, never raw pointers or opaque group IDs.
 
 MSE v1 covers main DRAM arbitration only. NoC, DMA, and peripheral interconnect are
-handled by QoS (Chapter 9). L1/L2 cache isolation is handled by CPE (Chapter 7).
+handled by QoS (Chapter 11). L1/L2 cache isolation is handled by CPE (Chapter 7).
 
 ---
 
@@ -419,7 +419,7 @@ All error codes are returned in `rd` or in `mse_status`. Silent failure is prohi
 ## 11. Instruction Encoding
 
 All CE Suite instructions share the same R-type format and custom-0 opcode
-(`0001011`). See Chapter 2 §10.1–§10.2 for the bitfield diagram and the
+(`0001011`). See Chapter 3 §10.1–§10.2 for the bitfield diagram and the
 funct3 extension-selector table.
 
 **MSE uses funct3 = `010`.**
@@ -464,7 +464,7 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ## 12. Out of Scope for v1
 
-- **NoC, DMA, and peripheral arbitration.** Covered by QoS (Chapter 9).
+- **NoC, DMA, and peripheral arbitration.** Covered by QoS (Chapter 11).
 - **NUMA-aware Contract assignment.** Multi-socket NUMA semantics for MSE Contracts
   are an open item (charter §8.1).
 - **Multi-resource Contracts.** Whether a single Contract can span memory and I/O
@@ -475,4 +475,4 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 ---
 
-**Next:** Chapter 9 — QoS: I/O Quality-of-Service Extension
+**Next:** Chapter 10 — MSE Usage Examples

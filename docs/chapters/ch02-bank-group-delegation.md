@@ -1,4 +1,4 @@
-# Chapter 3 — Bank, Group, and Delegation Semantics
+# Chapter 2 — Bank, Group, and Delegation Semantics
 
 ## Scope
 
@@ -14,7 +14,7 @@ Contracts, and delegation in the CE Suite. It specifies:
 - Revocation: cooperative (`ec.ot`) and forced (`ec.oe`) paths.
 
 Byte-level layouts are in Chapter 0. Instruction operand encodings are in
-Chapter 2. The radix-tree allocation algorithms are in Appendix A. This
+Chapter 3. The radix-tree allocation algorithms are in Appendix A. This
 chapter defines what the operations mean; the other chapters define how
 they are encoded.
 
@@ -201,7 +201,7 @@ ECID's Group. After delegation:
   cannot issue `ec.ib` against a Bank it has delegated away, and it cannot
   use a Contract it has delegated away.
 
-**Bank delegation** uses `ec.it` (Chapter 2 §4): one bank per call,
+**Bank delegation** uses `ec.it` (Chapter 3 §4): one bank per call,
 parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
 `ec.it` N times.
 
@@ -214,7 +214,7 @@ GroupID = ECID.
 
 ### 3.4.2 Creating a child ECID
 
-Delegation presupposes a child ECID. The instruction `ec.ir` (Chapter 2
+Delegation presupposes a child ECID. The instruction `ec.ir` (Chapter 3
 §5) allocates a new child ECID in the calling context's radix-tree prefix.
 The kernel then:
 
@@ -292,7 +292,7 @@ via `ec.oe`.
 
 `ec.oe rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
 resources. This instruction always succeeds. The target context cannot
-stall, block, or defend against it. See Chapter 2 §5 for the step-by-step
+stall, block, or defend against it. See Chapter 3 §5 for the step-by-step
 semantics.
 
 `ec.oe` is the path for:
@@ -393,4 +393,4 @@ forced-revocation algorithms are in Appendix A.
 
 ---
 
-[Next: Chapter 4 — Hardware Microarchitecture Overview](ch04-hardware-microarch.md)
+[Next: Chapter 3 — CME Instruction Set Reference](ch03-cme-instruction-set.md)
