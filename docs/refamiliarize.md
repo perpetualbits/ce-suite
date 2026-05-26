@@ -123,8 +123,8 @@ All D items (D1–D4) and all F/G items except F8 and G3 are resolved. See work-
 ### A.6 What's *next* (the suggested work order)
 
 **Phase 1 — Resolve work items.**
-All D items and most F/G items are resolved as of v0.12. Remaining items: F8 (binary
-encoding), G1 (diagrams), G3 (RV32 audit). See work-items.md for details.
+All D items and all F/G items except F8 and G3 are resolved as of v0.12. Remaining:
+F8 (binary encoding) and G3 (RV32 audit). See work-items.md for details.
 
 **Phase 2 — Usage examples chapters.**
 - ~~Chapter 10 — CPE Usage Examples~~ — **DONE**
@@ -155,6 +155,9 @@ docs/
 │   ├── ch07-cpe-instruction-set.md
 │   ├── ch08-mse-memory-scheduling.md
 │   ├── ch09-qos-io-quality-of-service.md
+│   ├── ch10-cpe-usage-examples.md
+│   ├── ch11-mse-usage-examples.md
+│   ├── ch12-qos-usage-examples.md
 │   └── appendix-a-ecid.md
 ├── reference/
 │   ├── glossary.md
