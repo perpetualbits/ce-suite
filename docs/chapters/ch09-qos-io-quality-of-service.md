@@ -297,11 +297,21 @@ opaque domain handle (charter §6.2).
 ### `qs.ir` — Assign an I/O Contract to an ECID
 
 * **Syntax**: `qs.ir rd, rs1, rs2`
-  * `rs1`: Target ECID.
-  * `rs2`: Contract parameters — `bw_class` (bits 3:0), `lat_class` (bits 7:4), and
-    `domain_id` (bits 23:8), packed into `rs2`; or a pointer to a `QOS_Contract_Params`
-    struct if bit 63 of `rs2` is set.
   * `rd`: 0 on success; error code on failure.
+  * `rs1`: Target ECID.
+  * `rs2`: Contract parameters. Inline form (bit `[XLEN-1]` = 0): bits 3:0 =
+    `bw_class`, bits 7:4 = `lat_class`, bits 23:8 = `domain_id`, bits
+    `[XLEN-2]`:24 reserved (must be zero). Pointer form (bit `[XLEN-1]` = 1):
+    bits `[XLEN-2]`:0 are a pointer to a `QOS_Contract_Params` struct (see below).
+* **Pointer form struct:**
+```c
+struct QOS_Contract_Params {
+    uint8_t  bw_class;    /* I/O bandwidth class (0 = best-effort) */
+    uint8_t  lat_class;   /* latency class (0 = best-effort) */
+    uint16_t domain_id;   /* I/O fabric domain */
+    uint32_t reserved;    /* must be zero */
+};
+```
 * **Semantics**:
   1. Checks that `rs1` is a valid, allocated ECID on this hart.
   2. Checks that `domain_id` is valid.
@@ -315,7 +325,9 @@ opaque domain handle (charter §6.2).
   7. If `domain_id` identifies a DMA channel, binds the DMA channel to ECID `rs1`.
   8. Updates the running bandwidth sum for all ancestor groups on this domain, up to
      the root.
-  9. The change takes effect on the next `ec.ob` that loads ECID `rs1`.
+  9. The change takes effect on the next `ec.ob` that loads ECID `rs1`. If ECID
+     `rs1` is currently running on this hart, the new Contract parameters are applied
+     immediately to the per-hart I/O fabric registers.
 * **Cycles**: 1–4 (O(1) cap check; ancestor sum update bounded by D ≤ 3).
 
 ---
@@ -323,10 +335,10 @@ opaque domain handle (charter §6.2).
 ### `qs.or` — Revoke the I/O Contract from an ECID
 
 * **Syntax**: `qs.or rd, rs1, rs2`
+  * `rd`: 0 on success; error code on failure.
   * `rs1`: Target ECID.
   * `rs2`: Domain selector — `domain_id` of the Contract to revoke, or 0 to revoke
     all domains simultaneously. (charter §6.7)
-  * `rd`: 0 on success; error code on failure.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class[domain] = 0` and `EC[rs1].lat_class[domain] = 0` for the
      specified domain(s).
@@ -345,17 +357,41 @@ opaque domain handle (charter §6.2).
 ### `qs.it` — Delegate a child I/O Contract to a child ECID
 
 * **Syntax**: `qs.it rd, rs1, rs2`
-  * `rs1`: Parent ECID — the source whose Contract is being split.
-  * `rs2`: Child ECID — the recipient; must satisfy `EC[rs2].delegation_L < D`. The
-    `domain_id` and child `bw_class` share the same encoding as `qs.ir`'s `rs2`.
   * `rd`: 0 on success; error code on failure.
+  * `rs1`: Parent ECID — the source whose Contract is being split.
+  * `rs2`: Delegation descriptor. Inline form (bit `[XLEN-1]` = 0):
+
+  | Bits | Field | Meaning |
+  |---|---|---|
+  | 15:0 | `child_ecid` | Child ECID to receive the delegated Contract |
+  | 19:16 | `child_bw_class` | Bandwidth class to delegate (0 = inherit parent's full class) |
+  | 23:20 | `child_lat_class` | Latency class to delegate (0 = inherit parent's full class) |
+  | 39:24 | `domain_id` | I/O fabric domain on which to split the Contract |
+  | `[XLEN-2]`:40 | — | Reserved; must be zero |
+  | `[XLEN-1]` | `ptr` | 1 = pointer form; bits `[XLEN-2]`:0 point to `QOS_Delegation_Params` |
+
+  > **RV32 note.** Bits 39:24 are unreachable on RV32; the pointer form is required
+  > on RV32 for `qs.it`.
+
+  Pointer form struct:
+```c
+struct QOS_Delegation_Params {
+    uint16_t child_ecid;       /* child ECID to receive the delegated Contract */
+    uint8_t  child_bw_class;   /* bandwidth class to delegate (0 = inherit parent's) */
+    uint8_t  child_lat_class;  /* latency class to delegate (0 = inherit parent's) */
+    uint16_t domain_id;        /* I/O fabric domain */
+    uint16_t reserved;         /* must be zero */
+};
+```
+
+  `child_ecid` must satisfy `EC[child_ecid].delegation_L < D`.
+
 * **Semantics**:
-  1. Verifies `rs2` is a child of `rs1` in the delegation tree.
-  2. Verifies `rs1` holds a Contract on the specified domain.
-  3. Performs the split: transfers a portion of `rs1`'s `bw_class` on the domain to
-     `rs2`. The portion is encoded in `rs2` (bits 3:0 of `bw_class` field); if zero,
-     the child inherits the parent's full class (useful when the parent relinquishes
-     its own participation).
+  1. Verifies `child_ecid` is a child of `rs1` in the delegation tree.
+  2. Verifies `rs1` holds a Contract on the specified `domain_id`.
+  3. Performs the split: transfers `child_bw_class` and `child_lat_class` to the
+     child on the specified domain; if both are 0, the child inherits the parent's
+     full class.
   4. Admission check: `bw_class(child) + existing_sum(subtree(rs1), domain) ≤ bw_cap(rs1, domain)`.
      If the check fails, returns `QOS_ERR_CAP_EXCEEDED`; no state changes.
   5. Updates running sums atomically.
@@ -366,10 +402,10 @@ opaque domain handle (charter §6.2).
 ### `qs.ot` — Revoke a child I/O Contract back to the parent
 
 * **Syntax**: `qs.ot rd, rs1, rs2`
+  * `rd`: 0 on success; error code on failure.
   * `rs1`: Child ECID whose Contract is being revoked.
   * `rs2`: Domain selector — `domain_id` of the Contract to revoke, or 0 to revoke
     all domains simultaneously. (charter §6.7)
-  * `rd`: 0 on success; error code on failure.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class[domain] = 0` and `EC[rs1].lat_class[domain] = 0`.
   2. Returns the revoked `bw_class` to the parent's cap headroom for that domain.
