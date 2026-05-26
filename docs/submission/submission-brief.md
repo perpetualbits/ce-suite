@@ -38,6 +38,16 @@ The **Context Extensions (CE) Suite** is a set of five coordinated RISC-V
 extensions that together deliver hardware-guaranteed determinism for shared
 SoCs — without sacrificing throughput on average-case workloads.
 
+Throughout this document, *context* means *execution context* (EC): any
+schedulable unit of work that a kernel, hypervisor, or firmware dispatches
+to a hardware thread. This includes OS threads, processes, vCPUs running
+guest operating systems, interrupt handlers, container tasks, and secure
+enclaves. CE Suite treats all of these uniformly — the hardware machinery for
+saving register state, partitioning caches, and arbitrating memory bandwidth
+is identical regardless of what kind of scheduled work is running. An
+*Execution Context Identifier* (ECID) is the hardware-managed token that
+names one such context while it is bound to a specific hart.
+
 | Extension | Name | Purpose |
 |-----------|------|---------|
 | **CME** | Context Management Extension | Hardware-resident context banks per hart; 1–9 cycle save/restore; delegation and revocation of banks to child contexts |
