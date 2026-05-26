@@ -311,12 +311,12 @@ specification fixes, and gap-filling work items are resolved.
 | Chapter 10 — MSE Usage Examples | Complete |
 | Chapter 11 — QoS Instruction Set Reference | Complete |
 | Chapter 12 — QoS Usage Examples | Complete |
-| Appendix A — ECID Radix-Tree Algorithms | Complete |
 | Chapter 13 — CSR Reference | Complete |
 | Chapter 14 — Privilege Model | Complete |
 | Chapter 15 — Trap and Exception Table | Complete |
 | Chapter 16 — Discovery Mechanism | Complete |
 | Chapter 17 — Memory Ordering Guarantees | Complete |
+| Appendix A — ECID Radix-Tree Algorithms | Complete |
 
 The specification is written in Markdown and requires conversion to
 AsciiDoc per RISC-V International toolchain requirements before a formal
