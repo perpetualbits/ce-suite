@@ -416,7 +416,53 @@ All error codes are returned in `rd` or in `mse_status`. Silent failure is prohi
 
 ---
 
-## 11. Out of Scope for v1
+## 11. Instruction Encoding
+
+All CE Suite instructions share the same R-type format and custom-0 opcode
+(`0001011`). See Chapter 2 §10.1–§10.2 for the bitfield diagram and the
+funct3 extension-selector table.
+
+**MSE uses funct3 = `010`.**
+
+### 11.1 MSE instruction encoding (funct3 = `010`)
+
+| funct7      | Mnemonic | rd field | rs1 field    | rs2 field                 |
+|-------------|----------|----------|--------------|---------------------------|
+| `0000000`   | `ms.ir`  | result   | target ECID  | contract parameters       |
+| `0000001`   | `ms.or`  | result   | target ECID  | `00000`                   |
+| `0000010`   | `ms.it`  | result   | parent ECID  | delegation descriptor     |
+| `0000011`   | `ms.ot`  | result   | child ECID   | `00000`                   |
+
+funct7 values `0000100`–`1111111` (4–127) are reserved for future MSE instructions.
+
+`ms.or` and `ms.ot` carry no `rs2` operand; the rs2 field is encoded as `00000` (x0).
+
+### 11.2 Encoding examples
+
+`ms.ir a0, a1, a2` — assign memory Contract (parameters in a2) to ECID in a1,
+result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000000 │ 01100  │ 01011  │ 010  │ 01010  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  ms.ir      rs2=a2   rs1=a1   MSE    rd=a0   custom-0
+```
+
+`ms.or a0, a1` — revoke memory Contract from ECID in a1, result in a0:
+
+```
+ 31      25  24    20  19    15 14  12 11     7 6      0
+┌─────────┬────────┬────────┬──────┬────────┬─────────┐
+│ 0000001 │ 00000  │ 01011  │ 010  │ 01010  │ 0001011 │
+└─────────┴────────┴────────┴──────┴────────┴─────────┘
+  ms.or      rs2=x0   rs1=a1   MSE    rd=a0   custom-0
+```
+
+---
+
+## 12. Out of Scope for v1
 
 - **NoC, DMA, and peripheral arbitration.** Covered by QoS (Chapter 9).
 - **NUMA-aware Contract assignment.** Multi-socket NUMA semantics for MSE Contracts
