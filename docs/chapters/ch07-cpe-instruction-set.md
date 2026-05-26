@@ -38,6 +38,10 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
 ## 7.3 Instruction Reference
 
+> **Memory ordering.** CPE Contract instructions operate on per-hart hardware
+> registers and SRAM; they carry no implicit memory fence. Cross-hart coordination
+> during EC migration requires explicit `FENCE` instructions. See Chapter 17.
+
 ### `cp.ir` — Assign a cache partition to an ECID
 
 > `cp.ir` = cache partition into resource (`cp` = CPE, `i` = into/assign, `r` = resource)

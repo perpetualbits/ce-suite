@@ -108,6 +108,14 @@ EC entry) — the instruction does not take a separate pointer operand.
 
 ---
 
+> **Memory ordering.** `ec.ib` and `ec.ob` are SRAM-only and carry no implicit
+> memory fence. `ec.im` and `ec.om` interact with the RISC-V address space as
+> stores and loads respectively; cross-hart use requires explicit `FENCE`
+> instructions. See Chapter 17 for the complete ordering model and the normative
+> migration fence sequence.
+
+---
+
 ## 3.3 Bank–Group Assignment
 
 Banks belong to Groups; GroupID equals the owning ECID number (charter §4.1). These

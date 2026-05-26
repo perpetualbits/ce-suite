@@ -292,6 +292,10 @@ All QoS instructions are privileged. They follow the naming scheme
 current one takes an ECID number as its primary operand — never a pointer, never an
 opaque domain handle (charter §6.2).
 
+> **Memory ordering.** QoS Contract instructions operate on per-hart hardware
+> registers and SRAM; they carry no implicit memory fence. Cross-hart coordination
+> during EC migration requires explicit `FENCE` instructions. See Chapter 17.
+
 ---
 
 ### `qs.ir` — Assign an I/O Contract to an ECID

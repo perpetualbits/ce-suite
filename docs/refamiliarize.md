@@ -71,6 +71,7 @@ ownership layer that ties the other four together.
 | **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); all 24 instructions × 6 privilege levels |
 | **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table |
 | **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos |
+| **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
 
@@ -130,10 +131,7 @@ P1–P4 are resolved. The remaining active P-series items are:
 P1 (CSR chapter, ch13), P2 (privilege model, ch14), P3 (trap table, ch15),
 and P4 (discovery mechanism, ch16) are all done. The next authoring item is:
 
-**P5 — Memory ordering** *(independent; no dependencies)*
-What ordering guarantees do CE Suite instructions carry? Fence requirements
-around `ec.ib`/`ec.ob`, `ec.im`/`ec.om` DMA ops, and Contract assignments
-(`ms.ir`, `cp.ir`, `qs.ir`) on other harts. Likely a new ch17.
+P5 is done (ch17). The remaining authoring items are:
 
 **P6–P8 — Process and mechanical items** (P6: opcode allocation via RISC-V
 International; P7: AsciiDoc conversion; P8: Sail formal model — large effort).

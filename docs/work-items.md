@@ -325,17 +325,25 @@ in ch13.
 
 ---
 
-### P5 · Memory ordering guarantees
+### P5 · Memory ordering guarantees ✓ RESOLVED
 
-**Affects:** ch03 (CME ISR), ch09 (MSE ISR), ch11 (QoS ISR); possibly ch00.
+**Affects:** `docs/chapters/ch17-memory-ordering.md` (new chapter); cross-reference
+notes added to ch03 §3.1/3.2 and ch09/ch11 instruction sections.
 
-The spec says nothing about memory ordering. A RISC-V proposal must state:
-
-- Does `ec.ib` (save to bank) require prior stores to be globally visible?
-- Does `ec.ob` (restore from bank) act as a load-acquire?
-- What fences does software need around `ec.im`/`ec.om` DMA operations?
-- Do Contract assignments (`ms.ir`, `cp.ir`, `qs.ir`) have cross-hart ordering
-  implications?
+**Decision:**
+- `ec.ib` and `ec.ob` carry **no implicit fence**. Banks are on-chip SRAM; they are
+  invisible to RVWMO. Same-hart switches need no fence (PPO covers ordering). For
+  cross-hart migration, `FENCE W,W` is issued after `ec.im`, not around `ec.ib`/`ec.ob`.
+- `ec.im` is a synchronous DMA write to ECS in RAM; it participates in RVWMO as a store.
+  After `ec.im`, software must issue `FENCE W,W` before signaling another hart.
+- `ec.om` is a synchronous DMA read from ECS in RAM; it participates in RVWMO as a load.
+  Before `ec.om` (cross-hart), software must issue `FENCE R,R` after the acquire signal.
+- Contract assignment instructions (`ms.ir`, `cp.ir`, `qs.ir`, etc.) operate on
+  per-hart SRAM and hardware registers only. They carry no implicit fence. Cross-hart
+  bandwidth accounting at the memory controller is handled by hardware atomic admission
+  (charter §4.3.3). No software fence is needed around Contract assignment itself.
+- A normative cross-hart migration fence sequence (steps 1–13 with `FENCE W,W` and
+  `FENCE R,R`; AMO `.rl`/`.aq` alternative provided) is specified in ch17 §17.5.
 
 ---
 
@@ -379,7 +387,7 @@ and is noted here for completeness. Not a near-term authoring task.
 2. ~~**P2** — Privilege model (depends on P1 ✓).~~ — **DONE** (ch14).
 3. ~~**P3** — Trap/exception table (can start in parallel with P2).~~ — **DONE** (ch15).
 4. ~~**P4** — Discovery mechanism (depends on P1 ✓).~~ — **DONE** (ch16).
-5. **P5** — Memory ordering (independent; can be done any time).
+5. ~~**P5** — Memory ordering (independent; can be done any time).~~ — **DONE** (ch17).
 6. **P6** — Opcode/name allocation (process item; engage RISC-V International).
 7. **P7** — AsciiDoc conversion (mechanical; do last).
 8. **P8** — Sail formal model (large separate project; deferred).
