@@ -13,8 +13,10 @@ every instruction in this chapter:
 3. **Unified error reporting via `rd`.** Every instruction that can fail writes 0
    (success) or a non-zero error code in `rd`; pass `x0` to discard. Status CSRs
    (`cme_status` etc.) are updated for diagnostics but are not the primary channel.
-   Two exceptions carry no `rd`: `ec.ib` (always succeeds or traps) and `ec.oe`
-   (always succeeds). Silent ignore is prohibited. (Charter §6.6)
+   Two exceptions return success-path information in `rd` rather than an error code:
+   `ec.ib` returns the bank slot index written; `ec.oe` returns the count of ECIDs
+   freed. Both trap on the error path — `rd` is never an error code for these two.
+   Use `x0` to discard either. Silent ignore is prohibited. (Charter §6.6)
 
 All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
 `ec.<dir><target>` (Charter §6.1), where `<dir>` ∈ `{i, o}` and `<target>` is
@@ -47,10 +49,12 @@ These instructions operate through SRAM-resident staging banks and constitute th
 
 > `ec.ib` = ECID into bank (`ec` = CME/ECID, `i` = into, `b` = bank)
 
-* **Syntax**: `ec.ib rs1`
+* **Syntax**: `ec.ib rd, rs1`
+  * `rd`: Bank slot index (0-based within the owning Group) of the bank written; write `x0` to discard.
   * `rs1`: Register mask — which register groups to save (see §3.7).
 * **Operand notes**: Operates on `current_ecid` implicitly. No explicit ECID argument.
-  No `rd`: `ec.ib` always succeeds or raises a trap; no soft failure is possible.
+  `ec.ib` always succeeds or raises a trap; no soft failure is possible. `rd` returns
+  the bank slot index, not an error code.
 * **Side effects**: Writes state from the active register file into the bank associated
   with `current_ecid`. Updates `cme_status`.
 * **Guaranteed cycles**: 1 cycle (full save), up to 3 with selective masking.
@@ -213,7 +217,8 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 
 > `ec.oe` = ECID out of existence (`ec` = CME/ECID, `o` = out of, `e` = existence)
 
-* **Syntax**: `ec.oe rs1`
+* **Syntax**: `ec.oe rd, rs1`
+  * `rd`: Total count of ECIDs freed, including the target itself; write `x0` to discard.
   * `rs1`: Target ECID to destroy.
 * **Semantics** (per charter §6.5):
   1. Revokes all Contracts held by `rs1` and every descendant in its subtree.
@@ -221,6 +226,9 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
   3. Marks the radix-tree subtree rooted at `rs1` as free.
   4. Increments the generation counter for every freed `EC[e]` slot.
   5. **Always succeeds.** Zombies and hostile contexts cannot stall reclamation.
+  6. **`rd` returns the total count of ECIDs freed**, including the target itself. Each
+     ECID in the destroyed subtree is counted exactly once. Callers that do not need
+     the count write to `x0`.
 * **Privileged**: Yes. The caller must be a parent or privileged ancestor of `rs1`.
 * **Cycles**: O(log N) average; proportional to subtree size.
 
@@ -387,7 +395,7 @@ respectively. This section covers CME (funct3 = `000`).
 
 | funct7      | Mnemonic | rd field      | rs1 field          | rs2 field          |
 |-------------|----------|---------------|--------------------|--------------------|
-| `0000000`   | `ec.ib`  | `00000` (none)| mask register      | `00000`            |
+| `0000000`   | `ec.ib`  | bank slot index | mask register    | `00000`            |
 | `0000001`   | `ec.ob`  | result        | target ECID        | mask register      |
 | `0000010`   | `ec.im`  | result        | target ECID        | mask register      |
 | `0000011`   | `ec.om`  | result        | target ECID        | mask register      |
@@ -396,7 +404,7 @@ respectively. This section covers CME (funct3 = `000`).
 | `0000110`   | `ec.it`  | result        | source ECID        | child ECID         |
 | `0000111`   | `ec.ot`  | result        | child ECID         | `00000`            |
 | `0001000`   | `ec.ir`  | new ECID / 0  | leaf flag (0 or 1) | `00000`            |
-| `0001001`   | `ec.oe`  | `00000` (none)| target ECID        | `00000`            |
+| `0001001`   | `ec.oe`  | ECIDs freed count | target ECID     | `00000`            |
 | `0001010`   | `ec.iv`  | result        | target ECID        | mask register      |
 | `0001011`   | `ec.ov`  | result        | target ECID        | mask register      |
 
@@ -404,7 +412,7 @@ funct7 values `0001100`–`1111111` (12–127) are reserved for future CME instr
 
 ### 3.10.4 Encoding examples
 
-`ec.ib a0` — save current context, mask in a0 (x10 = `01010`):
+`ec.ib x0, a0` — save current context, mask in a0 (x10 = `01010`), discard bank slot index:
 
 ```
  31      25  24    20  19    15 14  12 11     7 6      0
@@ -466,11 +474,12 @@ mismatch, privilege violation, or Group ownership failure) must either:
 
 Silent ignore is prohibited (charter §6.6).
 
-**Exceptions to the `rd` rule (no soft failure possible):**
+**Success-path `rd` for `ec.ib` and `ec.oe`:**
 
-* **`ec.ib rs1`** — always succeeds or raises a trap; no `rd`.
-* **`ec.oe rs1`** — always succeeds; no `rd`. Forward progress is guaranteed;
-  zombies cannot stall reclamation.
+* **`ec.ib rd, rs1`** — always succeeds or raises a trap; no soft failure. `rd` returns
+  the bank slot index (0-based within the owning Group) of the bank written.
+* **`ec.oe rd, rs1`** — always succeeds; `rd` returns the total count of ECIDs freed,
+  including the target. Forward progress is guaranteed; zombies cannot stall reclamation.
 
 ---
 
@@ -492,7 +501,7 @@ Silent ignore is prohibited (charter §6.6).
   ─── Step 1: ec.ib mask ─────────────────────────────────────────────
     Active reg file  ──→  Bank[A]         (state saved to SRAM)
     current_ecid unchanged  (still A)
-    No rd; always succeeds or traps.
+    rd = bank slot index (0-based in owning Group); x0 discards. Always succeeds or traps.
 
   ─── Step 2: ec.ob x0, B, mask ──────────────────────────────────────
     EC[B].bank_ref   ──→  Bank[B] located
