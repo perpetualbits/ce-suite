@@ -525,17 +525,26 @@ definitions), §7 (illegal-access table), §8.2 (address summary); ch14 §14.6.2
 
 ---
 
-### E6 · Power Gating Integration
+### E6 · Power Gating Integration ✓ RESOLVED
 
-**Affects:** ch04 §8 (or a new §9); alternatively a normative note in ch17
-alongside the migration sequence.
+**Affects:** ch04 (new §4.14).
 
-Define the normative protocol for hart power gating when CE Banks are resident:
-before the power management firmware gates a hart's SRAM, it must call `ec.im`
-for every Bank resident on that hart. On wake, `ec.om` fills Banks before the
-first context runs. Without this, power-gating firmware has no architectural
-guidance and can silently corrupt Bank state. The instructions already exist;
-this item only adds the protocol specification and the "must" language.
+**Decision:** Normative §4.14 "Power Gating Protocol" added to ch04. Two-phase
+protocol:
+
+- **Before cutting SRAM power:** issue `ec.im x0, e, FULL_MASK` for every ECID
+  `e` with a resident Bank. Abort the gate if `ec.im` returns a non-zero error
+  code; alternatively destroy the ECID via `ec.oe`. If another agent may read the
+  ECS during the gating window, issue `FENCE W,W` after the last `ec.im`.
+- **After SRAM power is restored:** issue `ec.om x0, e, FULL_MASK` for every
+  Bank that was spilled. All fills must complete before the first `ec.ob`.
+  Issue `FENCE R,R` before the first `ec.om` if another hart may have updated the
+  ECS during the gating window.
+
+Four normative invariants added: spill before gate, fill before schedule, no skip
+on error, bank bookkeeping survives the gate (ECS is RAM-resident per §4.2.1;
+SRAM bank tags are not). Memory ordering cross-references point to ch17 §17.3.1
+and §17.3.2.
 
 **Depends on:** No blocking dependencies.
 
@@ -582,8 +591,8 @@ These are independent and can be done in any order, with one exception:
 1. ~~**E8**~~ — fully resolved ✓.
 2. ~~**E4**~~ — fully resolved ✓.
 3. ~~**E5**~~ — fully resolved ✓ (two new CSRs: `current_ecid_level` at 0xFD1, `current_ecid_parent` at 0xFD2; privilege rules added to ch14).
-4. **E6** — small normative note; can be combined with a ch04 or ch17 session. **START HERE.**
-5. **E3** — small; touches ch03 and ch00; do after E8 if ch03 is being revised.
+4. ~~**E6**~~ — fully resolved ✓ (ch04 §4.14: normative power-gating protocol — spill all Banks via `ec.im` before gating, fill via `ec.om` on wake).
+5. **E3** — small; touches ch03 and ch00. **START HERE.**
 6. **E1** — new appendix; self-contained; do once baseline enhancements are stable.
 7. **E2** — new chapter or section; self-contained; substantial but straightforward.
 8. **E7** — informative only; can be done any time.
