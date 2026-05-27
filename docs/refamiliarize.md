@@ -73,6 +73,7 @@ ownership layer that ties the other four together.
 | **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos; E1: §3.1 + §7 cross-reference to Appendix B |
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
 | **Chapter 18** (CLIC Interrupt Integration) | Done | E2: interrupt-EC pattern; boot allocation; M-mode prologue/epilogue; CPE partition isolation; nested interrupts; bank provisioning |
+| **Chapter 19** (Interoperability with Ratified Extensions) | Done | I1: RVA23S64 mandatory set + RVA23.1 optional; per-EC CSR slot obligations; Smstateen gate bit (provisional bit 58); Ssqosid bridges-to CE Contracts |
 | **Appendix B** (Capability Profiles) | Done | E1: four standard profiles (CE-Embedded/MinimalRT/RT/Full); naming convention over ce_present + cme_del_cap + cme_bank_count |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
@@ -125,9 +126,10 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 **`docs/work-items.md` remaining open items** (specification-level):
 
 P1–P7 are resolved. P8 (Sail formal model) is deferred. All E-series (E1–E8) done.
-One new item found during P7 adoc verification:
+F11 done. I-series (Interop) added:
 
 - **F11** — ch08 `0.` line-wrap artifact — **done** ✓
+- **I1** — Ratified-extension interop chapter (ch19) — **done** ✓
 
 E-series all done:
 
@@ -216,7 +218,9 @@ docs/
 │   ├── ch14-privilege-model.md
 │   ├── ch15-trap-table.md
 │   ├── ch16-discovery.md
-│   └── ch17-memory-ordering.md
+│   ├── ch17-memory-ordering.md
+│   ├── ch18-clic-integration.md
+│   └── ch19-interop-ratified-extensions.md
 ├── adoc/                            # AsciiDoc conversion (P7); mirrors chapters/
 │   ├── index.adoc                   # master book document
 │   ├── chapters/                    # one .adoc per chapter/appendix

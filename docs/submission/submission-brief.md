@@ -316,7 +316,10 @@ specification fixes, and gap-filling work items are resolved.
 | Chapter 15 — Trap and Exception Table | Complete |
 | Chapter 16 — Discovery Mechanism | Complete |
 | Chapter 17 — Memory Ordering Guarantees | Complete |
+| Chapter 18 — CLIC Interrupt Integration | Complete |
+| Chapter 19 — Interoperability with Ratified Extensions | Complete |
 | Appendix A — ECID Radix-Tree Algorithms | Complete |
+| Appendix B — Capability Profiles | Complete |
 
 The specification is written in Markdown and requires conversion to
 AsciiDoc per RISC-V International toolchain requirements before a formal

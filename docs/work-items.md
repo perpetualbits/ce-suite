@@ -681,4 +681,61 @@ These are independent and can be done in any order, with one exception:
 
 ---
 
+## Category I — Interop
+
+Items that specify how CE Suite coexists with external RISC-V extensions and profiles.
+
+---
+
+### I1 · Ratified-extension interop chapter ✓ RESOLVED
+
+**Affects:** `docs/chapters/ch19-interop-ratified-extensions.md` (new chapter);
+`docs/adoc/chapters/ch19-interop-ratified-extensions.adoc` (generated); `docs/adoc/index.adoc`
+(ch19 include added between ch18 and appendix-a); ch16 §7 (one-sentence cross-reference added);
+`docs/submission/submission-brief.md` and adoc mirror (ch19 listed in §8).
+
+**What was produced:** A normative chapter (12–16 printed pages) mapping the RVA23S64
+mandatory extension set and RVA23.1 optional extensions to CE Suite save/restore
+obligations. For each extension the chapter identifies which CSRs belong in the per-EC
+bank CSR slot (ch00 §0.6), how the `Smstateen`/`Ssstateen` CE-Suite gate bit (proposed
+at bit 58 of `*stateen0`, provisional) interacts with `S_EN`/`VS_EN` (ch14), and what
+state is per-hart vs. per-ECID.
+
+**Covered in full sections:**
+
+- H extension and Sha: `hgatp`, `hstatus`, `vsatp`, `vsstatus`, `vstvec`, `vsepc`,
+  `vscause`, `vstval`, `vsie`, `vsip`, `vsscratch`, `sstateen0–3`, `hstateen0–3`.
+- Smstateen / Ssstateen: CE-Suite gate bit assignment (bit 58, provisional); complementary
+  relationship with `S_EN`/`VS_EN`.
+- Smaia / Ssaia: `siselect`, `sireg`, `stopei`, `stopi`, `sseteipnum`, `sclreipnum`,
+  `sseteienum`, `sclreienum`, `sclaimei`, and VS equivalents; IMSIC per-hart note.
+- Sstc: `stimecmp`, `vstimecmp`. Sscofpmf: `scountovf` per-hart. Svnapot, Svinval:
+  orthogonal.
+- Supm / Ssnpm: `senvcfg`, `henvcfg`, `hstatus` PMM fields.
+- Zicfilp / Zicfiss: ELP state bits in `sstatus`/`vsstatus`, `ssp`.
+- Smcdeleg / Ssccfg: `scountinhibit`; Sscsrind: already covered by §19.2.3.
+- Smmpm / Smnpm: per-hart in standard deployment.
+- Sv48 / Sv57: SATP slot covers full value; no mode constraints.
+- Svadu, Sdtrig, Ssstrict, Svvptc, Sspm: orthogonal.
+- Ssqosid (RVA23.1): `srmcfg` per-EC; CE Contracts as admission layer above RCID
+  tagging; open option for future RCID integration in Contract descriptor parked in
+  charter §8.
+- Ssctr (RVA23.1): CTR table via `siselect`/`sireg`, `scountovf`.
+- Sscfg, Ssdbltrap, Svrsw60t59b (RVA23.1): per-paragraph coverage.
+- Deferred: Smclic/ACLIC (ch18), Smmtt/Smsdid (v0.49 draft), charter §8 open items.
+- §19.6 summary table: complete mapping of all 29 extensions.
+
+**What was deliberately deferred:**
+
+- The Ssqosid RCID→Contract integration option: parked in charter §8.
+- Smmtt / Smsdid interoperability rules: deferred pending ratification.
+- Smclic / ACLIC: handled by ch18; cross-referenced only.
+- Any extension in Development or early Draft state not on the March 2026 BoD track.
+
+**No new instructions, CSRs, or charter-level decisions were made in this session.**
+The provisional `*stateen0` bit 58 assignment follows the same status as opcode
+addresses and CSR addresses throughout the spec.
+
+---
+
 *End of Work Items.*

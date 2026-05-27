@@ -262,6 +262,11 @@ access raises on CE-absent hardware (§15.2.1, universal trap conditions).
 (`CE-Embedded`, `CE-MinimalRT`, `CE-RT`, `CE-Full`) as a convenience naming layer
 over the `ce_present` bits and capability CSR values established by this chapter.
 
+**Chapter 19** (Ratified-extension interoperability) specifies how CE-aware software
+coexists with RVA23 mandatory state — which extension-specific CSRs (H, Sha, Ssaia,
+Sstc, and others) belong in the bank CSR slot, and how CE's privilege controls
+interact with `Smstateen`/`Ssstateen` gates.
+
 [Next: Chapter 17 — Memory Ordering Guarantees](ch17-memory-ordering.md)
 
 ---

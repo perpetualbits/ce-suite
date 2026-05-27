@@ -1,0 +1,594 @@
+== Chapter 19 — Interoperability with Ratified Extensions
+
+*Status:* Normative.
+
+This chapter describes how a CE-Suite-capable hart coexists with
+ratified RISC-V extensions and with extensions on the ratification track
+for the RVA23 and RVA23.1 profiles. Nothing in this chapter introduces
+new CE Suite instructions, CSRs, or charter-level decisions. All
+statements about per-EC state residing in the bank CSR slot follow from
+the bank layout defined in ch00 §0.6 — this chapter identifies which
+extension-specific CSRs belong in that slot, not a new rule about how
+banks work.
+
+'''''
+
+=== 19.1 Purpose and scope
+
+CE Suite is designed to coexist with the full RISC-V privilege
+architecture. A CE-Suite-capable hart that also implements RVA23S64
+mandatory extensions must ensure that every per-EC architectural state
+introduced by those extensions is correctly saved and restored on
+context switch, and that the two mechanisms for restricting CE access —
+`cme_priv_ctl.S_EN` / `hcme_ctrl.VS_EN` (ch14) and
+`*stateen0` CE-Suite gate bits (§19.2.2) — interact without
+contradiction.
+
+*What this chapter is.* A mapping from ratified extension names to CE
+Suite save/restore obligations: for each extension, which CSRs (if any)
+belong in the per-EC bank CSR slot, and what cross-extension invariants
+software must maintain.
+
+*What this chapter is not.* A re-specification of the extensions
+themselves. Each extension is fully defined by its own RISC-V
+specification; this chapter references only the CE-relevant subset.
+
+*CE remains opt-in.* Per charter §3.7, CE may be disabled by firmware,
+and any privilege level may ignore CE even when the hardware is enabled.
+A hart that implements the RVA23S64 mandatory set and CE Suite but runs
+a non-CE kernel behaves as a standard RISC-V hart. Nothing in the RVA23
+mandatory set requires CE to be active or creates a dependency on CE
+state.
+
+'''''
+
+=== 19.2 The RVA23S64 mandatory set
+
+This section covers extensions that are mandatory in the RVA23S64
+profile and that have CE-relevant state implications. Extensions whose
+CE interaction is "`none`" or "`orthogonal to ECID`" appear only in the
+summary table (§19.6).
+
+==== 19.2.1 H extension and Sha
+
+The H extension (hypervisor support) introduces a VS (Virtual
+Supervisor) privilege level and a set of hypervisor CSRs. `Sha`
+(hypervisor state enable aliases) requires the `sstateen0`–`sstateen3`
+and `hstateen0`–`hstateen3` CSR sets to gate access to state visible to
+guest software.
+
+*Per-EC CSR state.* When an EC runs as a guest OS under a hypervisor
+(VS-mode), its architectural state includes all VS-mode CSRs. The bank
+CSR slot (ch00 §0.6, 496 bytes on RV64) must cover the following CSRs
+for any ECID that operates in or hosts VS-mode:
+
+* `hgatp` — hypervisor guest address translation and protection
+* `hstatus` — hypervisor status (includes SPV, SPVP, GVA, and VSPMM
+fields)
+* `vsatp` — VS-mode address translation and protection
+* `vsstatus` — VS-mode status (SS, FS, XS, SPP, SPELP bits and related
+state)
+* `vstvec` — VS-mode trap-vector base address
+* `vsepc` — VS-mode exception program counter
+* `vscause` — VS-mode trap cause
+* `vstval` — VS-mode trap value
+* `vsie` — VS-mode interrupt enable
+* `vsip` — VS-mode interrupt pending
+* `vsscratch` — VS-mode scratch register
+
+When `Sha` is present, the CSR slot must additionally cover:
+
+* `sstateen0`, `sstateen1`, `sstateen2`, `sstateen3` — supervisor state
+enable registers
+* `hstateen0`, `hstateen1`, `hstateen2`, `hstateen3` — hypervisor state
+enable registers
+
+*Interaction with the CE H-extension privilege model.* Ch14 §14.8
+specifies the full VM entry/exit CE protocol: `ec.ib` saves the host
+ECID context and `ec.ob` restores the guest ECID context on VM entry;
+the symmetric sequence occurs on VM exit. This chapter does not repeat
+those sequences. The additional CSRs enumerated above belong in the bank
+CSR slot so that the `ec.ib`/`ec.ob` pair captures them atomically,
+preserving the virtual machine’s complete architectural state.
+
+==== 19.2.2 Smstateen / Ssstateen
+
+`Smstateen` and `Ssstateen` define the `*stateen0`–`*stateen3`
+registers that gate software access to groups of architectural state at
+each privilege level.
+
+*CE-Suite gate bit.* CE Suite state must be gated by a dedicated bit in
+`*stateen0`. The CE-Suite gate bit is proposed at *bit 58* of
+`mstateen0`, `sstateen0`, and (when H is present) `hstateen0`. This
+assignment is provisional and subject to RISC-V International
+allocation, following the same convention as CE Suite CSR addresses and
+opcode assignments elsewhere in this specification.
+
+When an OS or hypervisor clears bit 58 in `sstateen0` or `hstateen0` for
+a lower privilege level, that privilege level cannot access CE Suite
+CSRs through the `Ssstateen` gate. This complements the
+`S_EN`/`VS_EN` mechanism from ch14.
+
+*The two mechanisms are complementary, not redundant:*
+
+* `cme_priv_ctl.S_EN` and `hcme_ctrl.VS_EN` (ch14
+§14.4) are CE-Suite–specific control bits managed by M-mode and HS-mode
+respectively. They are the primary per-privilege CE access gate, checked
+before any CE instruction executes.
+* The `*stateen0` CE-Suite bit is the RISC-V standardized mechanism
+for advertising to software at a given privilege level whether a
+particular group of state is accessible, without requiring CE-specific
+knowledge in that software.
+
+An OS that clears the CE-Suite bit in `sstateen0` may still rely on
+`S_EN = 0` to deny CE access from user mode; the deny is enforced by
+whichever mechanism fires first. Both cleared simultaneously provides
+defense-in-depth.
+
+*Bank CSR slot coverage.* The `sstateen0`–`sstateen3` and
+`hstateen0`–`hstateen3` registers are per-EC. Their inclusion in the CSR
+slot follows from §19.2.1 (where they appear as Sha requirements); that
+single enumeration covers both the Sha and Ssstateen obligations.
+
+==== 19.2.3 Smaia / Ssaia
+
+`Smaia` and `Ssaia` define the IMSIC (Incoming Message-Signaled
+Interrupt Controller) interface CSRs for the Advanced Interrupt
+Architecture. For an execution context that manages interrupt delivery —
+particularly an ECID used as an interrupt-handler EC per the ch18
+pattern — the following CSRs are per-EC and must be in the bank CSR
+slot.
+
+*Supervisor-level AIA CSRs:*
+
+* `siselect` — supervisor indirect CSR select
+* `sireg` — supervisor indirect CSR register (data register for indirect
+access)
+* `stopei` — supervisor top pending external interrupt
+* `stopi` — supervisor top pending interrupt
+* `sseteipnum` — supervisor set external interrupt pending by number
+* `sclreipnum` — supervisor clear external interrupt pending by number
+* `sseteienum` — supervisor set external interrupt enable by number
+* `sclreienum` — supervisor clear external interrupt enable by number
+* `sclaimei` — supervisor claim external interrupt
+
+*VS-level AIA CSRs (when H is present):*
+
+When the H extension is present, the VS-mode equivalents must also be
+covered in the bank CSR slot for ECIDs hosting guest VMs:
+
+* `vsiselect` — VS indirect CSR select
+* `vsireg` — VS indirect CSR register
+* `vstopei` — VS top pending external interrupt
+* `vstopi` — VS top pending interrupt
+
+*IMSIC backing store.* The IMSIC backing store — the interrupt-file
+memory region that holds pending and enabled interrupt bits for each
+interrupt identity — is a hart resource, not a per-ECID resource.
+Interrupts pending against an ECID that is not currently bound to the
+hart remain pending in the hart’s IMSIC; they do not migrate with the
+ECID. This is identical to standard RISC-V AIA behavior; CE does not
+change it. An OS managing CE-enabled interrupt handlers must account for
+the IMSIC interrupt file separately from the ECID’s bank-saved CSR
+state.
+
+==== 19.2.4 Sstc, Sscofpmf, Svnapot, Svinval
+
+*Sstc.* `Sstc` introduces `stimecmp`, a per-EC supervisor timer compare
+register. Each execution context has its own timer deadline; the bank
+CSR slot must cover `stimecmp`. When the H extension is present,
+`vstimecmp` (the VS-mode analogue) must also be in the CSR slot for
+ECIDs hosting guest VMs.
+
+*Sscofpmf.* `Sscofpmf` introduces `scountovf`, which reflects which
+hardware performance counters have overflowed. `scountovf` is per-hart
+and orthogonal to ECID; CE does not save or restore it. A context switch
+between two CE-managed ECIDs does not clear or snapshot `scountovf`,
+which is identical to non-CE context switch behavior. CE introduces no
+new hazard here.
+
+*Svnapot.* `Svnapot` extends page-table entry encoding to allow
+naturally aligned power-of-two regions. It adds no CSR state. CE does
+not save or restore any `Svnapot`-specific state; `satp` is already
+covered by the bank SATP slot (ch00 §0.6).
+
+*Svinval.* `Svinval` introduces `SINVAL.VMA`, `SFENCE.W.INVAL`, and
+`SFENCE.INVAL.IR` instructions (plus `HINVAL.VVMA` and `HINVAL.GVMA`
+when H is present). These are instruction-only extensions; they add no
+CSR state. CE does not save or restore any `Svinval`-specific state.
+
+==== 19.2.5 Supm / Ssnpm pointer masking
+
+`Supm` (user-mode pointer masking) and `Ssnpm` (supervisor-mode pointer
+masking) allow software to mask the upper bits of load/store addresses.
+The Pointer Masking Mode (PMM) fields that control masking are per-EC:
+
+* `senvcfg` — supervisor environment configuration register (includes
+the PMM field controlling masking for U-mode)
+* `henvcfg` — hypervisor environment configuration register (includes
+the PMM field controlling masking for VS-mode; present when H is
+present)
+* `hstatus` — hypervisor status register (includes the VSPMM field for
+HS-mode pointer masking; present when H is present)
+
+The bank CSR slot must cover `senvcfg`, `henvcfg`, and `hstatus` for any
+ECID that uses pointer masking. `henvcfg` and `hstatus` are already
+required in the bank CSR slot by §19.2.1 when the H extension is
+present; `senvcfg` is an additional requirement from this section.
+
+Cross-reference: §19.3.3 covers `Smmpm` / `Smnpm` (M-mode pointer
+masking), which affect M-mode execution and are per-hart in the standard
+CE deployment.
+
+'''''
+
+=== 19.3 RVA23 optional extensions with per-EC state
+
+The following extensions are optional in the RVA23 profile. This section
+describes what CE must save and restore when each extension is
+implemented.
+
+==== 19.3.1 Zicfilp and Zicfiss
+
+`Zicfilp` (landing pads for forward-edge CFI) and `Zicfiss` (shadow
+stack for return-address CFI) introduce per-EC state that the bank CSR
+slot must cover.
+
+*`Zicfilp` — landing pad state.* The ELP (Expected Landing Pad) state
+tracks whether the next instruction must be a landing-pad instruction
+(`LPAD`). The relevant fields are embedded in existing status registers
+and are per-EC:
+
+* `mstatus.MPELP` — M-mode previous expected landing pad state
+* `sstatus.SPELP` — S-mode previous expected landing pad state
+* `vsstatus.VSPELP` — VS-mode previous expected landing pad state (when
+H is present)
+
+`sstatus` and `vsstatus` are already required in the bank CSR slot by
+§19.2.1; the SPELP and VSPELP bits are carried inside those registers
+and are covered by their inclusion. `mstatus.MPELP` is relevant only
+when M-mode execution is CE-managed (see §19.3.3 for the analogous
+discussion of M-mode state).
+
+*`Zicfiss` — shadow stack pointer.* `ssp` (shadow stack pointer) records
+the current shadow stack head address and changes on every function call
+and return. `ssp` is per-EC; the bank CSR slot must cover `ssp` for any
+ECID that executes software with shadow-stack enforcement active.
+
+Linux CFI integration is discussed in ch05; this section covers only the
+per-EC save/restore obligation.
+
+==== 19.3.2 Smcdeleg / Ssccfg and Sscsrind
+
+`Smcdeleg` (machine-mode counter delegation) and `Ssccfg` (supervisor
+counter configuration) allow M-mode to delegate hardware performance
+counters to S-mode. `Sscsrind` (supervisor indirect CSR access) provides
+the `siselect`/`sireg` mechanism for accessing indirect-CSR tables.
+
+*`scountinhibit`.* When counter delegation is in effect, `scountinhibit`
+is per-EC: each execution context may independently inhibit specific
+counters. The bank CSR slot must cover `scountinhibit` when
+`Smcdeleg`/`Ssccfg` are present and counter delegation is active for
+CE-managed ECIDs.
+
+*`siselect` / `sireg`.* These indirect-CSR access registers are already
+covered in §19.2.3 as part of the `Ssaia` AIA requirements. No
+additional action is required here. When both `Ssaia` (AIA) and
+`Sscsrind` are present, the same register pair serves both roles; the
+bank CSR slot covers them once.
+
+==== 19.3.3 Smmpm / Smnpm
+
+`Smmpm` (machine-mode pointer masking) and `Smnpm` (S-mode and M-mode
+no-masking-in- higher-privilege) control pointer masking behavior for
+M-mode execution. The relevant fields are:
+
+* `mseccfg` — machine security configuration register (includes the
+M-mode PMM field)
+* `menvcfg` — machine environment configuration register (includes the
+PMM field for S-mode masking control)
+
+*M-mode is the delegation root.* Per ch14 §14.3, M-mode firmware is the
+root of the CE delegation tree (L = 0). In the typical CE deployment,
+M-mode firmware does not run as a CE-managed ECID — it is the privileged
+actor that creates and manages ECIDs, not one itself. The `mseccfg` and
+`menvcfg` registers are therefore per-hart state, not per-ECID state, in
+standard deployments. CE does not save or restore them.
+
+*Exception.* If an implementation delegates M-mode work into multiple
+CE-managed ECIDs — an unusual configuration — `mseccfg` and `menvcfg`
+may need to be saved and restored on bank transitions. This is an
+implementation choice; the CE Suite specification does not require it.
+
+==== 19.3.4 Sv48 / Sv57
+
+`Sv48` and `Sv57` extend virtual address spaces to 48-bit and 57-bit
+widths via additional levels in the page-table hierarchy. The `satp`
+register’s `MODE` field selects the active paging scheme.
+
+The bank SATP slot (ch00 §0.6) holds the full XLEN-wide `satp` value. CE
+imposes no constraints on `satp.MODE`; an ECID may use `Sv39`, `Sv48`,
+or `Sv57` paging and the bank save/restore captures the complete `satp`
+value including the mode field and the physical page number of the root
+page table. No additional per-EC state is introduced.
+
+`vsatp` (the VS-mode analogue, when H is present) is already covered in
+§19.2.1.
+
+==== 19.3.5 Svadu, Sdtrig, Ssstrict, Svvptc, Sspm
+
+These extensions are orthogonal to CE Suite; none introduces per-EC CSR
+state that CE must save or restore.
+
+* *Svadu* — hardware A/D bit updates: modifies page-table walker
+behavior; adds no CSR state.
+* *Sdtrig* — debug triggers: trigger registers are per-hart debug
+resources; CE does not save or restore debug trigger state.
+* *Ssstrict* — strict profile companion extension: imposes stricter
+behavior constraints; adds no CSR state.
+* *Svvptc* — virtual page-table cache hints: page-table invalidation
+behavior; adds no CSR state.
+* *Sspm* — supervisor page-based memory type: adds `Svpbmt` page-table
+entry memory type bits; adds no CSR state beyond `satp` and page-table
+entries (both already covered or orthogonal to CE).
+
+'''''
+
+=== 19.4 RVA23.1 optional extensions
+
+*RVA23.1 (Profiles SIG / TSC fast-track, BoD ratification target March
+2026).* As of the time this chapter is written, the extensions described
+in this section are not yet ratified by the RISC-V Board of Directors
+but are on the fast-track path through the Profiles SIG and TSC toward
+BoD approval. This provisional status applies to the entire section; if
+ratification is confirmed or the timeline changes, this chapter will be
+updated accordingly. Subsequent references in this section abbreviate
+the profile as "`RVA23.1.`"
+
+==== 19.4.1 Ssqosid
+
+`Ssqosid` introduces the `srmcfg` CSR, which carries two fields: *RCID*
+(Resource Control Identifier) and *MCID* (Monitoring Counter
+Identifier). Downstream resource controllers — defined by the companion
+non-ISA CBQRI (Capacity and Bandwidth Quality of Service for RISC-V)
+specification — use `srmcfg.RCID` to apply bandwidth partitioning, cache
+way allocation, or other resource policies, and use `srmcfg.MCID` to
+attribute monitoring counters to a specific workload identity. `Ssqosid`
+defines only the CSR and the tagging convention; resource-controller
+policies are defined by CBQRI.
+
+*Positioning relative to CE Suite.* CE Suite’s MSE and QoS Contracts are
+a scheduler and admission-control layer above `Ssqosid` tagging, not a
+replacement. The distinction is precise:
+
+* `Ssqosid` / CBQRI provides a hardware _tagging_ mechanism — a numeric
+identifier (`srmcfg.RCID`) that hardware resource controllers observe to
+enforce allocation policies. It does not specify scheduling, does not
+provide WCET bounds, and does not have hierarchical Contract splitting
+with atomic admission.
+* CE Suite MSE and QoS Contracts provide admission control (an OS must
+obtain a Contract before claiming deterministic resource access),
+hierarchical delegation (Contracts are split from parent to child with
+atomic success/fail semantics per ch00 §0.7), WCET bounding through
+bounded slot allocation, and per-ECID isolation.
+
+Both mechanisms serve the real-time and mixed-criticality use case and
+are complementary: CE Contracts determine _which resources are
+available_ to an ECID (the admission and isolation layer); `srmcfg.RCID`
+is the _tag_ that hardware resource controllers observe to enforce the
+corresponding allocation policy.
+
+*Concrete interoperability.* When both CE Suite and `Ssqosid` are
+present, the recommended software configuration is:
+
+[arabic]
+. The kernel assigns an RCID to each ECID’s Contract metadata, stored in
+the ECS reachable via `EC[e].ecs_ptr` (ch00 §0.4).
+. On `ec.ob` (context restore), the kernel may follow up with a write to
+`srmcfg.RCID` from the incoming ECID’s Contract metadata. This is a
+software operation; CE does not propose a hardware coupling between
+`ec.ob` and `srmcfg`.
+. `srmcfg` is per-EC state. The bank CSR slot must cover `srmcfg` for
+any ECID whose resource allocation is expressed through `Ssqosid`
+tagging.
+. `srmcfg.MCID` is for monitoring attribution only; it requires no
+special CE handling and may be written independently of `ec.ob`.
+
+*Open option (not decided in this version).* A future CE version could
+fold an `Ssqosid`-RCID field into the Contract descriptor so that
+`ms.ir` and `qs.ir` automatically populate `srmcfg.RCID` on resource
+assignment, eliminating the explicit software write on `ec.ob`. This
+option is parked in charter §8 for a later version if `Ssqosid` sees
+sufficient adoption; the current chapter does not propose it.
+
+==== 19.4.2 Ssctr and Sscsrind
+
+`Ssctr` (supervisor control transfer records) defines a per-EC hardware
+trace buffer that records recent control transfers (branches, calls,
+returns). The per-EC state introduced by `Ssctr` includes:
+
+* `scountovf` — supervisor count overflow register (shared with
+`Sscofpmf` when both are present; saved once)
+* `mctrctl` — machine CTR control register (per-hart in the typical
+deployment; see §19.3.3 for the analogous M-mode state discussion)
+* The CTR table entries, accessed through `siselect`/`sireg` (already
+covered in §19.2.3; no additional `siselect`/`sireg` pair is introduced)
+
+The bank CSR slot must cover the `Ssctr`-specific indirect-CSR state
+accessed via `siselect`/`sireg` when `Ssctr` is present. The number of
+CTR table entries is implementation-defined; implementations must
+provision sufficient CSR-slot space to hold the full per-ECID CTR table.
+
+`Sscsrind` is the indirect-CSR access mechanism underlying both `Ssaia`
+(`siselect`/`sireg` in §19.2.3) and CTR table access. When both `Ssaia`
+and `Ssctr` are present, the same `siselect`/`sireg` registers serve
+both clients; the bank CSR slot covers them once.
+
+==== 19.4.3 Sscfg, Ssdbltrap, Svrsw60t59b
+
+*Sscfg (supervisor configuration gate).* `Sscfg` adds `scfg`, a per-EC
+supervisor configuration register that gates access to optional
+supervisor-level features. The bank CSR slot must cover `scfg` when
+`Sscfg` is present.
+
+*Ssdbltrap (double-trap behavior).* `Ssdbltrap` defines behavior when a
+trap occurs while the hart is already taking a trap. It operates through
+changes to `mstatus` and `sstatus` field definitions (adding a
+double-trap status bit). No new per-EC CSR is introduced beyond what is
+already in the bank CSR slot via `mstatus` and `sstatus`; those
+registers’ expanded definitions are captured automatically.
+
+*Svrsw60t59b (PTE reserved-for-software bits).* `Svrsw60t59b` designates
+bits 60 and 59 of page-table entries as available for supervisor
+software use. No CSR state is added. CE is unaffected.
+
+'''''
+
+=== 19.5 Deferred
+
+The following extensions are tracked by the CE Suite project but are not
+specified for interoperability in this version. The reason in each case
+is that the extension itself has not reached ratification-stable state.
+
+*CLIC (Smclic) and ACLIC.* The RISC-V Core-Local Interrupt Controller
+and its advanced variant are currently in Development state. Chapter 18
+specifies CE Suite integration with the CLIC interrupt model and the
+interrupt-EC pattern; that chapter is the relevant normative reference
+for CE {plus} CLIC integration. When Smclic and ACLIC ratify, ch18 may
+be extended; no further Smclic/ACLIC interoperability specification is
+made here.
+
+*Smmtt / Smsdid (Supervisor Domains).* The Supervisor Domains
+specification — `Smmtt` for memory tagging and `Smsdid` for domain
+identifiers — is at draft v0.49 at the time of writing. The expected
+positioning is: CE runs under a Supervisor Domain; SDID is the M-mode
+domain tag, ECIDs are S/HS-mode hart-local identities, and the two are
+stacked orthogonally. A domain boundary governs which physical memory a
+CE-managed context may address; CE governs how register state and
+resource contracts are assigned within that context. When Smmtt/Smsdid
+ratify, a new section in this chapter will specify the combined
+configuration rules.
+
+*Charter §8 open items overlapping with external extensions.* Charter §8
+items 1 (NUMA-aware Contract assignment) and 2 (multi-resource
+Contracts) may interact with future RISC-V memory partitioning and
+topology extensions. Those interactions will be specified when the
+relevant charter items are resolved and the external extensions have
+ratified. Cross-reference: charter §8.
+
+'''''
+
+=== 19.6 Summary table
+
+The table below is the primary quick-reference for reviewers. The CE
+interaction column uses the following values:
+
+* *Save/restore* — the extension introduces per-EC CSR state that
+belongs in the bank CSR slot and is saved/restored on `ec.ib`/`ec.ob`.
+* *Per-hart* — the extension introduces state that is per-hart, not
+per-ECID; CE does not save/restore it in the standard deployment.
+* *Orthogonal* — the extension introduces no new CSR state affecting
+per-EC context; CE is unaffected.
+* *Bridges-to* — CE Suite concepts map to or interact with this
+extension’s concepts; see the reference section for details.
+* *Deferred* — interoperability rules are deferred pending extension
+ratification or charter resolution.
+
+[width="100%",cols="25%,25%,25%,25%",options="header",]
+|===
+|Extension |RVA23 status |CE interaction |Reference
+|H extension |Mandatory |Save/restore: `hgatp`, `hstatus`, `vsatp`,
+`vsstatus`, `vstvec`, `vsepc`, `vscause`, `vstval`, `vsie`, `vsip`,
+`vsscratch` |§19.2.1
+
+|Sha |Mandatory |Save/restore: `sstateen0`–`sstateen3`,
+`hstateen0`–`hstateen3` |§19.2.1
+
+|Smstateen |Mandatory |CE-Suite gate bit: bit 58 of `mstateen0`
+(provisional); per-hart enforcement |§19.2.2
+
+|Ssstateen |Mandatory |Save/restore: `sstateen0`–`sstateen3` (covered by
+§19.2.1); CE-Suite gate bit 58 of `sstateen0` |§19.2.2
+
+|Smaia |Mandatory |Per-hart (M-mode interrupt file); orthogonal to ECID
+|§19.2.3
+
+|Ssaia |Mandatory |Save/restore: `siselect`, `sireg`, `stopei`, `stopi`,
+`sseteipnum`, `sclreipnum`, `sseteienum`, `sclreienum`, `sclaimei`; plus
+`vsiselect`, `vsireg`, `vstopei`, `vstopi` when H present |§19.2.3
+
+|Sstc |Mandatory |Save/restore: `stimecmp`; `vstimecmp` when H present
+|§19.2.4
+
+|Sscofpmf |Mandatory |Per-hart (`scountovf`); orthogonal to ECID
+|§19.2.4
+
+|Svnapot |Mandatory |Orthogonal; no per-EC CSR state |§19.2.4
+
+|Svinval |Mandatory |Orthogonal; instruction-only extension |§19.2.4
+
+|Supm |Optional |Save/restore: `senvcfg` (PMM field) |§19.2.5
+
+|Ssnpm |Optional |Save/restore: `senvcfg`, `henvcfg`, `hstatus`
+(PMM/VSPMM fields; H present) |§19.2.5
+
+|Zicfilp |Optional |Save/restore: `sstatus.SPELP`, `vsstatus.VSPELP` (H
+present); `mstatus.MPELP` if M-mode CE-managed |§19.3.1
+
+|Zicfiss |Optional |Save/restore: `ssp` (shadow stack pointer) |§19.3.1
+
+|Smcdeleg / Ssccfg |Optional |Save/restore: `scountinhibit` when counter
+delegation active |§19.3.2
+
+|Sscsrind |Optional |`siselect`/`sireg` already covered by §19.2.3; no
+additional action |§19.3.2
+
+|Smmpm |Optional |Per-hart (`mseccfg`); orthogonal in standard
+deployment |§19.3.3
+
+|Smnpm |Optional |Per-hart (`menvcfg`); orthogonal in standard
+deployment |§19.3.3
+
+|Sv48 |Optional |SATP slot holds full satp; CE imposes no mode
+constraints |§19.3.4
+
+|Sv57 |Optional |SATP slot holds full satp; CE imposes no mode
+constraints |§19.3.4
+
+|Svadu |Optional |Orthogonal; no per-EC CSR state |§19.3.5
+
+|Sdtrig |Optional |Per-hart (debug triggers); orthogonal to ECID
+|§19.3.5
+
+|Ssstrict |Optional |Orthogonal; no per-EC CSR state |§19.3.5
+
+|Svvptc |Optional |Orthogonal; no per-EC CSR state |§19.3.5
+
+|Sspm |Optional |Orthogonal; no per-EC CSR state |§19.3.5
+
+|Ssqosid |RVA23.1 |Save/restore: `srmcfg`; bridges-to CE Contracts as
+admission layer above RCID tagging |§19.4.1
+
+|Ssctr |RVA23.1 |Save/restore: CTR table (via `siselect`/`sireg`),
+`scountovf` (if not already saved by Sscofpmf) |§19.4.2
+
+|Sscfg |RVA23.1 |Save/restore: `scfg` |§19.4.3
+
+|Ssdbltrap |RVA23.1 |Orthogonal; no new per-EC CSR state |§19.4.3
+
+|Svrsw60t59b |RVA23.1 |Orthogonal; PTE bits only, no CSR state |§19.4.3
+
+|Smclic / ACLIC |Development |Deferred; see ch18 for CE {plus} CLIC
+integration |§19.5
+
+|Smmtt / Smsdid |Draft v0.49 |Deferred; orthogonal stacking expected
+(SDID = domain tag; ECIDs = hart-local identities) |§19.5
+|===
+
+'''''
+
+link:appendix-a-ecid.md[Next: Appendix A — ECID Radix-Tree Algorithms]
+
+'''''
+
+_End of Chapter 19._

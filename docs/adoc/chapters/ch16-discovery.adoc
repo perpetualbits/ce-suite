@@ -155,14 +155,15 @@ consistent with "`not present`": `qos_domain_count = 0` means no
 domains available; `cpe_caps = 0` means no cache partitioning
 capability; and so on.
 
-*Capability profiles.* After reading `ce_present` and the per-extension
-capability CSRs, software may optionally determine which named
-implementation profile the hart satisfies by consulting Appendix B
-(Capability Profiles). Profiles are a convenience naming layer — a stable
-mapping from the raw CSR values to named tiers such as `CE-Embedded`,
-`CE-MinimalRT`, `CE-RT`, and `CE-Full`. The raw CSR values are always
-authoritative; Appendix B provides the conformance-check criteria and the
-device-tree advertisement mechanism for profiles.
+*Capability profiles.* After reading `ce_present` and the
+per-extension capability CSRs, software may optionally determine which
+named implementation profile the hart satisfies by consulting Appendix B
+(Capability Profiles). Profiles are a convenience naming layer — a
+stable mapping from the raw CSR values to named tiers such as
+`CE-Embedded`, `CE-MinimalRT`, `CE-RT`, and `CE-Full`. The raw CSR
+values are always authoritative; Appendix B provides the
+conformance-check criteria and the device-tree advertisement mechanism
+for profiles.
 
 '''''
 
@@ -307,10 +308,16 @@ trap conditions).
 
 *Appendix B* (Capability Profiles) defines the named implementation
 profiles (`CE-Embedded`, `CE-MinimalRT`, `CE-RT`, `CE-Full`) as a
-convenience naming layer over the `ce_present` bits and capability CSR
-values established by this chapter.
+convenience naming layer over the `ce_present` bits and capability
+CSR values established by this chapter.
 
-link:ch17-memory-ordering.adoc[Next: Chapter 17 — Memory Ordering
+*Chapter 19* (Ratified-extension interoperability) specifies how
+CE-aware software coexists with RVA23 mandatory state — which
+extension-specific CSRs (H, Sha, Ssaia, Sstc, and others) belong in the
+bank CSR slot, and how CE’s privilege controls interact with
+`Smstateen`/`Ssstateen` gates.
+
+link:ch17-memory-ordering.md[Next: Chapter 17 — Memory Ordering
 Guarantees]
 
 '''''
