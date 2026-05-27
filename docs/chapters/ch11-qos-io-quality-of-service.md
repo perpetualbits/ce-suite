@@ -212,7 +212,7 @@ A child cannot claim more guaranteed I/O bandwidth than the parent has delegated
 ### 11.5.3 Hierarchical splitting
 
 A privileged actor may split a QoS Contract into a parent Contract and one or more
-child Contracts (charter §4.3.3). Each child's `bw_class` must be ≤ the parent's
+child Contracts (charter §4.3.2). Each child's `bw_class` must be ≤ the parent's
 `bw_class` minus what the parent retains. The sum of all children's `bw_class` values
 must never exceed the parent's. Splitting is performed via `qs.it` (§11.7) and is
 **atomic**: if the hardware admission check fails, no state is changed.
@@ -222,7 +222,7 @@ must never exceed the parent's. Splitting is performed via `qs.it` (§11.7) and 
 When an ECID's Contract is revoked (via `qs.or` or `ec.oe`), the Contract dissolves
 and its `bw_class` is returned to the parent ECID's cap headroom for that domain.
 If the ECID has child Contracts on the same domain, those are revoked first,
-recursively (charter §4.3.5). Dissolution always succeeds — even for zombie or hostile
+recursively (charter §4.3.4). Dissolution always succeeds — even for zombie or hostile
 ECIDs — and is O(log N) via the radix tree.
 
 ### 11.5.5 DMA attribution
