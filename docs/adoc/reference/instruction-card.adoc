@@ -5,8 +5,10 @@ opcode (`0001011`). *funct3* selects the extension; *funct7* selects the
 instruction within that extension.
 
 *Error convention.* Every instruction that can fail writes `0` (success)
-or a non-zero error code in `rd`. Two exceptions carry no `rd`: `ec.ib`
-(always succeeds or traps) and `ec.oe` (always succeeds).
+or a non-zero error code in `rd`. Two exceptions return success-path
+information in `rd` rather than an error code: `ec.ib` (bank slot index
+written) and `ec.oe` (count of ECIDs freed). Both trap on error; use `x0`
+to discard.
 
 '''''
 
@@ -15,7 +17,7 @@ or a non-zero error code in `rd`. Two exceptions carry no `rd`: `ec.ib`
 [width="100%",cols="13%,9%,23%,12%,17%,14%,12%",options="header",]
 |===
 |funct7 |Mnemonic |Syntax |rd |rs1 |rs2 |Description
-|`0000000` |`ec.ib` |`ec.ib rs1` |_(none)_ |mask register |— |Save
+|`0000000` |`ec.ib` |`ec.ib rd, rs1` |bank slot index |mask register |— |Save
 running context to on-chip bank
 
 |`0000001` |`ec.ob` |`ec.ob rd, rs1, rs2` |result |target ECID |mask
@@ -42,7 +44,7 @@ delegated bank from a child ECID
 |`0001000` |`ec.ir` |`ec.ir rd, rs1` |new ECID/0 |leaf flag (0/1) |—
 |Allocate a new child ECID
 
-|`0001001` |`ec.oe` |`ec.oe rs1` |_(none)_ |target ECID |— |Forced
+|`0001001` |`ec.oe` |`ec.oe rd, rs1` |ECIDs freed count |target ECID |— |Forced
 destroy: remove ECID and entire delegation subtree
 
 |`0001010` |`ec.iv` |`ec.iv rd, rs1, rs2` |result |target ECID |mask
@@ -52,8 +54,9 @@ register |Seal a bank (vault — cryptographically protected)
 register |Unseal a bank (vault)
 |===
 
-*Notes.* - `ec.ib` and `ec.oe` take no `rd`; unused fields encode as
-`00000`. - `ec.ir`: `rs1 = 0` → leaf child (cannot delegate further);
+*Notes.* - `ec.ib` and `ec.oe` return success-path data in `rd` (not
+error codes); `rs2` encodes as `00000` (unused). - `ec.ir`: `rs1 = 0` →
+leaf child (cannot delegate further);
 `rs1 = 1` → delegating child (delegation_L = parent_L {plus} 1,
 requires parent_L ++<++ D). - `ec.it` delegates *one bank* per call,
 implementation-chosen from the parent’s group. To delegate N banks, call

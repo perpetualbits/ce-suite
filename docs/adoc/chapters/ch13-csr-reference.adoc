@@ -20,7 +20,13 @@ CE Suite CSRs occupy two provisional ranges in the RISC-V custom
 |Range |RISC-V encoding [11:8] |Access |Count
 |0x7C0–0x7CE |0111 (M-mode RW) |Read/Write |15
 |0xFC0–0xFCF |1111 (M-mode RO) |Read-Only |16
+|0xFD1–0xFD2 |1111 (M-mode RO) |Read-Only |2
 |===
+
+*Note.* The 0xFC0–0xFCF range (16 entries) is fully assigned. The two CME
+virtualization CSRs added in E5 use provisional addresses 0xFD1–0xFD2 in the
+same M-mode RO encoding class. Address 0xFD0 is provisionally assigned to
+`ce_present` by Chapter 16 (discovery).
 
 *All addresses are provisional.* Real submission to RISC-V International
 requires allocated CSR addresses. The assignments here serve as a
@@ -288,6 +294,59 @@ semantics of the vault are currently shell-only (work item F7); they are
 deferred to a future revision (charter §8.6). This CSR is defined here
 for completeness; full key-management semantics will be added when
 charter §8.6 is resolved.
+
+'''''
+
+==== 3.10 `current_ecid_level` — 0xFD1
+
+Delegation level of the currently executing context on this hart.
+
+[width="100%",cols="16%,17%,19%,17%,31%",options="header",]
+|===
+|Bits |Field |Access |Reset |Description
+|XLEN-1:2 |_reserved_ |WIRI |0 |—
+
+|1:0 |L |RO |0 |Delegation level of the running ECID; 0 when CE is
+disabled or no ECID is bound
+|===
+
+*Semantics.* Hardware updates `L` atomically with `current_ecid` at the
+commit of every successful `ec.ob`. No instruction or CSR write may
+modify this field directly. A root ECID created by M-mode has `L = 0`;
+each delegation step increments `L` by 1 in the child, matching
+`EC[current_ecid].delegation_L`. Together with `cme_del_cap` (0xFC1),
+this CSR lets software determine whether the current ECID may further
+delegate: the ECID may delegate iff `L < cme_del_cap.D`.
+
+*Privilege note.* S-mode, HS-mode, and VS-mode may read this CSR when
+enabled per Chapter 14 §14.6. A nested hypervisor deciding whether it
+can create further child ECIDs reads `current_ecid_level` directly,
+avoiding a full `EC[e]` table lookup on every scheduling decision.
+
+'''''
+
+==== 3.11 `current_ecid_parent` — 0xFD2
+
+Parent ECID of the currently executing context on this hart.
+
+[width="100%",cols="16%,17%,19%,17%,31%",options="header",]
+|===
+|Bits |Field |Access |Reset |Description
+|XLEN-1:16 |_reserved_ |WIRI |0 |—
+
+|15:0 |PARENT |RO |0 |ECID number of the parent of the running context;
+0 if the running ECID is a root (L = 0) or CE is disabled
+|===
+
+*Semantics.* Hardware updates `PARENT` atomically with `current_ecid` at
+the commit of every successful `ec.ob`. No instruction or CSR write may
+modify this field directly. For a root ECID (`L = 0`), `PARENT` reads as
+0. For all other ECIDs, `PARENT` mirrors `EC[current_ecid].parent_ecid`.
+
+*Privilege note.* S-mode, HS-mode, and VS-mode may read this CSR when
+enabled per Chapter 14 §14.6. A nested hypervisor may read
+`current_ecid_parent` to identify its supervisor context for upward
+resource coordination, without a full `EC[e]` table lookup.
 
 '''''
 
@@ -756,8 +815,8 @@ domain. Interrupt routing is implementation-defined.
 |Any CE Suite CSR access from privilege below M-mode |_illegal
 instruction_ (subject to P2 S-mode relaxations)
 
-|Write to a CSR in the 0xFC0–0xFCF range |_illegal instruction_ (RISC-V
-privilege spec §4.1)
+|Write to any CE Suite RO CSR (0xFC0–0xFCF, 0xFD1–0xFD2) |_illegal
+instruction_ (RISC-V privilege spec §4.1)
 
 |Write to a reserved field in an RW CSR |Ignored (WIRI)
 
@@ -797,7 +856,7 @@ return 0; writes are silently ignored
 |0x7CE |`qos_violation_en` |QoS |RW |Domain-scoped
 |===
 
-==== 8.2 M-mode RO CSRs (0xFC0–0xFCF)
+==== 8.2 M-mode RO CSRs (0xFC0–0xFCF, 0xFD1–0xFD2)
 
 [cols=",,,",options="header",]
 |===
@@ -818,6 +877,9 @@ return 0; writes are silently ignored
 |0xFCD |`qos_max_nesting` |QoS |impl
 |0xFCE |`qos_bw_sum` |QoS |0
 |0xFCF |`qos_status` |QoS |0
+|_(0xFD0)_ |_(`ce_present` — Chapter 16)_ |_CE substrate_ |_impl_
+|0xFD1 |`current_ecid_level` |CME |0
+|0xFD2 |`current_ecid_parent` |CME |0
 |===
 
 '''''

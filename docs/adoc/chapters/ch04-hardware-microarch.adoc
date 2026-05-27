@@ -287,6 +287,62 @@ Key derivation, attestation, and rotation are charter open items
 
 '''''
 
+=== 4.14 Power Gating Protocol
+
+Hart power-gating firmware *must* follow this normative protocol when CE
+Banks are resident in the hart's SRAM. Removing SRAM power without first
+spilling Banks corrupts the register state of every EC whose Bank is
+resident on that hart; `EC[e].ecs_ptr` will point at stale data on wake.
+
+==== Before cutting SRAM power
+
+For every ECID `e` with a Bank currently resident on the hart being gated:
+
+....
+ec.im  x0, e, FULL_MASK    # spill Bank to EC[e].ecs_ptr in RAM (synchronous)
+....
+
+`ec.im` is synchronous: when the instruction completes, the Bank's state
+is in the ECS at `EC[e].ecs_ptr`. Firmware must issue `ec.im` for each
+resident Bank before gating. If `ec.im` returns a non-zero error code,
+the Bank is not safely spilled; firmware must abort the gate or destroy
+the ECID via `ec.oe` before proceeding.
+
+If another hart or system agent may read the ECS during the gating window,
+issue `FENCE W,W` after the last `ec.im`. See Chapter 17 §17.3.1 for the
+ordering model.
+
+==== After SRAM power is restored
+
+For every ECID `e` whose Bank was spilled before gating:
+
+....
+ec.om  x0, e, FULL_MASK    # fill Bank from EC[e].ecs_ptr in RAM (synchronous)
+....
+
+Firmware must complete all `ec.om` fills before scheduling any context on
+the hart — that is, before issuing the first `ec.ob`. If the ECS may have
+been updated by a different hart during the gating window, issue
+`FENCE R,R` before the first `ec.om`. See Chapter 17 §17.3.2.
+
+==== Invariants (normative)
+
+[arabic]
+. *Spill before gate.* Every resident Bank must be spilled via `ec.im`
+before SRAM power is removed.
+. *Fill before schedule.* Every Bank that was spilled must be restored via
+`ec.om` before the hart issues its first `ec.ob`.
+. *No skip on error.* If `ec.im` returns a non-zero result, that Bank is
+not safely in RAM. Either abort the gate or destroy the ECID (`ec.oe`)
+before cutting power.
+. *Bank bookkeeping survives the gate.* `EC[e]` entries are RAM-resident
+(§4.2.1) and survive power gating; Bank tags in SRAM do not. Firmware
+must maintain a software record — in the ECS or a firmware-private table
+— of which ECIDs had resident Banks, so it knows which `ec.om` calls to
+issue on wake.
+
+'''''
+
 === 4.13 Placeholder: Diagram — CME Microarchitecture
 
 Show:

@@ -109,9 +109,10 @@ pointer-form rs2)
 
 ==== 15.3.2 New cause: `CE_EXC_BANK_FAULT` (cause 16)
 
-`ec.ib` carries no `rd` — it always succeeds or traps. If the bank SRAM
-hardware raises a fault during the save (uncorrectable ECC error, bus
-error), the instruction cannot return a soft error code and must trap.
+`ec.ib` carries `rd` for the bank slot index (not an error code) — it always
+succeeds or traps. If the bank SRAM hardware raises a fault during the save
+(uncorrectable ECC error, bus error), the instruction cannot return a soft error
+code and must trap.
 
 `ec.ob` also performs a bank SRAM read; the same hardware fault applies.
 Although `ec.ob` carries `rd`, a hardware bank SRAM error is
@@ -169,9 +170,13 @@ seal again without unsealing first
 authentication failed
 |===
 
-Note: `ec.ib` and `ec.oe` carry no `rd`; they do not return codes from
-this table. `ec.ib` uses the trap path (§15.3.2); `ec.oe` always
-succeeds.
+Note: `ec.ib` and `ec.oe` return success-path information in `rd`, not error
+codes from this table. `ec.ib` returns the bank slot index (trap path: §15.3.2);
+`ec.oe` returns the count of ECIDs freed (always succeeds).
+
+The normative software recovery protocol when `CME_ERR_NO_BANK` (code 2) is
+returned by `ec.ig` or `ec.ob` is specified in Chapter 3: §3.3 (`ec.ig` —
+Bank Exhaustion Recovery) and §3.1 (`ec.ob` — Bank Exhaustion Recovery).
 
 '''''
 
@@ -191,7 +196,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 [cols=",,",options="header",]
 |===
 |Condition |Outcome |Value
-|Normal completion |— |no `rd`
+|Normal completion |rd |bank slot index (0-based in owning Group)
 |Reserved mask bit non-zero |trap |2 (illegal instruction)
 |Hardware bank SRAM error |trap |16 (`CE_EXC_BANK_FAULT`)
 |===
@@ -206,8 +211,8 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 |Target ECID not allocated / generation mismatch |rd |1
 (`CME_ERR_INVALID_ECID`)
 
-|Target ECID has no bank assigned |rd |1
-(`CME_ERR_INVALID_ECID`)
+|Target ECID has no bank resident (context is in ECS in RAM) |rd |2
+(`CME_ERR_NO_BANK`)
 
 |Caller is not an authorized ancestor of target |rd |3
 (`CME_ERR_PERMISSION`)
@@ -335,7 +340,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 [cols=",,",options="header",]
 |===
 |Condition |Outcome |Value
-|Always succeeds |— |no `rd`; never fails
+|Always succeeds |rd |ECIDs freed count; never fails
 |===
 
 *`ec.iv`* (seal a bank — vault) _(instruction shell; cryptographic
@@ -705,15 +710,14 @@ remap the ECS struct or terminate the faulting task.
 
 === 15.7 Quick-Reference Summary
 
-*Instructions with no `rd` (always succeed or trap):*
+*Instructions that return success-path data in `rd` (not error codes):*
 
 [cols=",,",options="header",]
 |===
-|Instruction |Trap cause if hardware error |Never fails in software
-|`ec.ib` |16 (`CE_EXC_BANK_FAULT`) |mask validity still
-checked
+|Instruction |`rd` on success |Trap cause if hardware error
+|`ec.ib` |bank slot index (0-based in owning Group) |16 (`CE_EXC_BANK_FAULT`)
 
-|`ec.oe` |— |always succeeds, no trap path
+|`ec.oe` |ECIDs freed count (including target) |— (never traps)
 |===
 
 *Instructions that always return `rd` (no trap except universal

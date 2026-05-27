@@ -191,7 +191,7 @@ ____
 
 [source,asm]
 ----
-    ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK              # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; QoS Contract restored automatically
 ----
 
@@ -348,7 +348,7 @@ ____
 
 [source,asm]
 ----
-    ec.oe  rt_ecid                    # forced destroy; all QoS Contracts revoked
+    ec.oe  x0, rt_ecid                    # forced destroy; all QoS Contracts revoked
                                       # and DMA bindings released automatically.
 ----
 

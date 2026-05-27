@@ -88,8 +88,8 @@ context-switch sequence is:
 [source,asm]
 ----
     # Outgoing context: ec.ib uses current_ecid CSR implicitly.
-    # No ECID operand; no rd (ec.ib always succeeds or traps).
-    ec.ib  FULL_MASK             # save current context to its bank
+    # No ECID operand; rd = bank slot index (x0 discards; always succeeds or traps).
+    ec.ib  x0, FULL_MASK         # save current context to its bank
 
     # Load incoming ECID from the task struct (Linux convention):
     lhu    a1, ECID_OFFSET(next_task)   # a1 = next_task->ecid

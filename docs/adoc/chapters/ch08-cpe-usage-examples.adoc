@@ -146,7 +146,7 @@ ____
 [source,asm]
 ----
     # Switch from best-effort task to real-time task.
-    ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK              # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; CPE partition restored automatically
 ----
 
@@ -250,7 +250,7 @@ needed.
 
 [source,asm]
 ----
-    ec.oe  rt_ecid               # forced destroy; CPE revoke is implicit
+    ec.oe  x0, rt_ecid               # forced destroy; CPE revoke is implicit
     # Ways are returned to rt_ecid's parent's allocation automatically.
 ----
 
@@ -354,7 +354,7 @@ per-hart and does not transfer automatically. The kernel must re-issue
     ec.im  x0, rt_ecid, FULL_MASK
 
     # 3. Destroy source ECID; kernel allocates fresh ECID on hart B.
-    ec.oe  rt_ecid
+    ec.oe  x0, rt_ecid
 
     # --- On hart B (destination) ---
 

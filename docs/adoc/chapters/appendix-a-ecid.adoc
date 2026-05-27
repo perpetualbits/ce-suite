@@ -257,15 +257,15 @@ not permitted when `EC[parent].delegation_L == D`.
 
 ==== A.5.1 Guarantee
 
-The instruction `ec.oe rs1` (charter §6.5) destroys the ECID in `rs1`
-and its entire delegation subtree. It *always succeeds*. A zombie,
+The instruction `ec.oe rd, rs1` (charter §6.5) destroys the ECID in `rs1`
+and its entire delegation subtree. `rd` receives the count of ECIDs freed. It *always succeeds*. A zombie,
 blocked, or hostile EC cannot stall its own destruction. The kernel need
 not wait for the target to be cooperatively scheduled or to voluntarily
 release resources.
 
 ==== A.5.2 Algorithm: destroy ECID subtree
 
-`ec.oe rs1` triggers the following sequence in the implementation:
+`ec.oe rd, rs1` triggers the following sequence in the implementation:
 
 ....
 function ecid_destroy(target_ecid):
@@ -376,7 +376,7 @@ difference between an owner ECID and any other allocated ECID; the
 `owner_ecid` field in the prefix node is a software record, not a
 hardware distinction.
 
-Calling `ec.oe 0x0010` (destroy Hypervisor A) would collapse the entire
+Calling `ec.oe x0, 0x0010` (destroy Hypervisor A) would collapse the entire
 subtree rooted at that node: ECIDs 0x1010, 0x1011, 0x1012, 0x1013,
 0x1020, 0x1101, 0x1102, and 0x0010 itself would all be destroyed, their
 Banks freed, and their Contracts dissolved. The range 0x1000–0x1FFF
