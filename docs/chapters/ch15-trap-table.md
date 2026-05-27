@@ -125,6 +125,10 @@ Note: `ec.ib` and `ec.oe` return success-path information in `rd`, not error
 codes from this table. `ec.ib` returns the bank slot index (trap path: §15.3.2);
 `ec.oe` returns the count of ECIDs freed (always succeeds).
 
+The normative software recovery protocol when `CME_ERR_NO_BANK` (code 2) is
+returned by `ec.ig` or `ec.ob` is specified in Chapter 3: §3.3 (`ec.ig` — Bank
+Exhaustion Recovery) and §3.1 (`ec.ob` — Bank Exhaustion Recovery).
+
 ---
 
 ## 15.5 Per-Instruction Outcome Tables
@@ -152,7 +156,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 |---|---|---|
 | Normal completion | rd | 0 (`CME_OK`) |
 | Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
-| Target ECID has no bank assigned | rd | 1 (`CME_ERR_INVALID_ECID`) |
+| Target ECID has no bank resident (context is in ECS in RAM) | rd | 2 (`CME_ERR_NO_BANK`) |
 | Caller is not an authorized ancestor of target | rd | 3 (`CME_ERR_PERMISSION`) |
 | Hardware bank SRAM error during restore | trap | 16 (`CE_EXC_BANK_FAULT`) |
 

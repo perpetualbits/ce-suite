@@ -64,7 +64,10 @@ These instructions operate through SRAM-resident staging banks and constitute th
 > `ec.ob` = ECID out of bank (`ec` = CME/ECID, `o` = out of, `b` = bank)
 
 * **Syntax**: `ec.ob rd, rs1, rs2`
-  * `rd`: 0 on success; error code if the target ECID is invalid or unbanked.
+  * `rd`: 0 on success; `CME_ERR_INVALID_ECID` if the target ECID is not allocated or
+    has a generation mismatch; `CME_ERR_NO_BANK` if the target ECID has no bank
+    resident (see Bank Exhaustion Recovery below); `CME_ERR_PERMISSION` if the
+    caller is not an authorized ancestor.
   * `rs1`: Target ECID number.
   * `rs2`: Register mask — which register groups to restore (see §3.7).
 * **Side effects**: Restores registers from the bank owned by ECID `rs1`. If the PC
@@ -74,6 +77,22 @@ These instructions operate through SRAM-resident staging banks and constitute th
 > **Typical switch sequence**: `ec.ib mask` (save current), then
 > `ec.ob x0, next_ecid, mask` (restore next, discard result). The transition
 > between `current_ecid` and `next_ecid` is complete when `ec.ob` commits.
+
+#### Bank Exhaustion Recovery
+
+When `ec.ob` returns `CME_ERR_NO_BANK` (code 2; defined in Chapter 15 §15.4), the
+target ECID has no bank resident — its context was previously spilled to ECS in RAM
+via `ec.im`, or was never banked. The normative recovery protocol:
+
+1. **Free a bank slot.** Follow the `ec.ig` bank exhaustion recovery sequence
+   (§3.3): select a victim ECID `v` that is banked and is not the currently
+   running context, issue `ec.im x0, v, mask` to spill it to `EC[v].ecs_ptr` in
+   RAM, then issue `ec.og x0, v` to release the victim's bank to the free pool.
+2. **Fill the target.** Issue `ec.om rd, rs1, mask` to load the target ECID's
+   state from `EC[rs1].ecs_ptr` in RAM into the freed bank. `ec.om` claims a
+   bank from the free pool and assigns it to the target's Group.
+3. **Retry.** Re-issue the original `ec.ob` call; the target ECID now has a bank
+   resident and the restore completes normally.
 
 ---
 
@@ -137,6 +156,26 @@ bank's up-pointer and checked at the bank (the reversal trick).
 * **Side effects**: A bank from the free pool is claimed for ECID `rs1`'s Group.
   The bank's owner field is set to `rs1`. Group has no member list to update.
 * **Cycles**: 1–4.
+
+#### Bank Exhaustion Recovery
+
+When `ec.ig` returns `CME_ERR_NO_BANK` (code 2; defined in Chapter 15 §15.4), the
+hart's free-bank pool is exhausted. The normative recovery protocol:
+
+1. **Select a victim.** Choose a banked ECID `v` on this hart that is not the
+   currently running context (`v ≠ current_ecid`) and is eligible to be spilled.
+   A per-hart LRU list of banked ECIDs is a common kernel data structure for this.
+2. **Spill the victim.** Issue `ec.im x0, v, mask` to transfer the victim's bank
+   state to `EC[v].ecs_ptr` in RAM. If `ec.im` returns a non-zero code, select a
+   different victim and repeat from step 1.
+3. **Release the victim's bank.** Issue `ec.og x0, v` to return the victim's bank
+   from its Group to the free pool. (`ec.im` alone does not free the bank;
+   `ec.og` is the instruction that releases it.)
+4. **Retry.** Re-issue the original `ec.ig` call; the freed bank is now available.
+
+If no eligible victim exists (all banked ECIDs are the currently running context or
+are otherwise ineligible), the bank request cannot be satisfied until a running
+context is switched out.
 
 ### `ec.og` — Release a bank from an ECID's Group
 

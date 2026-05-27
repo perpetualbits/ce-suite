@@ -471,16 +471,19 @@ substantially for contexts that never touch FPRs or vectors.
 
 ---
 
-### E4 · Bank Exhaustion Protocol
+### E4 · Bank Exhaustion Protocol ✓ RESOLVED
 
 **Affects:** ch03 (`ec.ig` and `ec.ob` — add a normative recovery subsection);
 ch15 (CME_ERR_NO_BANK already defined — add cross-reference).
 
-Define the normative software recovery protocol when `ec.ig` or `ec.ob` returns
-`CME_ERR_NO_BANK`: software selects a victim Bank, calls `ec.im` to spill it to
-the victim ECID's ECS in RAM, then retries the original instruction. Leaving this
-implicit means every implementer invents a different protocol, and OS code
-written for one implementation silently breaks on another.
+**Decision:** Normative `#### Bank Exhaustion Recovery` subsections added under
+`ec.ob` (§3.1) and `ec.ig` (§3.3) in ch03. Protocol for `ec.ig`: select victim,
+`ec.im` to spill to RAM, `ec.og` to release the bank back to the free pool, retry
+`ec.ig`. Protocol for `ec.ob`: same spill+release, then `ec.om` to fill the
+target's state into the freed bank, retry `ec.ob`. ch15 `ec.ob` error table
+corrected: "no bank assigned" row changed from `CME_ERR_INVALID_ECID` (1) to
+`CME_ERR_NO_BANK` (2) — the condition is recoverable and distinct from an invalid
+ECID. Cross-reference paragraph added to ch15 §15.4.
 
 **Depends on:** No blocking dependencies. CME_ERR_NO_BANK already exists in
 ch15; this item adds the protocol description to ch03.
@@ -561,8 +564,8 @@ locations); full sweep of all remaining chapters and reference files removing
 These are independent and can be done in any order, with one exception:
 
 1. ~~**E8**~~ — fully resolved ✓.
-2. **E4** — small and unblocking; do early to close a real spec gap. **START HERE.**
-3. **E5** — small; two CSRs; can follow E4 immediately.
+2. ~~**E4**~~ — fully resolved ✓.
+3. **E5** — small; two CSRs; can follow E4 immediately. **START HERE.**
 4. **E6** — small normative note; can be combined with a ch04 or ch17 session.
 5. **E3** — small; touches ch03 and ch00; do after E8 if ch03 is being revised.
 6. **E1** — new appendix; self-contained; do once baseline enhancements are stable.

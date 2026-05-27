@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E8 fully propagated; E4 next)
+### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 done; E5 next)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -56,7 +56,7 @@ ownership layer that ties the other four together.
 | **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
-| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated |
+| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added |
 | **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
@@ -69,7 +69,7 @@ ownership layer that ties the other four together.
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 | **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs; provisional addresses 0x7C0–0x7CF and 0xFC0–0xFCF |
 | **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); all 24 instructions × 6 privilege levels |
-| **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table |
+| **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4 ec.ob error corrected + cross-ref |
 | **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos |
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
 
@@ -128,7 +128,7 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 - **E1** — Capability Profiles (new appendix)
 - **E2** — CLIC Integration (new section or chapter)
 - **E3** — Dirty/Lazy Bank Tracking (ch03, ch00)
-- **E4** — Bank Exhaustion Protocol (ch03)
+- **E4** — Bank Exhaustion Protocol (ch03) ✓ done
 - **E5** — Nested Virtualization CSRs (ch13, ch14)
 - **E6** — Power Gating Integration (ch04 or ch17)
 - **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative)
@@ -139,10 +139,13 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 P1–P7 are done. The active authoring work is the E-series enhancements.
 Suggested order (see work-items.md for rationale):
 
-~~**E8**~~ fully done ✓. **Next: E4** — Bank Exhaustion Protocol: add a normative
-recovery subsection to ch03 (`ec.ig` and `ec.ob`) describing what to do when
-`CME_ERR_NO_BANK` is returned. **E5** (two new CSRs in ch13/ch14) can follow
-immediately. **E3 and E6** touch ch00/ch04 and are also small. **E1, E2, E7**
+~~**E8**~~ fully done ✓. ~~**E4**~~ fully done ✓ — normative Bank Exhaustion
+Protocol added to ch03 §3.1 (`ec.ob`) and §3.3 (`ec.ig`); ch15 `ec.ob` error
+table corrected (`CME_ERR_NO_BANK` replaces `CME_ERR_INVALID_ECID` for the
+"no bank resident" case) and cross-reference paragraph added to §15.4.
+
+**Next: E5** — two new read-only CSRs (`current_ecid_level`, `current_ecid_parent`)
+in ch13 and ch14. **E3 and E6** touch ch00/ch04 and are also small. **E1, E2, E7**
 are self-contained and can be done in any order afterward.
 
 ### A.7 Where things live
