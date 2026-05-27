@@ -204,8 +204,10 @@ cross-references). Work-items F12 logged: pre-existing §4.3.N drift in ch11/ch1
 ~~**F12 ch11**~~ done ✓ — ch11 §11.5.3 (`§4.3.3` → `§4.3.2`) and §11.5.4 (`§4.3.5` → `§4.3.4`)
 corrected in both the Markdown source and the adoc mirror.
 
-**Next session: F12 ch13** — ch13 §4.1 `cpe_caps` DELEG bit: `§4.3.7` → `§4.3.6`
-(§4.3.7 does not exist). Then a further session for ch02 §3.4 (`§4.3 item 7` → `§4.3.6`).
+~~**F12 ch13**~~ done ✓ — ch13 §4.1 `cpe_caps` DELEG bit: `§4.3.7` → `§4.3.6`
+corrected in both the Markdown source and the adoc mirror.
+
+**Next session: F12 ch02** — ch02 §3.4: `§4.3 item 7` → `§4.3.6`.
 
 ### A.7 Where things live
 

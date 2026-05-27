@@ -301,7 +301,7 @@ CPE capability flags for this hart.
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
 | XLEN-1:12 | *reserved* | WIRI | 0 | — |
-| 11 | DELEG | RO | impl | 1 = `cp.it`/`cp.ot` delegation supported (charter §4.3.7) |
+| 11 | DELEG | RO | impl | 1 = `cp.it`/`cp.ot` delegation supported (charter §4.3.6) |
 | 10 | L2P | RO | impl | 1 = L2-private cache partitioning supported |
 | 9 | L1D | RO | impl | 1 = L1D cache partitioning supported |
 | 8 | L1I | RO | impl | 1 = L1I cache partitioning supported |
