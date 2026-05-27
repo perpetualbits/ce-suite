@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.13 of the charter)
+### A.3 Chapter status (as of v0.13 of the charter; P6/P7 done; E-series queued)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -162,7 +162,20 @@ docs/
 │   ├── ch10-mse-usage-examples.md
 │   ├── ch11-qos-io-quality-of-service.md
 │   ├── ch12-qos-usage-examples.md
-│   └── appendix-a-ecid.md
+│   ├── appendix-a-ecid.md
+│   ├── ch13-csr-reference.md
+│   ├── ch14-privilege-model.md
+│   ├── ch15-trap-table.md
+│   ├── ch16-discovery.md
+│   └── ch17-memory-ordering.md
+├── adoc/                            # AsciiDoc conversion (P7); mirrors chapters/
+│   ├── index.adoc                   # master book document
+│   ├── chapters/                    # one .adoc per chapter/appendix
+│   ├── reference/
+│   └── submission/
+├── submission/                      # RISC-V International submission materials (P6)
+│   ├── submission-brief.md          # opcode/name/CSR allocation request
+│   └── motivation.md                # use-case and value-proposition document
 ├── reference/
 │   ├── glossary.md
 │   └── instruction-card.md          # quick reference; current as of v0.13
