@@ -21,7 +21,8 @@ All examples assume:
   from a bank, `ec.om` restores from memory. The full table is in Chapter 3.
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   In examples below, `x0` is used for `rd` to discard the result — the fast path
-  is expected to succeed. `ec.ib` carries no `rd` (it always succeeds or traps).
+  is expected to succeed. `ec.ib` returns the bank slot index in `rd` (not an error
+  code); use `x0` to discard. It always succeeds or traps — no soft failure.
 - Instruction operands are ECID numbers — 16-bit hart-local identifiers. They
   are not pointers to kernel structs. How the kernel stored or retrieved an ECID
   number is a Linux convention described in Chapter 5, not an architectural rule.
@@ -41,7 +42,7 @@ Two threads are scheduled on the same hart. The currently running thread
 
 ```asm
 # Save current context to its bank (operates on current_ecid implicitly)
-ec.ib  FULL_MASK
+ec.ib  x0, FULL_MASK
 
 # Restore next context from its bank; hardware updates current_ecid
 ec.ob  x0, next_ecid, FULL_MASK
@@ -78,7 +79,7 @@ first interrupt fires.
 
 ```asm
 # Save interrupted context to its bank (current_ecid implicit)
-ec.ib  FULL_MASK
+ec.ib  x0, FULL_MASK
 
 # Restore interrupt handler context; hardware sets current_ecid = interrupt_ecid
 ec.ob  x0, interrupt_ecid, FULL_MASK
@@ -88,7 +89,7 @@ ec.ob  x0, interrupt_ecid, FULL_MASK
 
 ```asm
 # Optionally save interrupt handler state (if it may be preempted itself)
-ec.ib  FULL_MASK
+ec.ib  x0, FULL_MASK
 
 # Restore interrupted context
 ec.ob  x0, current_ecid, FULL_MASK
@@ -117,7 +118,7 @@ stored in a hardware-sealed bank that the OS cannot read.
 
 ```asm
 # Save calling context to its bank (current_ecid implicit)
-ec.ib  FULL_MASK
+ec.ib  x0, FULL_MASK
 
 # Unseal secure bank and restore enclave state; hardware sets current_ecid = enclave_ecid
 ec.ov  x0, enclave_ecid, FULL_MASK
@@ -155,28 +156,28 @@ matching the three delegation levels (L = 0, 1, 2).
 ### Code: L0 → L1 (host to guest hypervisor)
 
 ```asm
-ec.ib  FULL_MASK                  # save host context (current_ecid implicit)
+ec.ib  x0, FULL_MASK                  # save host context (current_ecid implicit)
 ec.ob  x0, l1_ecid, FULL_MASK    # restore guest hypervisor
 ```
 
 ### Code: L1 → L2 (guest hypervisor to nested guest)
 
 ```asm
-ec.ib  FULL_MASK                  # save guest hypervisor context
+ec.ib  x0, FULL_MASK                  # save guest hypervisor context
 ec.ob  x0, l2_ecid, FULL_MASK    # restore nested guest
 ```
 
 ### Code: L2 → L1 (nested guest exits to guest hypervisor)
 
 ```asm
-ec.ib  FULL_MASK                  # save nested guest context
+ec.ib  x0, FULL_MASK                  # save nested guest context
 ec.ob  x0, l1_ecid, FULL_MASK    # restore guest hypervisor
 ```
 
 ### Code: L1 → L0 (guest hypervisor exits to host)
 
 ```asm
-ec.ib  FULL_MASK                  # save guest hypervisor context
+ec.ib  x0, FULL_MASK                  # save guest hypervisor context
 ec.ob  x0, host_ecid, FULL_MASK  # restore host kernel
 ```
 
@@ -212,7 +213,7 @@ CME, CPE, and MSE are used together:
 
 ```asm
 # Preempt non-DSP VM task (current_ecid implicit)
-ec.ib  FULL_MASK
+ec.ib  x0, FULL_MASK
 
 # Restore DSP audio handler; hardware enforces CPE partition and MSE Contract
 ec.ob  x0, dsp_ecid, FULL_MASK
@@ -235,7 +236,7 @@ A secure enclave runs within a guest VM's address space.
 ### On Entry (guest to enclave)
 
 ```asm
-ec.ib  FULL_MASK                       # save guest context (current_ecid implicit)
+ec.ib  x0, FULL_MASK                       # save guest context (current_ecid implicit)
 ec.ov  x0, secure_ecid, FULL_MASK     # unseal enclave bank and restore
 ```
 

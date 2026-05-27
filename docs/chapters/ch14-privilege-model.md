@@ -408,7 +408,7 @@ OS kernel and, optionally, for VMs under a type-1 hypervisor.
     hret                                      # enter VS-mode
 
     # On VM exit back to HS-mode:
-    ec.ib  FULL_MASK                         # save VS ECID
+    ec.ib  x0, FULL_MASK                     # save VS ECID
     li    t0, 0
     csrw  hcme_ctrl, t0                      # VS_EN = 0 (revoke next VM's CE)
     ec.ob  x0, hs_ecid, FULL_MASK           # restore HS ECID

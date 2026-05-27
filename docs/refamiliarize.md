@@ -56,7 +56,7 @@ ownership layer that ties the other four together.
 | **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
-| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added |
+| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated |
 | **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |

@@ -171,7 +171,7 @@ the other is best-effort (`be_ecid`). The scheduler switches between them.
 > `ec.ib` = ECID into bank — `ec.ob` = ECID out of bank (QoS Contract restored automatically)
 
 ```asm
-    ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK          # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; QoS Contract restored automatically
 ```
 
@@ -311,7 +311,7 @@ A hypervisor (`hyp_ecid`, L=1) holds a QoS Contract on the NoC domain with
 ### Scenario C — teardown via `ec.oe` (implicit revoke)
 
 ```asm
-    ec.oe  rt_ecid                    # forced destroy; all QoS Contracts revoked
+    ec.oe  x0, rt_ecid                # forced destroy; all QoS Contracts revoked
                                       # and DMA bindings released automatically.
 ```
 

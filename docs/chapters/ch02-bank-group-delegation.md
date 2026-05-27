@@ -290,7 +290,7 @@ via `ec.oe`.
 
 ### 2.5.2 Forced destruction: `ec.oe`
 
-`ec.oe rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
+`ec.oe rd, rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
 resources. This instruction always succeeds. The target context cannot
 stall, block, or defend against it. See Chapter 3 §3.5 for the step-by-step
 semantics.

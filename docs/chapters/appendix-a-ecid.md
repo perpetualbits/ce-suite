@@ -230,14 +230,14 @@ After any delegation step, the following invariants must hold:
 
 ### A.5.1 Guarantee
 
-The instruction `ec.oe rs1` (charter §6.5) destroys the ECID in `rs1` and its entire
+The instruction `ec.oe rd, rs1` (charter §6.5) destroys the ECID in `rs1` and its entire
 delegation subtree. It **always succeeds**. A zombie, blocked, or hostile EC cannot
 stall its own destruction. The kernel need not wait for the target to be cooperatively
 scheduled or to voluntarily release resources.
 
 ### A.5.2 Algorithm: destroy ECID subtree
 
-`ec.oe rs1` triggers the following sequence in the implementation:
+`ec.oe rd, rs1` triggers the following sequence in the implementation:
 
 ```
 function ecid_destroy(target_ecid):

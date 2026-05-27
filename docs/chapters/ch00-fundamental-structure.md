@@ -311,21 +311,23 @@ pointer, never a bank ID:
 ```text
 ec.ob rd, rs1, rs2 # rd = result, rs1 = target ECID number, rs2 = register mask
 ec.om rd, rs1, rs2 # rd = result, rs1 = target ECID number, rs2 = mask
-ec.oe rs1          # rs1 = target ECID to destroy (no rd — always succeeds)
+ec.oe rd, rs1      # rd = ECIDs freed count; rs1 = target ECID to destroy
 ```
 
 Instructions operating on the current context consult `current_ecid`
 implicitly and omit the ECID operand:
 
 ```text
-ec.ib rs1          # save current context; rs1 = mask (no rd — always succeeds or traps)
+ec.ib rd, rs1      # rd = bank slot index; rs1 = mask (x0 discards; always succeeds or traps)
 ```
 
 **Error handling.** Every CE Suite instruction that can return a failure code
 writes 0 (success) or a non-zero error code in `rd`. Callers pass `x0` to
 discard the result. Status CSRs (`cme_status`, etc.) are updated for
-diagnostic use but are not the primary error channel. Two exceptions carry no
-`rd`: `ec.ib` (always succeeds or traps) and `ec.oe` (always succeeds).
+diagnostic use but are not the primary error channel. Two exceptions return
+success-path information in `rd` rather than an error code: `ec.ib` (bank slot
+index written) and `ec.oe` (ECIDs freed count). Both trap on error; use `x0` to
+discard.
 Any instruction referencing an unallocated slot, a stale generation, or a
 privilege violation must raise a defined trap or return a documented failure
 code in `rd`. Silent ignore is prohibited.

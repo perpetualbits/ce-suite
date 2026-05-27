@@ -5,8 +5,10 @@ opcode (`0001011`). **funct3** selects the extension; **funct7** selects
 the instruction within that extension.
 
 **Error convention.** Every instruction that can fail writes `0` (success)
-or a non-zero error code in `rd`. Two exceptions carry no `rd`: `ec.ib`
-(always succeeds or traps) and `ec.oe` (always succeeds).
+or a non-zero error code in `rd`. Two exceptions return success-path
+information in `rd` rather than an error code: `ec.ib` (bank slot index
+written) and `ec.oe` (count of ECIDs freed). Both trap on error; use `x0`
+to discard.
 
 ---
 
@@ -14,7 +16,7 @@ or a non-zero error code in `rd`. Two exceptions carry no `rd`: `ec.ib`
 
 | funct7    | Mnemonic | Syntax                  | rd          | rs1              | rs2           | Description |
 |-----------|----------|-------------------------|-------------|------------------|---------------|-------------|
-| `0000000` | `ec.ib`  | `ec.ib rs1`             | *(none)*    | mask register    | —             | Save running context to on-chip bank |
+| `0000000` | `ec.ib`  | `ec.ib rd, rs1`         | bank slot index | mask register | —             | Save running context to on-chip bank |
 | `0000001` | `ec.ob`  | `ec.ob rd, rs1, rs2`    | result      | target ECID      | mask register | Restore context from bank (fast switch) |
 | `0000010` | `ec.im`  | `ec.im rd, rs1, rs2`    | result      | target ECID      | mask register | Save context to ECS in RAM (synchronous DMA) |
 | `0000011` | `ec.om`  | `ec.om rd, rs1, rs2`    | result      | target ECID      | mask register | Restore context from ECS in RAM (synchronous DMA) |
@@ -23,12 +25,12 @@ or a non-zero error code in `rd`. Two exceptions carry no `rd`: `ec.ib`
 | `0000110` | `ec.it`  | `ec.it rd, rs1, rs2`    | result      | source ECID      | child ECID    | Delegate one bank to a child ECID |
 | `0000111` | `ec.ot`  | `ec.ot rd, rs1`         | result      | child ECID       | —             | Revoke a delegated bank from a child ECID |
 | `0001000` | `ec.ir`  | `ec.ir rd, rs1`         | new ECID/0  | leaf flag (0/1)  | —             | Allocate a new child ECID |
-| `0001001` | `ec.oe`  | `ec.oe rs1`             | *(none)*    | target ECID      | —             | Forced destroy: remove ECID and entire delegation subtree |
+| `0001001` | `ec.oe`  | `ec.oe rd, rs1`         | ECIDs freed count | target ECID  | —             | Forced destroy: remove ECID and entire delegation subtree |
 | `0001010` | `ec.iv`  | `ec.iv rd, rs1, rs2`    | result      | target ECID      | mask register | Seal a bank (vault — cryptographically protected) |
 | `0001011` | `ec.ov`  | `ec.ov rd, rs1, rs2`    | result      | target ECID      | mask register | Unseal a bank (vault) |
 
 **Notes.**
-- `ec.ib` and `ec.oe` take no `rd`; unused fields encode as `00000`.
+- `ec.ib` and `ec.oe` return success-path data in `rd` (not error codes); `rs2` encodes as `00000` (unused).
 - `ec.ir`: `rs1 = 0` → leaf child (cannot delegate further); `rs1 = 1` →
   delegating child (delegation_L = parent_L + 1, requires parent_L < D).
 - `ec.it` delegates **one bank** per call, implementation-chosen from the

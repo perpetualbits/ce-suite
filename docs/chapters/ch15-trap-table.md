@@ -84,7 +84,7 @@ constraint is violated.
 
 ### 15.3.2 New cause: `CE_EXC_BANK_FAULT` (cause 16)
 
-`ec.ib` carries no `rd` — it always succeeds or traps. If the bank SRAM
+`ec.ib` carries `rd` for the bank slot index (not an error code) — it always succeeds or traps. If the bank SRAM
 hardware raises a fault during the save (uncorrectable ECC error, bus error),
 the instruction cannot return a soft error code and must trap.
 
@@ -121,8 +121,9 @@ numeric values. The table below is the normative CME error code table.
 | 6 | `CME_ERR_ALREADY_SEALED` | Bank is already sealed; cannot seal again without unsealing first |
 | 7 | `CME_ERR_NOT_SEALED` | Bank is not sealed, or vault authentication failed |
 
-Note: `ec.ib` and `ec.oe` carry no `rd`; they do not return codes from this
-table. `ec.ib` uses the trap path (§15.3.2); `ec.oe` always succeeds.
+Note: `ec.ib` and `ec.oe` return success-path information in `rd`, not error
+codes from this table. `ec.ib` returns the bank slot index (trap path: §15.3.2);
+`ec.oe` returns the count of ECIDs freed (always succeeds).
 
 ---
 
@@ -141,7 +142,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 
 | Condition | Outcome | Value |
 |---|---|---|
-| Normal completion | — | no `rd` |
+| Normal completion | rd | bank slot index (0-based in owning Group) |
 | Reserved mask bit non-zero | trap | 2 (illegal instruction) |
 | Hardware bank SRAM error | trap | 16 (`CE_EXC_BANK_FAULT`) |
 
@@ -221,7 +222,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 
 | Condition | Outcome | Value |
 |---|---|---|
-| Always succeeds | — | no `rd`; never fails |
+| Always succeeds | rd | ECIDs freed count; never fails |
 
 **`ec.iv`** (seal a bank — vault) *(instruction shell; cryptographic semantics deferred)*
 
@@ -436,12 +437,12 @@ When S-mode receives a CE-related exception (delegated by M-mode):
 
 ## 15.7 Quick-Reference Summary
 
-**Instructions with no `rd` (always succeed or trap):**
+**Instructions with success-path `rd` (no soft failure):**
 
-| Instruction | Trap cause if hardware error | Never fails in software |
+| Instruction | `rd` on success | Trap cause if hardware error |
 |---|---|---|
-| `ec.ib` | 16 (`CE_EXC_BANK_FAULT`) | mask validity still checked |
-| `ec.oe` | — | always succeeds, no trap path |
+| `ec.ib` | bank slot index (0-based in owning Group) | 16 (`CE_EXC_BANK_FAULT`) |
+| `ec.oe` | ECIDs freed count (including target) | — (never traps) |
 
 **Instructions that always return `rd` (no trap except universal conditions):**
 

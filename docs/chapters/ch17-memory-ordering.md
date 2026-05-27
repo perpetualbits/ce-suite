@@ -63,7 +63,7 @@ would be for any cross-hart store.
 ```
     # Kernel context switch on the same hart. No fence needed for
     # registers or for data shared only with this hart's contexts.
-    ec.ib  t0         # save current context; t0 = register mask
+    ec.ib  x0, t0     # save current context; t0 = register mask
     ec.ob  x0, B, t0  # restore B; discard rd
     # B runs from here; sees all prior stores on this hart (PPO)
 ```
@@ -195,7 +195,7 @@ migration handoff signal; it must be zero before the sequence begins.
     qs.or  x0, A_ecid, x0        # revoke QoS Contract (if any; 0 = all domains)
 
     # Step 2. Save A's register state to the bank (if not already done).
-    ec.ib  save_mask
+    ec.ib  x0, save_mask
 
     # Step 3. Spill the bank to ECS in RAM.
     ec.im  x0, A_ecid, spill_mask
@@ -209,7 +209,7 @@ migration handoff signal; it must be zero before the sequence begins.
     sw     t0, 0(flag_addr)       # plain store; FENCE W,W in step 4 covers it
 
     # Step 6. Destroy the ECID on Hart 0 (optional; may be done after step 5).
-    ec.oe  A_ecid
+    ec.oe  x0, A_ecid
 
     ── Hart 1 (destination) ─────────────────────────────────────────────
 

@@ -119,7 +119,7 @@ best-effort (`be_ecid`). The scheduler switches between them.
 
 ```asm
     # Switch from best-effort task to real-time task.
-    ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK          # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; MSE Contract restored automatically
 ```
 
@@ -160,7 +160,7 @@ context switches.
 ### Context switch (no additional setup needed)
 
 ```asm
-    ec.ib  FULL_MASK
+    ec.ib  x0, FULL_MASK
     ec.ob  x0, rt_ecid, FULL_MASK  # restores both CPE partition and MSE Contract
 ```
 
@@ -251,7 +251,7 @@ The kernel destroys `rt_ecid` entirely. The MSE Contract dissolves automatically
 as part of the destroy sequence.
 
 ```asm
-    ec.oe  rt_ecid               # forced destroy; MSE Contract revoke is implicit
+    ec.oe  x0, rt_ecid           # forced destroy; MSE Contract revoke is implicit
     # bw_class returned to parent's cap headroom automatically.
 ```
 

@@ -127,7 +127,7 @@ Two tasks share a hart. One holds a CPE partition (`rt_ecid`); the other does no
 
 ```asm
     # Switch from best-effort task to real-time task.
-    ec.ib  FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK          # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; CPE partition restored automatically
 ```
 
@@ -218,7 +218,7 @@ The kernel destroys `rt_ecid` entirely. CPE Contracts in the subtree are revoked
 as part of the destroy sequence; no explicit `cp.or` is needed.
 
 ```asm
-    ec.oe  rt_ecid               # forced destroy; CPE revoke is implicit
+    ec.oe  x0, rt_ecid           # forced destroy; CPE revoke is implicit
     # Ways are returned to rt_ecid's parent's allocation automatically.
 ```
 
@@ -314,7 +314,7 @@ destination hart after migration.
     ec.im  x0, rt_ecid, FULL_MASK
 
     # 3. Destroy source ECID; kernel allocates fresh ECID on hart B.
-    ec.oe  rt_ecid
+    ec.oe  x0, rt_ecid
 
     # --- On hart B (destination) ---
 
