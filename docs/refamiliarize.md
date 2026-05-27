@@ -57,7 +57,7 @@ ownership layer that ties the other four together.
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added |
-| **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added |
+| **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added; E4 ec.im bank-free wording corrected |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
 | **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3/F8 applied |
@@ -69,7 +69,7 @@ ownership layer that ties the other four together.
 | **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 | **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs; provisional addresses 0x7C0–0x7CF and 0xFC0–0xFCF |
 | **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); all 24 instructions × 6 privilege levels |
-| **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4 ec.ob error corrected + cross-ref |
+| **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4: ec.ob CME_ERR_NO_BANK corrected + cross-ref |
 | **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos |
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
 
