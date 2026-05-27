@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E8 chartered; ch03 propagation next)
+### A.3 Chapter status (as of v0.14 of the charter; E8 fully propagated; E4 next)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -132,18 +132,18 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 - **E5** — Nested Virtualization CSRs (ch13, ch14)
 - **E6** — Power Gating Integration (ch04 or ch17)
 - **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative)
-- **E8** — Return values for `ec.ib` and `ec.oe`; charter revised (v0.14) ✓; ch03 propagation is next
+- **E8** — Return values for `ec.ib` and `ec.oe` ✓ fully done (charter v0.14 + ch03 + full sweep of all chapters and reference files)
 
 ### A.6 What's *next* (the suggested work order)
 
 P1–P7 are done. The active authoring work is the E-series enhancements.
 Suggested order (see work-items.md for rationale):
 
-**E8** — charter revised (v0.14) ✓. **Next: propagate E8 to ch03** (update
-`ec.ib` and `ec.oe` operand syntax, descriptions, and encoding table). **E4
-and E5** are small and can follow immediately after. **E3 and E6** touch
-ch00/ch04 and are also small. **E1, E2, E7** are self-contained and can be
-done in any order afterward.
+~~**E8**~~ fully done ✓. **Next: E4** — Bank Exhaustion Protocol: add a normative
+recovery subsection to ch03 (`ec.ig` and `ec.ob`) describing what to do when
+`CME_ERR_NO_BANK` is returned. **E5** (two new CSRs in ch13/ch14) can follow
+immediately. **E3 and E6** touch ch00/ch04 and are also small. **E1, E2, E7**
+are self-contained and can be done in any order afterward.
 
 ### A.7 Where things live
 

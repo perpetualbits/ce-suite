@@ -538,28 +538,21 @@ this is informative guidance for OS integrators.
 
 ---
 
-### E8 · Return values for `ec.ib` and `ec.oe` — charter revised ✓; ch03 next
+### E8 · Return values for `ec.ib` and `ec.oe` ✓ RESOLVED
 
-**Affects:** ~~Charter §6.5 (`ec.oe`) and §6.6 (`ec.ib`)~~ ✓ Done (charter v0.14).
-**Remaining:** ch03 — update `ec.ib` and `ec.oe` operand syntax, descriptions,
-and encoding table (§3.10 / encoding appendix).
+**Affects:** Charter §6.5/§6.6, ch00, ch02, ch03, ch05, ch06, ch08, ch10,
+ch12, ch14, ch15, ch17, appendix-a, instruction-card.md.
 
 **Decision (v0.14):**
 
 - `ec.ib rd, rs1` — `rd` returns the bank slot index (0-based within the owning
-  Group) of the bank written. A hypervisor no longer needs a follow-on CSR read
-  to determine which bank holds the saved guest state.
+  Group) of the bank written. `x0` discards.
 - `ec.oe rd, rs1` — `rd` returns the total count of ECIDs freed, including the
-  target itself. Each ECID in the destroyed subtree is counted exactly once.
-  Useful for ECID quota accounting without polling separate CSRs.
+  target itself. `x0` discards.
 
-Callers that do not need the value write to `x0`.
-
-**Propagated to charter:** §6.2 example, §6.5 (syntax + item 6), §6.6
-("Exceptions no rd" → "Success-path rd for ec.ib and ec.oe"), Changelog.
-
-**Next session:** Propagate to ch03 — update Overview item 3, `ec.ib` syntax
-block, `ec.oe` syntax block, timing table, encoding table.
+**Propagated to:** Charter v0.14 (§6.2, §6.5, §6.6, changelog); ch03 (7
+locations); full sweep of all remaining chapters and reference files removing
+"no rd" / "carry no rd" claims and updating assembly syntax to two-operand form.
 
 ---
 
@@ -567,11 +560,9 @@ block, `ec.oe` syntax block, timing table, encoding table.
 
 These are independent and can be done in any order, with one exception:
 
-1. **E8** — charter revised (v0.14) ✓. **Next:** ch03 propagation session —
-   update `ec.ib` and `ec.oe` tables, descriptions, and encoding section.
-   Do before other ch03 work so instruction tables are stable.
-2. **E4** — small and unblocking; do early to close a real spec gap.
-3. **E5** — small; two CSRs; can be combined with E8's ch13 propagation pass.
+1. ~~**E8**~~ — fully resolved ✓.
+2. **E4** — small and unblocking; do early to close a real spec gap. **START HERE.**
+3. **E5** — small; two CSRs; can follow E4 immediately.
 4. **E6** — small normative note; can be combined with a ch04 or ch17 session.
 5. **E3** — small; touches ch03 and ch00; do after E8 if ch03 is being revised.
 6. **E1** — new appendix; self-contained; do once baseline enhancements are stable.
