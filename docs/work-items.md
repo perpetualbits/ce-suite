@@ -406,4 +406,178 @@ and is noted here for completeness. Not a near-term authoring task.
 
 ---
 
+## Category E — Enhancements
+
+These items extend the v1 spec with genuinely valuable additions that require
+relatively little work and no fundamental model changes. Each was reviewed
+against the current spec and classified as "category 3" (valuable, low effort,
+pity to omit). Items are independent of each other unless noted.
+
+Source: `docs/future-directions.md` items §1, §2, §5, §6, §8, §13, §16, §18.
+
+---
+
+### E1 · Capability Profiles
+
+**Affects:** New appendix (Appendix B); ch16 §2 (ISA string names); possibly a
+new CSR if a profile-ID field is warranted.
+
+Define named implementation profiles — e.g., "Minimal RT" (CME+CPE, D=1),
+"Full Virtualization" (all extensions, D=3), "Embedded" (CME only, D=0, no VMT)
+— as a documented mapping from existing discoverable parameters (ce_present bits
++ cme_del_cap + cme_bank_count) to a stable profile name. No new hardware
+required; profiles are purely a naming convention over what is already
+discoverable. Gives certification bodies a stable target and lets firmware
+advertise a single profile identifier.
+
+**Open questions:** Who governs the profile namespace? Can profiles compose
+(e.g., "Minimal RT + Vault")? Resolve these before writing the appendix.
+
+**Note:** E7 (Minimal Embedded Profile from future-directions §7) is subsumed
+by this item — it becomes one row in the profiles table.
+
+---
+
+### E2 · CLIC Integration
+
+**Affects:** New section in ch05 (Linux Kernel Integration) or a new
+ch18; no new instructions required.
+
+The CE model already supports assigning interrupt handlers their own ECIDs,
+Banks, and cache partitions — an ISR is just another EC. What is missing is a
+normative description of how to configure this: assign a dedicated ECID to the
+ISR vector at boot, configure CLIC to trigger a Bank swap on interrupt entry and
+exit, and ensure the ISR's CPE partition is separate from the preempted task's
+partition. Critical for the hard-RT market where interrupt latency guarantees are
+only meaningful if the ISR has its own CE resources.
+
+**Depends on:** No blocking dependencies. Can be written now.
+
+---
+
+### E3 · Dirty / Lazy Tracking for Banks
+
+**Affects:** ch03 (`ec.ib` definition); ch00 §0.5 (EC[e] layout — one dirty
+bit per register group); possibly charter §3.2 if the EC[e] struct changes.
+
+Add a dirty-bit per register group to EC[e]. Semantics: if rs1 = 0 on `ec.ib`,
+hardware uses the dirty bitmap in place of an explicit mask, saving only groups
+written since the last `ec.ib` or `ec.ob`. Software may still pass an explicit
+non-zero mask to override. The FPU dirty-bit pattern used by Linux FP context
+switch is the direct analogue. Reduces interrupt handler switch cost
+substantially for contexts that never touch FPRs or vectors.
+
+**Depends on:** No blocking dependencies.
+
+---
+
+### E4 · Bank Exhaustion Protocol
+
+**Affects:** ch03 (`ec.ig` and `ec.ob` — add a normative recovery subsection);
+ch15 (CME_ERR_NO_BANK already defined — add cross-reference).
+
+Define the normative software recovery protocol when `ec.ig` or `ec.ob` returns
+`CME_ERR_NO_BANK`: software selects a victim Bank, calls `ec.im` to spill it to
+the victim ECID's ECS in RAM, then retries the original instruction. Leaving this
+implicit means every implementer invents a different protocol, and OS code
+written for one implementation silently breaks on another.
+
+**Depends on:** No blocking dependencies. CME_ERR_NO_BANK already exists in
+ch15; this item adds the protocol description to ch03.
+
+---
+
+### E5 · Nested Virtualization CSRs
+
+**Affects:** ch13 (two new RO CSRs: `current_ecid_level` and
+`current_ecid_parent`); ch14 (privilege access rules for the new CSRs).
+
+Add two read-only per-hart CSRs that expose the running ECID's delegation level
+and parent ECID directly, without requiring a full EC[e] table lookup. Hardware
+already holds both values in EC[e].delegation_L and EC[e].parent_ecid. Exposing
+them as CSRs costs one address each in the RO custom range. A nested hypervisor
+deciding whether it can delegate to a guest needs this on every scheduling
+decision; an EC table read for each is unnecessarily expensive.
+
+**Provisional addresses:** Two slots in 0xFC0–0xFCF range (currently 4 slots
+remain unassigned in that range per ch13 §1).
+
+**Depends on:** No blocking dependencies.
+
+---
+
+### E6 · Power Gating Integration
+
+**Affects:** ch04 §8 (or a new §9); alternatively a normative note in ch17
+alongside the migration sequence.
+
+Define the normative protocol for hart power gating when CE Banks are resident:
+before the power management firmware gates a hart's SRAM, it must call `ec.im`
+for every Bank resident on that hart. On wake, `ec.om` fills Banks before the
+first context runs. Without this, power-gating firmware has no architectural
+guidance and can silently corrupt Bank state. The instructions already exist;
+this item only adds the protocol specification and the "must" language.
+
+**Depends on:** No blocking dependencies.
+
+---
+
+### E7 · SCHED_DEADLINE / MSE Integration
+
+**Affects:** ch05 (Linux Kernel Integration) — one new informative section.
+
+Add a section describing how Linux SCHED_DEADLINE's runtime/period parameters
+map onto MSE Contract bandwidth and latency classes: when a SCHED_DEADLINE task
+is admitted, the kernel calls `ms.ir` to allocate a matching MSE Contract; if
+Contract admission fails (hardware reports insufficient bandwidth), task
+admission fails. Closes the loop between the POSIX RT scheduling API and
+hardware-enforced memory bandwidth reservation. No new instructions or CSRs;
+this is informative guidance for OS integrators.
+
+**Depends on:** No blocking dependencies.
+
+---
+
+### E8 · Return values for `ec.ib` and `ec.oe`
+
+**Affects:** Charter §6.5 (`ec.oe`) and §6.6 (`ec.ib`) — charter revision
+required first. Then ch03 (instruction operand tables and descriptions).
+
+Add meaningful `rd` return values to the two instructions currently defined as
+having no `rd`. Using rd = x0 (the RISC-V discard register) makes this
+zero-cost in the encoding:
+
+- `ec.ib rd, rs1` — rd returns the bank slot index (or a generation token) into
+  which the context was saved. Currently a hypervisor that needs to know which
+  bank holds a saved guest must do a follow-on CSR read.
+- `ec.oe rd, rs1` — rd returns a count of resources freed (ECIDs reclaimed,
+  Banks released, Contracts dissolved). Useful for capacity accounting without
+  polling separate CSRs.
+
+The original reasoning for no-rd ("always-succeed instructions don't need error
+reporting") was correct but narrow — it excluded the success-path information
+case. rd = x0 already provides the discard path for callers that don't need the
+result.
+
+**Depends on:** Charter revision session must precede chapter work. This is a
+two-session item: (1) charter revision bumping to v0.14, (2) propagation to ch03.
+
+---
+
+## Enhancement priority order
+
+These are independent and can be done in any order, with one exception:
+
+1. **E8** — requires charter revision first (two sessions). Do this early so
+   ch03 is stable before any downstream work.
+2. **E4** — small and unblocking; do early to close a real spec gap.
+3. **E5** — small; two CSRs; can be combined with E8's ch13 propagation pass.
+4. **E6** — small normative note; can be combined with a ch04 or ch17 session.
+5. **E3** — small; touches ch03 and ch00; do after E8 if ch03 is being revised.
+6. **E1** — new appendix; self-contained; do once baseline enhancements are stable.
+7. **E2** — new chapter or section; self-contained; substantial but straightforward.
+8. **E7** — informative only; can be done any time.
+
+---
+
 *End of Work Items.*

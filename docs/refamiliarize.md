@@ -119,22 +119,27 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
-P1–P4 are resolved. The remaining active P-series items are:
+P1–P7 are resolved. P8 (Sail formal model) is deferred. Eight enhancement
+items (E1–E8) have been added based on a review of `docs/future-directions.md`:
 
-- **P5** — Memory ordering (independent; any time)
-- **P6** — Opcode/name allocation (process item; engage RISC-V International)
-- **P7** — AsciiDoc conversion (mechanical; do last)
-- **P8** — Sail formal model (large separate project; deferred)
+- **E1** — Capability Profiles (new appendix)
+- **E2** — CLIC Integration (new section or chapter)
+- **E3** — Dirty/Lazy Bank Tracking (ch03, ch00)
+- **E4** — Bank Exhaustion Protocol (ch03)
+- **E5** — Nested Virtualization CSRs (ch13, ch14)
+- **E6** — Power Gating Integration (ch04 or ch17)
+- **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative)
+- **E8** — Return values for `ec.ib` and `ec.oe` (charter revision first, then ch03)
 
 ### A.6 What's *next* (the suggested work order)
 
-P1 (CSR chapter, ch13), P2 (privilege model, ch14), P3 (trap table, ch15),
-and P4 (discovery mechanism, ch16) are all done. The next authoring item is:
+P1–P7 are done. The active authoring work is the E-series enhancements.
+Suggested order (see work-items.md for rationale):
 
-P5 is done (ch17). The remaining authoring items are:
-
-**P6–P8 — Process and mechanical items** (P6: opcode allocation via RISC-V
-International; P7: AsciiDoc conversion; P8: Sail formal model — large effort).
+**E8 first** — requires a charter revision session (v0.14); do this before
+other ch03 work so the instruction tables are stable. **E4 and E5** are small
+and can follow immediately. **E3 and E6** touch ch00/ch04 and are also small.
+**E1, E2, E7** are self-contained and can be done in any order afterward.
 
 ### A.7 Where things live
 
