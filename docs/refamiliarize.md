@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 + E3 + E1 + E2 done; E7 next)
+### A.3 Chapter status (as of v0.14 of the charter; E1–E8 all done)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -58,7 +58,7 @@ ownership layer that ties the other four together.
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added; E3: `ec.ib` dirty-save mode (rs1=x0) and `ec.ob` bitmap clearing added |
 | **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added; E4 ec.im bank-free wording corrected; E6: §4.14 normative power-gating protocol added |
-| **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
+| **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions; E7: §5.7 SCHED_DEADLINE/MSE integration added (informative) |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
 | **Chapter 7** (CPE Instruction Set Reference) | Done | F1 complete redesign; ECID-first, D1/D3/F8 applied |
 | **Chapter 8** (CPE Usage Examples) | Done | cpe_caps informative caveat noted |
@@ -133,7 +133,7 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 - **E4** — Bank Exhaustion Protocol (ch03) ✓ done
 - **E5** — Nested Virtualization CSRs (ch13, ch14) ✓ done
 - **E6** — Power Gating Integration (ch04 or ch17) ✓ done
-- **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative)
+- **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative) ✓ done
 - **E8** — Return values for `ec.ib` and `ec.oe` ✓ fully done (charter v0.14 + ch03 + full sweep of all chapters and reference files)
 
 ### A.6 What's *next* (the suggested work order)
@@ -174,7 +174,13 @@ pattern with dedicated ECID, Bank, and CPE partition per ISR vector; boot-time a
 sequence; M-mode prologue/epilogue with `mscratch`-based preempted-ECID preservation;
 dirty-save optimization; nested interrupt handling; bank provisioning guidance; timing table.
 
-**Next: E7** — SCHED_DEADLINE / MSE Integration (informative, one new section in ch05).
+~~**E7**~~ fully done ✓ — ch05 §5.7 "SCHED_DEADLINE and MSE Integration (Informative)" added: two-phase
+admission control (`runtime/period` CPU feasibility then `ms.ir` DRAM bandwidth); `bw_class`/`lat_class`
+mapping from task parameters; `ec.ob` self-manages Contract across context switches; cgroup bandwidth
+caps via parent ECID `bw_cap`; CPE + MSE combination for end-to-end provable WCET.
+
+**All E-series enhancements (E1–E8) are now complete.** The active work remaining is P6 (opcode/name
+allocation with RISC-V International), P7 (AsciiDoc conversion), and P8 (Sail formal model).
 
 ### A.7 Where things live
 

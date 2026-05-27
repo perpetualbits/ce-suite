@@ -160,7 +160,8 @@ resources to the parent Contract; all assigned banks are freed.
 
 Linux's real-time scheduling classes (SCHED_DEADLINE, SCHED_FIFO) map onto MSE
 Contracts. The kernel allocates a Contract representing a bandwidth/latency
-budget and binds it to the task's ECID at task-creation time:
+budget and binds it to the task's ECID at task-creation time. See §5.7 for
+the detailed SCHED_DEADLINE integration pattern.
 
 ```
 ms.ir  rd, rs1, rs2   # assign MSE Contract to ECID rs1; rs2 = descriptor; rd = 0 or error
@@ -237,6 +238,162 @@ Linux must handle three CE availability modes gracefully:
 Linux should expose these three states via a kernel config option
 (`CONFIG_RISCV_CE`) and a boot parameter (`riscv_ce=off`) for isolation
 during debugging.
+
+---
+
+## 5.7 SCHED_DEADLINE and MSE Integration (Informative)
+
+> **This section is informative.** It describes a recommended integration
+> pattern for Linux OS implementors, not a normative architectural requirement.
+> CE implementations and Linux kernels that omit this integration are fully
+> conforming.
+
+### 5.7.1 Background
+
+Linux `SCHED_DEADLINE` implements the Constant Bandwidth Server (CBS) model.
+Each real-time task declares a `runtime` (Cᵢ, microseconds) and a `period`
+(Tᵢ, microseconds). The scheduler admits the task only if total CPU utilization
+remains feasible:
+
+```
+Σᵢ (Cᵢ / Tᵢ) ≤ U_cpu
+```
+
+If the check fails, `sched_setattr(2)` returns `EBUSY`. This guarantees that no
+admitted task misses its CPU-time deadline due to over-commitment.
+
+CPU-time feasibility alone is not sufficient for hard real-time workloads. A
+task may stay within its runtime budget yet exceed its Worst-Case Execution Time
+if it competes for DRAM bandwidth with uncontrolled best-effort traffic. MSE
+provides the second dimension of admission control.
+
+### 5.7.2 Mapping Task Parameters to MSE Contract Fields
+
+Each MSE Contract carries two 4-bit fields (Chapter 9, §9.4.1):
+
+- **`bw_class`** — guaranteed minimum CN-slot count per window; maps from the
+  task's declared peak DRAM bandwidth requirement.
+- **`lat_class`** — latency priority within CN slot arbitration; maps from the
+  task's deadline urgency (lower value = higher priority; 0 = best-effort only).
+
+The kernel derives these from the task's `SCHED_DEADLINE` parameters and an
+optional per-task memory bandwidth annotation:
+
+| Input | MSE mapping |
+|---|---|
+| Peak DRAM bandwidth (fraction of total bus) | `bw_class`: `ceil(fraction × 15)` |
+| Deadline period (Tᵢ) | `lat_class`: shorter period → lower value → higher priority |
+
+**Example.** On a system with `mse_slot_ns` = 100 ns and maximum DRAM bandwidth
+20 GB/s:
+
+- Task A: 2 ms period, 2 GB/s peak → `lat_class` = 1, `bw_class` = 2
+- Task B: 8 ms period, 1 GB/s peak → `lat_class` = 3, `bw_class` = 1
+
+A task that declares no memory bandwidth requirement, or that belongs to
+`SCHED_OTHER`, gets `bw_class` = 0 (best-effort, competes in BE slots only).
+
+### 5.7.3 Admission at `sched_setattr()`
+
+When the kernel processes `sched_setattr(2)` for a `SCHED_DEADLINE` task with
+a memory bandwidth annotation, it performs two admission checks in order:
+
+```c
+/* Step 1: CPU feasibility (existing SCHED_DEADLINE logic). */
+if (sum_utilization + runtime / period > U_cpu)
+    return -EBUSY;
+
+/* Step 2: DRAM bandwidth admission (CE-specific). */
+contract_params = encode_mse_params(bw_class, lat_class);
+```
+
+```asm
+    ms.ir  a0, task_ecid, contract_params   # attempt Contract assignment
+    bnez   a0, admission_fail               # non-zero rd → admission refused
+```
+
+```c
+admission_fail:
+    return -EBUSY;  /* MSE_ERR_SYSTEM_FULL or MSE_ERR_CAP_EXCEEDED */
+```
+
+`ms.ir` returns 0 on success, or a non-zero error code in `rd` (Chapter 9,
+§9.10). Two failure codes are relevant at admission time:
+
+| Error code | Value | Meaning | Kernel response |
+|---|---|---|---|
+| `MSE_ERR_CAP_EXCEEDED` | 3 | Parent cgroup bandwidth cap would be exceeded | `EBUSY` |
+| `MSE_ERR_SYSTEM_FULL` | 4 | Global CN budget exhausted | `EBUSY` |
+
+The CPU check runs first because it is a pure arithmetic comparison; `ms.ir`
+involves a hardware state change and is attempted only after the CPU check passes.
+If `ms.ir` fails, no Contract state is modified (Chapter 9, §9.7.3).
+
+### 5.7.4 Context Switch and Task Lifecycle
+
+Once admitted, the MSE Contract is self-managing across context switches:
+
+```
+sched_setattr()        → ms.ir assigns bw_class / lat_class to the task's ECID
+Context switch in      → ec.ob loads bw_class / lat_class into per-hart memory
+                         controller registers (Chapter 9, §9.9); no additional
+                         MSE instruction needed
+Context switch out     → ec.ib saves bank state; memory controller adopts the
+                         next task's class values on its ec.ob
+SCHED_DEADLINE → other → ms.or revokes the Contract explicitly before demotion
+Task teardown          → ec.oe dissolves the Contract atomically
+```
+
+`ec.ob` loads the incoming task's full bank state, which includes the `bw_class`
+and `lat_class` fields in the CP slot (Chapter 0, §0.6). The memory controller
+adopts the new classes at the next CN slot boundary — no per-context-switch MSE
+instruction is required in the scheduler hot path.
+
+### 5.7.5 Cgroup Memory Bandwidth Caps
+
+MSE Contracts compose naturally with Linux cgroups (Chapter 9, §9.4.2). A cgroup
+is represented by a parent ECID with a group bandwidth cap set at cgroup creation
+time. When a task inside the cgroup calls `sched_setattr()`, `ms.ir` enforces:
+
+```
+bw_class_task + Σ bw_class(existing Contract holders in cgroup) ≤ bw_cap(cgroup_ecid)
+```
+
+This prevents a single container from claiming more DRAM bandwidth than its
+cgroup budget allows, even when the global CN budget has headroom.
+`MSE_ERR_CAP_EXCEEDED` (3) is the error code for this case.
+
+The kernel sets `bw_cap(cgroup_ecid)` via `ms.ir` on the cgroup's own ECID at
+cgroup creation time, distributing bandwidth top-down from the system root
+Contract through the cgroup hierarchy.
+
+### 5.7.6 Combined CPE and MSE for End-to-End WCET
+
+SCHED_DEADLINE tasks that also hold CPE cache partitions (Chapter 7) achieve
+end-to-end provable latency bounds:
+
+- **CPE** ensures the task's working set is not evicted from L1/L2. Cache hits
+  have bounded latency independent of DRAM state.
+- **MSE** bounds the latency of cache misses to `(K + 1) × slot_size` (Chapter 9,
+  §9.3).
+
+A real-time analysis tool can compute a tight WCET without pessimistic
+assumptions about cache-vs-DRAM interference: cache hits are bounded by CPE,
+and cache misses are bounded by MSE. The typical kernel setup for a fully
+bounded task:
+
+```asm
+    # 1. ECID already allocated at task creation.
+
+    # 2. Assign cache partition (CPE).
+    cp.ir  x0, task_ecid, cache_descriptor
+
+    # 3. Assign DRAM bandwidth Contract (MSE).
+    ms.ir  a0, task_ecid, memory_contract_params
+    bnez   a0, admission_fail   # refuse sched_setattr() if capacity is full
+
+    # 4. Admit to SCHED_DEADLINE (CPU feasibility already verified).
+```
 
 ---
 

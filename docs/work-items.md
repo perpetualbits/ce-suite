@@ -601,19 +601,32 @@ and §17.3.2.
 
 ---
 
-### E7 · SCHED_DEADLINE / MSE Integration
+### E7 · SCHED_DEADLINE / MSE Integration ✓ RESOLVED
 
-**Affects:** ch05 (Linux Kernel Integration) — one new informative section.
+**Affects:** ch05 (Linux Kernel Integration) — new §5.7 (informative).
 
-Add a section describing how Linux SCHED_DEADLINE's runtime/period parameters
-map onto MSE Contract bandwidth and latency classes: when a SCHED_DEADLINE task
-is admitted, the kernel calls `ms.ir` to allocate a matching MSE Contract; if
-Contract admission fails (hardware reports insufficient bandwidth), task
-admission fails. Closes the loop between the POSIX RT scheduling API and
-hardware-enforced memory bandwidth reservation. No new instructions or CSRs;
-this is informative guidance for OS integrators.
+**Decision:** §5.7 "SCHED_DEADLINE and MSE Integration (Informative)" added to
+ch05 with six subsections:
 
-**Depends on:** No blocking dependencies.
+- §5.7.1 — Background: CBS model and CPU feasibility; why CPU admission alone
+  is insufficient for hard RT.
+- §5.7.2 — Mapping `runtime`/`period` and peak DRAM bandwidth to `bw_class`
+  and `lat_class`.
+- §5.7.3 — Two-phase admission at `sched_setattr()`: CPU feasibility first,
+  then `ms.ir`; `MSE_ERR_SYSTEM_FULL` (4) or `MSE_ERR_CAP_EXCEEDED` (3) maps
+  to `EBUSY`.
+- §5.7.4 — Task lifecycle: `ec.ob` self-manages bw_class/lat_class across
+  context switches; no per-switch MSE instruction needed; `ms.or` on demotion,
+  `ec.oe` on teardown.
+- §5.7.5 — Cgroup bandwidth caps: parent ECID's `bw_cap` enforces per-cgroup
+  memory bandwidth limits.
+- §5.7.6 — CPE + MSE combination for end-to-end provable WCET.
+
+No new instructions, CSRs, or charter changes. §5.4.1 updated with a forward
+reference to §5.7.
+
+**Propagated to:** ch05 §5.4.1 (forward reference added); ch05 §5.7 (new
+section); adoc/chapters/ch05-linux-integration.adoc (mirrored).
 
 ---
 
@@ -646,7 +659,7 @@ These are independent and can be done in any order, with one exception:
 5. ~~**E3**~~ — fully resolved ✓ (dirty-group bitmap in ch00 §0.3; `ec.ib` dirty-save mode and `ec.ob` bitmap clearing in ch03 §3.1).
 6. ~~**E1**~~ — fully resolved ✓ (Appendix B: four standard profiles CE-Embedded/MinimalRT/RT/Full; ch16 §3.1 + §7 updated).
 7. ~~**E2**~~ — fully resolved ✓ (ch18: CLIC Interrupt Integration — interrupt-EC pattern, boot allocation, M-mode prologue/epilogue, CPE isolation, MSE reservation, nested interrupts, bank provisioning).
-8. **E7** — informative only; can be done any time.
+8. ~~**E7**~~ — fully resolved ✓ (ch05 §5.7: SCHED_DEADLINE admission integrates `ms.ir`; two-phase check; cgroup caps; CPE+MSE WCET).
 
 ---
 
