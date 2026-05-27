@@ -18,6 +18,11 @@
 PYTHON  := python3
 MD2ADOC := tools/md2adoc.py
 
+# Find asciidoctor in PATH or in the user gem bin directory (gem install --user)
+_GEM_BIN        := $(shell ruby -e 'require "rubygems"; puts Gem.user_dir' 2>/dev/null)/bin
+ASCIIDOCTOR     := $(firstword $(shell command -v asciidoctor 2>/dev/null) $(_GEM_BIN)/asciidoctor)
+ASCIIDOCTOR_PDF := $(firstword $(shell command -v asciidoctor-pdf 2>/dev/null) $(_GEM_BIN)/asciidoctor-pdf)
+
 MD_CHAPTER_SRCS    := $(wildcard docs/chapters/*.md)
 MD_REFERENCE_SRCS  := $(wildcard docs/reference/*.md)
 MD_SUBMISSION_SRCS := $(wildcard docs/submission/*.md)
@@ -44,16 +49,16 @@ docs/adoc/submission/%.adoc: docs/submission/%.md
 	$(PYTHON) $(MD2ADOC) $< $@
 
 html: adoc
-	@command -v asciidoctor >/dev/null 2>&1 || \
+	@test -x "$(ASCIIDOCTOR)" || \
 	  { echo "ERROR: asciidoctor not found. Install with: gem install asciidoctor rouge"; exit 1; }
 	mkdir -p build
-	asciidoctor -D build/ docs/adoc/index.adoc
+	$(ASCIIDOCTOR) -D build/ docs/adoc/index.adoc
 
 pdf: adoc
-	@command -v asciidoctor-pdf >/dev/null 2>&1 || \
+	@test -x "$(ASCIIDOCTOR_PDF)" || \
 	  { echo "ERROR: asciidoctor-pdf not found. Install with: gem install asciidoctor-pdf"; exit 1; }
 	mkdir -p build
-	asciidoctor-pdf -D build/ docs/adoc/index.adoc
+	$(ASCIIDOCTOR_PDF) -D build/ docs/adoc/index.adoc
 
 check:
 	@stale=0; \
