@@ -20,7 +20,7 @@ in Chapter 7.
 in `rd`. In examples below, `x0` is used for `rd` to discard the result
 where the fast path is expected to succeed.
 * Inline descriptors are XLEN-wide values with bit `[XLEN-1]` =
-0. The pointer form (bit `[XLEN-1]` = 1) is used in examples
+0; the pointer form (bit `[XLEN-1]` = 1) is used in examples
 that need more than 8 ways per level; the struct fields are defined in
 Chapter 7 §7.4 and §7.5.
 * `cpe_caps` field positions used below are *informative*, not yet
@@ -146,7 +146,7 @@ ____
 [source,asm]
 ----
     # Switch from best-effort task to real-time task.
-    ec.ib  x0, FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK          # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; CPE partition restored automatically
 ----
 
@@ -250,7 +250,7 @@ needed.
 
 [source,asm]
 ----
-    ec.oe  x0, rt_ecid               # forced destroy; CPE revoke is implicit
+    ec.oe  x0, rt_ecid           # forced destroy; CPE revoke is implicit
     # Ways are returned to rt_ecid's parent's allocation automatically.
 ----
 

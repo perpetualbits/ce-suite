@@ -127,7 +127,7 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 P1–P7 are resolved. P8 (Sail formal model) is deferred. All E-series (E1–E8) done.
 One new item found during P7 adoc verification:
 
-- **F11** — ch08 `0.` line-wrap artifact — **open** (next session)
+- **F11** — ch08 `0.` line-wrap artifact — **done** ✓
 
 E-series all done:
 
@@ -142,14 +142,10 @@ E-series all done:
 
 ### A.6 What's *next* (the suggested work order)
 
-**F11** — ch08 Markdown line-wrap fix — is the first open item. One sentence
-in `docs/chapters/ch08-cpe-usage-examples.md` §8.1 wraps so that `0.` falls at
-the start of a line inside a bullet point, which asciidoctor misreads as an
-ordered-list item (warning found during P7 `make html`). Fix: rewrite
-`bit \`[XLEN-1]\` =\n0. The pointer form` as `bit \`[XLEN-1]\` = 0; the pointer
-form`. Then `make adoc` to regenerate the adoc, commit, done.
+~~**F11**~~ — ch08 Markdown line-wrap fix — **done ✓**. Changed `= 0. The pointer form`
+to `= 0; the pointer form` in §8.1; `make adoc` regenerated cleanly.
 
-P7 done ✓. P1–P7 all done. E-series all done. History follows.
+P7 done ✓. P1–P7 all done. E-series all done. F11 done ✓. History follows.
 
 ~~**E8**~~ fully done ✓. ~~**E4**~~ fully done ✓ — normative Bank Exhaustion
 Protocol added to ch03 §3.1 (`ec.ob`) and §3.3 (`ec.ig`); ch15 `ec.ob` error

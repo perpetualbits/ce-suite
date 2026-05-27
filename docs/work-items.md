@@ -181,7 +181,7 @@ items tracked in work-items.md.
 
 ---
 
-### F11 · ch08 Markdown line-wrap produces spurious `0.` list item in adoc
+### ~~F11~~ · ch08 Markdown line-wrap produces spurious `0.` list item in adoc — DONE
 
 **Affects:** `docs/chapters/ch08-cpe-usage-examples.md`, §8.1 "All examples assume" bullet.
 
@@ -192,9 +192,8 @@ items tracked in work-items.md.
 `0.` falls at the start of a new line inside a bullet point. AsciiDoc interprets this
 as an ordered list item starting at 0 (which it does not support).
 
-**Fix:** Rewrite the sentence so `0.` is not at a line start. One option:
-change `= \n0. The pointer form` to `= 0; the pointer form`. Then run `make adoc`
-to regenerate `ch08-cpe-usage-examples.adoc`.
+**Fix applied:** Changed `= 0. The pointer form` to `= 0; the pointer form` in
+`ch08-cpe-usage-examples.md` §8.1; `make adoc` regenerated the adoc cleanly.
 
 ---
 
@@ -258,7 +257,7 @@ an illegal-instruction trap); silent ignore prohibited.
 15. ~~**G1** (diagrams)~~ — **DONE**.
 16. ~~**F8** (binary encoding)~~ — **DONE**.
 17. ~~**G3** (RV32 width audit)~~ — **DONE**.
-18. **F11** (ch08 `0.` line-wrap artifact from P7 adoc verification) — **open**.
+18. ~~**F11** (ch08 `0.` line-wrap artifact from P7 adoc verification)~~ — **DONE**.
 
 ---
 

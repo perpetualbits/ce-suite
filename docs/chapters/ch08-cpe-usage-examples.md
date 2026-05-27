@@ -18,7 +18,7 @@ All examples assume:
 - Instructions that can fail write 0 (success) or a non-zero error code in `rd`.
   In examples below, `x0` is used for `rd` to discard the result where the fast
   path is expected to succeed.
-- Inline descriptors are XLEN-wide values with bit `[XLEN-1]` = 0. The pointer
+- Inline descriptors are XLEN-wide values with bit `[XLEN-1]` = 0; the pointer
   form (bit `[XLEN-1]` = 1) is used in examples that need more than 8 ways per
   level; the struct fields are defined in Chapter 7 §7.4 and §7.5.
 - `cpe_caps` field positions used below are **informative**, not yet normative
