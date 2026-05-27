@@ -448,20 +448,46 @@ by this item — it appears as the `CE-Embedded` profile in Appendix B §B.3.1.
 
 ---
 
-### E2 · CLIC Integration
+### E2 · CLIC Integration ✓ RESOLVED
 
-**Affects:** New section in ch05 (Linux Kernel Integration) or a new
-ch18; no new instructions required.
+**Affects:** New ch18 (Chapter 18 — CLIC Interrupt Integration).
 
-The CE model already supports assigning interrupt handlers their own ECIDs,
-Banks, and cache partitions — an ISR is just another EC. What is missing is a
-normative description of how to configure this: assign a dedicated ECID to the
-ISR vector at boot, configure CLIC to trigger a Bank swap on interrupt entry and
-exit, and ensure the ISR's CPE partition is separate from the preempted task's
-partition. Critical for the hard-RT market where interrupt latency guarantees are
-only meaningful if the ISR has its own CE resources.
+**Decision:** Standalone ch18 (not a section in ch05), because the content is
+cross-OS (bare-metal, RTOS, Linux, KVM) and not Linux-specific, and the scope
+— boot allocation, prologue/epilogue sequences, CPE isolation, MSE reservation,
+nested interrupts, bank provisioning, timing — is too broad for a single section.
 
-**Depends on:** No blocking dependencies. Can be written now.
+**Content added:**
+
+- §18.1 — Problem statement: shared CE resources under preemption (register
+  corruption, CPE isolation failure).
+- §18.2 — Interrupt-EC pattern: dedicated ECID + Bank + CPE partition per ISR
+  vector; permanent lifetime (not per-invocation).
+- §18.3 — Boot-time allocation: `ec.ir` (leaf ECID), `cp.ir` (dedicated CPE
+  partition), `ms.ir` (optional MSE Contract), `ec.om` (zero-initialize Bank).
+- §18.4 — Interrupt entry and exit: M-mode prologue/epilogue using `mscratch`
+  to preserve the preempted ECID across the `ec.ib`/`ec.ob` bank swap.
+  §18.4.2: dirty-save optimization (`ec.ib x0, x0`) for GPR-only ISRs.
+- §18.5 — CPE cache-partition isolation: L1/L2 controller switches partition on
+  `ec.ob`; task hot lines undisturbed; independent WCET analysis.
+- §18.6 — MSE memory reservation (optional): ISR Contract for bounded DRAM
+  latency; omit for cache-resident interrupt handlers.
+- §18.7 — Nested interrupts: one ECID per priority level; prologue/epilogue
+  handles nesting without modification; nesting depth bounded by CLIC priority
+  levels, not CE delegation depth D.
+- §18.8 — Bank provisioning: provisioning rule = runnable ECIDs + ISR ECIDs;
+  CME_ERR_NO_BANK recovery per ch03/ch15.
+- §18.9 — Timing: 2–18 cycles per direction (fast path); dirty-save reduces to
+  2–12 cycles; comparison to software save/restore (128+ cycles).
+- §18.10 — Other operating environments: M-mode/S-mode/VS-mode variations;
+  `mscratch`/`sscratch`/`vsscratch`; Linux IRQ trampoline pattern.
+- §18.11 — Relationship to other chapters (ch03, ch04, ch07, ch09, ch13, ch14, ch15).
+
+**No new instructions, CSRs, or charter changes required.**
+
+**Propagated to:** ch18 (new file); ch17 footer updated to point to ch18;
+refamiliarize.md chapter table and E2 status updated; work-items.md priority
+order updated.
 
 ---
 
@@ -619,7 +645,7 @@ These are independent and can be done in any order, with one exception:
 4. ~~**E6**~~ — fully resolved ✓ (ch04 §4.14: normative power-gating protocol — spill all Banks via `ec.im` before gating, fill via `ec.om` on wake).
 5. ~~**E3**~~ — fully resolved ✓ (dirty-group bitmap in ch00 §0.3; `ec.ib` dirty-save mode and `ec.ob` bitmap clearing in ch03 §3.1).
 6. ~~**E1**~~ — fully resolved ✓ (Appendix B: four standard profiles CE-Embedded/MinimalRT/RT/Full; ch16 §3.1 + §7 updated).
-7. **E2** — new chapter or section; self-contained; substantial but straightforward.
+7. ~~**E2**~~ — fully resolved ✓ (ch18: CLIC Interrupt Integration — interrupt-EC pattern, boot allocation, M-mode prologue/epilogue, CPE isolation, MSE reservation, nested interrupts, bank provisioning).
 8. **E7** — informative only; can be done any time.
 
 ---

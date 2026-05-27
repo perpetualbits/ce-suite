@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 + E3 + E1 done; E2 or E7 next)
+### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 + E3 + E1 + E2 done; E7 next)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -72,6 +72,7 @@ ownership layer that ties the other four together.
 | **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4: ec.ob CME_ERR_NO_BANK corrected + cross-ref |
 | **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos; E1: §3.1 + §7 cross-reference to Appendix B |
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
+| **Chapter 18** (CLIC Interrupt Integration) | Done | E2: interrupt-EC pattern; boot allocation; M-mode prologue/epilogue; CPE partition isolation; nested interrupts; bank provisioning |
 | **Appendix B** (Capability Profiles) | Done | E1: four standard profiles (CE-Embedded/MinimalRT/RT/Full); naming convention over ce_present + cme_del_cap + cme_bank_count |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
@@ -127,7 +128,7 @@ P1–P7 are resolved. P8 (Sail formal model) is deferred. Eight enhancement
 items (E1–E8) have been added based on a review of `docs/future-directions.md`:
 
 - **E1** — Capability Profiles (new appendix) ✓ done
-- **E2** — CLIC Integration (new section or chapter)
+- **E2** — CLIC Integration (ch18) ✓ done
 - **E3** — Dirty/Lazy Bank Tracking (ch03, ch00) ✓ done
 - **E4** — Bank Exhaustion Protocol (ch03) ✓ done
 - **E5** — Nested Virtualization CSRs (ch13, ch14) ✓ done
@@ -168,8 +169,12 @@ restored groups.
 `cme_del_cap`, and `cme_bank_count`. No new hardware. Ch16 §3.1 and §7 updated with
 cross-references.
 
-**Next: E2** — CLIC Integration (new section in ch05 or new ch18). **E7** can be
-done in any order afterward.
+~~**E2**~~ fully done ✓ — ch18 (Chapter 18 — CLIC Interrupt Integration) added: interrupt-EC
+pattern with dedicated ECID, Bank, and CPE partition per ISR vector; boot-time allocation
+sequence; M-mode prologue/epilogue with `mscratch`-based preempted-ECID preservation;
+dirty-save optimization; nested interrupt handling; bank provisioning guidance; timing table.
+
+**Next: E7** — SCHED_DEADLINE / MSE Integration (informative, one new section in ch05).
 
 ### A.7 Where things live
 

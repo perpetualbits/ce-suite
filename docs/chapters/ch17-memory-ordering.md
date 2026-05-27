@@ -348,4 +348,4 @@ fence sequence in §17.5.
 
 ---
 
-[Next: Appendix A — ECID Radix-Tree Algorithms](appendix-a-ecid.md)
+[Next: Chapter 18 — CLIC Interrupt Integration](ch18-clic-integration.md)
