@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 + E3 done; E1 next)
+### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 + E3 + E1 done; E2 or E7 next)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -70,8 +70,9 @@ ownership layer that ties the other four together.
 | **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs (0x7C0–0x7CF, 0xFC0–0xFCF); E5: +2 CME RO CSRs at 0xFD1–0xFD2 (`current_ecid_level`, `current_ecid_parent`) |
 | **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); E5: S/HS/VS read access for new CSRs added |
 | **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4: ec.ob CME_ERR_NO_BANK corrected + cross-ref |
-| **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos |
+| **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos; E1: §3.1 + §7 cross-reference to Appendix B |
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
+| **Appendix B** (Capability Profiles) | Done | E1: four standard profiles (CE-Embedded/MinimalRT/RT/Full); naming convention over ce_present + cme_del_cap + cme_bank_count |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
 
@@ -125,7 +126,7 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 P1–P7 are resolved. P8 (Sail formal model) is deferred. Eight enhancement
 items (E1–E8) have been added based on a review of `docs/future-directions.md`:
 
-- **E1** — Capability Profiles (new appendix)
+- **E1** — Capability Profiles (new appendix) ✓ done
 - **E2** — CLIC Integration (new section or chapter)
 - **E3** — Dirty/Lazy Bank Tracking (ch03, ch00) ✓ done
 - **E4** — Bank Exhaustion Protocol (ch03) ✓ done
@@ -162,8 +163,13 @@ ch03 §3.1 `ec.ib` updated: rs1=x0 encoding activates dirty-save mode; new
 register-field disambiguation. `ec.ob` side effects note bitmap clearing for all
 restored groups.
 
-**Next: E1** — Capability Profiles (new appendix). **E2, E7** are self-contained
-and can be done in any order afterward.
+~~**E1**~~ fully done ✓ — Appendix B added: four standard profiles (`CE-Embedded`,
+`CE-MinimalRT`, `CE-RT`, `CE-Full`) defined as a naming convention over `ce_present`,
+`cme_del_cap`, and `cme_bank_count`. No new hardware. Ch16 §3.1 and §7 updated with
+cross-references.
+
+**Next: E2** — CLIC Integration (new section in ch05 or new ch18). **E7** can be
+done in any order afterward.
 
 ### A.7 Where things live
 

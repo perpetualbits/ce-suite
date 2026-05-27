@@ -417,24 +417,34 @@ Source: `docs/future-directions.md` items §1, §2, §5, §6, §8, §13, §16, �
 
 ---
 
-### E1 · Capability Profiles
+### E1 · Capability Profiles ✓ RESOLVED
 
-**Affects:** New appendix (Appendix B); ch16 §2 (ISA string names); possibly a
-new CSR if a profile-ID field is warranted.
+**Affects:** New appendix (Appendix B); ch16 §3.1 + §7 (cross-reference added).
 
-Define named implementation profiles — e.g., "Minimal RT" (CME+CPE, D=1),
-"Full Virtualization" (all extensions, D=3), "Embedded" (CME only, D=0, no VMT)
-— as a documented mapping from existing discoverable parameters (ce_present bits
-+ cme_del_cap + cme_bank_count) to a stable profile name. No new hardware
-required; profiles are purely a naming convention over what is already
-discoverable. Gives certification bodies a stable target and lets firmware
-advertise a single profile identifier.
+**Decision:** Four standard profiles defined in a new Appendix B, as a naming
+convention over existing discoverable parameters (`ce_present`, `cme_del_cap`,
+`cme_bank_count`). No new hardware, no new CSR, no ISA string profile names.
 
-**Open questions:** Who governs the profile namespace? Can profiles compose
-(e.g., "Minimal RT + Vault")? Resolve these before writing the appendix.
+- **`CE-Embedded`** — CME only, D=0, NV≥1, VMT=0. Target: microcontrollers.
+- **`CE-MinimalRT`** — CME+CPE, D≥1, NV≥2. Target: embedded RTOS, industrial RT.
+- **`CE-RT`** — CME+CPE+MSE, D≥2, NV≥4. Target: mixed-criticality, embedded Linux+RT.
+- **`CE-Full`** — CME+CPE+MSE+QoS, D=3, NV≥8, VMT≥1. Target: cloud, server, ASIL-D.
+
+CE-Full ⊇ CE-RT ⊇ CE-MinimalRT (nested); CE-Embedded is an independent branch
+(D=0 and CPE=0 conflict with all others).
+
+**Open questions resolved:**
+- *Governance:* Profiles defined by the spec; vendor profiles use `V-<Vendor>-<Name>` prefix.
+- *Composition:* Deferred to a future version; not supported in v1.
+- *Profile-ID CSR:* Not introduced; profiles are purely naming over existing CSRs.
+- *ISA string names:* Not introduced; profiles advertised via `ce,profile` DT property.
+
+**Propagated to:** Appendix B (new file); ch16 §3.1 (capability profiles note added);
+ch16 §7 (Appendix B listed in "Where to go next"); adoc/chapters/appendix-b-profiles.adoc
+(new file); adoc/index.adoc (Appendix B include added).
 
 **Note:** E7 (Minimal Embedded Profile from future-directions §7) is subsumed
-by this item — it becomes one row in the profiles table.
+by this item — it appears as the `CE-Embedded` profile in Appendix B §B.3.1.
 
 ---
 
@@ -608,7 +618,7 @@ These are independent and can be done in any order, with one exception:
 3. ~~**E5**~~ — fully resolved ✓ (two new CSRs: `current_ecid_level` at 0xFD1, `current_ecid_parent` at 0xFD2; privilege rules added to ch14).
 4. ~~**E6**~~ — fully resolved ✓ (ch04 §4.14: normative power-gating protocol — spill all Banks via `ec.im` before gating, fill via `ec.om` on wake).
 5. ~~**E3**~~ — fully resolved ✓ (dirty-group bitmap in ch00 §0.3; `ec.ib` dirty-save mode and `ec.ob` bitmap clearing in ch03 §3.1).
-6. **E1** — new appendix; self-contained; do once baseline enhancements are stable. **START HERE.**
+6. ~~**E1**~~ — fully resolved ✓ (Appendix B: four standard profiles CE-Embedded/MinimalRT/RT/Full; ch16 §3.1 + §7 updated).
 7. **E2** — new chapter or section; self-contained; substantial but straightforward.
 8. **E7** — informative only; can be done any time.
 

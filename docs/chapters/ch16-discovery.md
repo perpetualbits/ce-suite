@@ -120,6 +120,14 @@ absent (`ce_present` bit = 0) returns 0. This is consistent with "not present":
 `qos_domain_count = 0` means no domains available; `cpe_caps = 0` means no cache
 partitioning capability; and so on.
 
+**Capability profiles.** After reading `ce_present` and the per-extension capability
+CSRs, software may optionally determine which named implementation profile the hart
+satisfies by consulting Appendix B (Capability Profiles). Profiles are a convenience
+naming layer — a stable mapping from the raw CSR values to named tiers such as
+`CE-Embedded`, `CE-MinimalRT`, `CE-RT`, and `CE-Full`. The raw CSR values are always
+authoritative; Appendix B provides the conformance-check criteria and the device-tree
+advertisement mechanism for profiles.
+
 ---
 
 ## 4. Software probe sequence
@@ -250,10 +258,11 @@ sequence is logically incorrect and should be guarded.
 **Chapter 15** (trap table) covers the illegal-instruction trap that `ce_present`
 access raises on CE-absent hardware (§15.2.1, universal trap conditions).
 
-**P5** (memory ordering) is independent of discovery and may be written in any
-session order.
+**Appendix B** (Capability Profiles) defines the named implementation profiles
+(`CE-Embedded`, `CE-MinimalRT`, `CE-RT`, `CE-Full`) as a convenience naming layer
+over the `ce_present` bits and capability CSR values established by this chapter.
 
-[Next: Chapter 17 — (P5) Memory Ordering Guarantees](ch17-memory-ordering.md)
+[Next: Chapter 17 — Memory Ordering Guarantees](ch17-memory-ordering.md)
 
 ---
 

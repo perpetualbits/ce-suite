@@ -58,3 +58,6 @@ include::chapters/ch17-memory-ordering.adoc[leveloffset=+0]
 
 [appendix]
 include::chapters/appendix-a-ecid.adoc[leveloffset=+0]
+
+[appendix]
+include::chapters/appendix-b-profiles.adoc[leveloffset=+0]
