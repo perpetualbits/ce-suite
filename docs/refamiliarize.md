@@ -45,7 +45,7 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 done; E3 next)
+### A.3 Chapter status (as of v0.14 of the charter; E8 + E4 + E5 + E6 + E3 done; E1 next)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
@@ -53,10 +53,10 @@ ownership layer that ties the other four together.
 | Chapter | State | Notes |
 |---|---|---|
 | **Charter** (Project Instructions) | v0.14 — current | D1–D4 locked; F1–F10, G1–G3 resolved; E8 chartered |
-| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13 |
+| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13; E3: §0.3 dirty-group tracking paragraph added |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
-| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added |
+| **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added; E3: `ec.ib` dirty-save mode (rs1=x0) and `ec.ob` bitmap clearing added |
 | **Chapter 4** (HW Microarchitecture) | Done | G3: RV32/RV64 NV timing rows added; E4 ec.im bank-free wording corrected; E6: §4.14 normative power-gating protocol added |
 | **Chapter 5** (Linux Kernel Integration) | Done | Pointer idioms framed as Linux conventions |
 | **Chapter 6** (CME Usage Examples) | Done | D1 syntax applied |
@@ -127,7 +127,7 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 
 - **E1** — Capability Profiles (new appendix)
 - **E2** — CLIC Integration (new section or chapter)
-- **E3** — Dirty/Lazy Bank Tracking (ch03, ch00)
+- **E3** — Dirty/Lazy Bank Tracking (ch03, ch00) ✓ done
 - **E4** — Bank Exhaustion Protocol (ch03) ✓ done
 - **E5** — Nested Virtualization CSRs (ch13, ch14) ✓ done
 - **E6** — Power Gating Integration (ch04 or ch17) ✓ done
@@ -153,9 +153,17 @@ resident Bank via `ec.im` before gating SRAM; fill via `ec.om` on wake before th
 first `ec.ob`; four normative invariants; memory-ordering cross-references to
 ch17 §17.3.1 and §17.3.2.
 
-**Next: E3** — dirty/lazy bank tracking; touches ch03 (`ec.ib` definition) and
-ch00 §0.5 (`EC[e]` layout). **E1, E2, E7** are self-contained and can be done
-in any order afterward.
+~~**E3**~~ fully done ✓ — ch00 §0.3 "Dirty-group tracking" paragraph added:
+one bit per register group (same positions as the register mask in §0.10);
+hardware sets bits on first write, `ec.ib` clears saved groups, `ec.ob` clears
+restored groups; bitmap stored in EC[e] impl-defined region or per-hart register.
+ch03 §3.1 `ec.ib` updated: rs1=x0 encoding activates dirty-save mode; new
+"#### Dirty-Save Mode" subsection with FPU analogy, code examples, and
+register-field disambiguation. `ec.ob` side effects note bitmap clearing for all
+restored groups.
+
+**Next: E1** — Capability Profiles (new appendix). **E2, E7** are self-contained
+and can be done in any order afterward.
 
 ### A.7 Where things live
 

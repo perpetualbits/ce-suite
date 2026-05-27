@@ -51,13 +51,50 @@ These instructions operate through SRAM-resident staging banks and constitute th
 
 * **Syntax**: `ec.ib rd, rs1`
   * `rd`: Bank slot index (0-based within the owning Group) of the bank written; write `x0` to discard.
-  * `rs1`: Register mask — which register groups to save (see §3.7).
+  * `rs1`: Register mask — which register groups to save (see §3.7). **Special case:
+    if `rs1` is the zero register (`x0`, encoding `00000`), dirty-save mode is
+    activated** (see below). An explicit non-zero mask always overrides dirty-save
+    mode.
 * **Operand notes**: Operates on `current_ecid` implicitly. No explicit ECID argument.
   `ec.ib` always succeeds or raises a trap; no soft failure is possible. `rd` returns
   the bank slot index, not an error code.
 * **Side effects**: Writes state from the active register file into the bank associated
-  with `current_ecid`. Updates `cme_status`.
-* **Guaranteed cycles**: 1 cycle (full save), up to 3 with selective masking.
+  with `current_ecid`. Clears the dirty-group bitmap bits for every register group
+  saved (see §3.7 and Chapter 0 §0.3). Updates `cme_status`.
+* **Guaranteed cycles**: 1–3 (proportional to number of groups saved).
+
+#### Dirty-Save Mode (`rs1 = x0`)
+
+When `rs1` encodes the zero register (`x0`, field value `00000`), `ec.ib`
+substitutes the running ECID's **dirty-group bitmap** (Chapter 0 §0.3) for the
+explicit mask. Hardware saves only the register groups that have been written since
+the last `ec.ib` or `ec.ob`; unmodified groups are skipped. The dirty bits for all
+saved groups are cleared on commit.
+
+This mode is analogous to the lazy FP context-switch discipline used with RISC-V
+`mstatus.FS`: a context that never touches FPRs, VEC, or MAT registers incurs no
+save cost for those groups. Interrupt handlers that touch only GPRs save and
+restore in 1–2 cycles regardless of whether the preempted context had dirty VMT
+state.
+
+```asm
+    # Dirty-save: save only groups the current context actually modified.
+    ec.ib  rd, x0       # rs1 = x0 → use dirty-group bitmap as mask
+                        # rd = bank slot index of bank written
+
+    # Explicit-mask save: always saves exactly these groups.
+    li     t0, 0x3      # GPR | FPR
+    ec.ib  rd, t0
+```
+
+An explicit non-zero mask always overrides dirty-save mode. A context that
+passes a non-zero rs1 saves exactly the groups in that mask regardless of the
+dirty-group bitmap state, and the dirty bits for those groups are cleared.
+
+**Note on `x0` vs. zero-valued register.** The dirty-save trigger is the
+register-field encoding `00000` (x0), not the value zero. An instruction
+`ec.ib rd, a0` where `a0 = 0` uses explicit-mask mode with an all-zeros mask
+(save nothing) — it does not activate dirty-save mode.
 
 ### `ec.ob` — Restore context from bank for target ECID
 
@@ -70,8 +107,10 @@ These instructions operate through SRAM-resident staging banks and constitute th
     caller is not an authorized ancestor.
   * `rs1`: Target ECID number.
   * `rs2`: Register mask — which register groups to restore (see §3.7).
-* **Side effects**: Restores registers from the bank owned by ECID `rs1`. If the PC
-  bit is set in the mask, execution jumps to the restored program counter on commit.
+* **Side effects**: Restores registers from the bank owned by ECID `rs1`. Clears the
+  dirty-group bitmap bits for every register group restored; the resumed context
+  begins with a clean bitmap for those groups. If the PC bit is set in the mask,
+  execution jumps to the restored program counter on commit.
 * **Guaranteed cycles**: 1–3.
 
 > **Typical switch sequence**: `ec.ib mask` (save current), then

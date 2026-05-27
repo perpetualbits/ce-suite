@@ -97,6 +97,23 @@ are expected to keep SRAM copies of the entries for currently active ECIDs. The
 fast-path instructions (`ec.ib`, `ec.ob`) touch only SRAM-resident entries; the
 DMA-path instructions (`ec.im`, `ec.om`) may walk the RAM-resident table.
 
+**Dirty-group tracking.** Hardware maintains a **dirty-group bitmap** for the
+currently running ECID, recording which register groups have been written since
+the last `ec.ib` or `ec.ob` on this hart. Each bit corresponds to a register
+group using the same positions as the register mask (§0.10): bit 0 = GPR, bit 1 =
+FPR, bit 2 = VEC, bit 3 = MAT, bit 4 = PC, bit 5 = CSR, bit 6 = SATP.
+
+Hardware sets the appropriate bit on the first write to each register group by the
+running context. `ec.ib` clears the bitmap for every group it saves (whether in
+explicit-mask or dirty-save mode). `ec.ob` clears the bitmap for all groups in
+the restore mask; the restored context begins with a clean bitmap.
+
+The bitmap may be stored in the implementation-defined region of `EC[e]` (charter
+§3.2 allows implementation-defined fields in `EC_entry`) or as a per-hart
+hardware register that is flushed into `EC[e]` on context save. Either placement
+is conforming. This bitmap is the mechanism behind `ec.ib`'s dirty-save mode
+(Chapter 3 §3.1).
+
 ---
 
 ## 0.4 Execution Context Structure (ECS)

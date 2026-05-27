@@ -455,7 +455,7 @@ only meaningful if the ISR has its own CE resources.
 
 ---
 
-### E3 · Dirty / Lazy Tracking for Banks
+### E3 · Dirty / Lazy Tracking for Banks ✓ RESOLVED
 
 **Affects:** ch03 (`ec.ib` definition); ch00 §0.5 (EC[e] layout — one dirty
 bit per register group); possibly charter §3.2 if the EC[e] struct changes.
@@ -466,6 +466,21 @@ written since the last `ec.ib` or `ec.ob`. Software may still pass an explicit
 non-zero mask to override. The FPU dirty-bit pattern used by Linux FP context
 switch is the direct analogue. Reduces interrupt handler switch cost
 substantially for contexts that never touch FPRs or vectors.
+
+**Decision:** Dirty-group bitmap added as implementation-defined state in
+`EC[e]` (fits under charter §3.2 "implementation-defined: cached bank/contract
+refs, flags, etc." — no charter version bump needed). ch00 §0.3 adds a
+"Dirty-group tracking" normative paragraph describing the bitmap layout (one bit
+per register group, same positions as the register mask in §0.10), when hardware
+sets/clears bits, and the two allowed physical placements (EC[e] impl-defined
+region or a per-hart hardware register flushed on save). ch03 §3.1 `ec.ib`
+updated: rs1 bullet notes the `x0`-encoding special case; side effects note
+bitmap clearing; guaranteed cycles changed to 1–3; new "#### Dirty-Save Mode
+(`rs1 = x0`)" subsection added with FPU analogy, code examples, and the
+register-field-encoding disambiguation. ch03 §3.1 `ec.ob` side effects note
+bitmap clearing for restored groups (resumed context begins with clean bitmap).
+Charter §3.2 unchanged (dirty bits fall under the existing impl-defined
+catch-all).
 
 **Depends on:** No blocking dependencies.
 
@@ -592,8 +607,8 @@ These are independent and can be done in any order, with one exception:
 2. ~~**E4**~~ — fully resolved ✓.
 3. ~~**E5**~~ — fully resolved ✓ (two new CSRs: `current_ecid_level` at 0xFD1, `current_ecid_parent` at 0xFD2; privilege rules added to ch14).
 4. ~~**E6**~~ — fully resolved ✓ (ch04 §4.14: normative power-gating protocol — spill all Banks via `ec.im` before gating, fill via `ec.om` on wake).
-5. **E3** — small; touches ch03 and ch00. **START HERE.**
-6. **E1** — new appendix; self-contained; do once baseline enhancements are stable.
+5. ~~**E3**~~ — fully resolved ✓ (dirty-group bitmap in ch00 §0.3; `ec.ib` dirty-save mode and `ec.ob` bitmap clearing in ch03 §3.1).
+6. **E1** — new appendix; self-contained; do once baseline enhancements are stable. **START HERE.**
 7. **E2** — new chapter or section; self-contained; substantial but straightforward.
 8. **E7** — informative only; can be done any time.
 
