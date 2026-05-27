@@ -183,7 +183,7 @@ This separation is intentional. The radix tree is a kernel policy structure — 
 
 When no bank is available for the requested ECID:
 
-- **Spill** (`ec.im`): saves staging bank S to RAM via DMA. The target ECS is located via `EC[e].ecs_ptr`. The bank is freed for reuse once the DMA completes.
+- **Spill** (`ec.im`): saves staging bank S to RAM via DMA. The target ECS is located via `EC[e].ecs_ptr`. Once the DMA completes the bank's content is safe in RAM; the kernel then issues `ec.og` to release the bank from the ECID's Group back to the free pool.
 - **Fill** (`ec.om`): restores from the ECS in RAM (located via `EC[e].ecs_ptr`) into staging bank R via DMA, then R → live registers.
 
 Banks remain locked (unavailable for reuse) until the DMA transfer completes. Ownership checks (§3) apply before DMA begins.

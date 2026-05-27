@@ -140,8 +140,17 @@ experience.
 5. Once the plan is locked, the assistant produces the refactored
    chapter as a file.
 6. You review the file. Iterate if needed.
-7. Save to disk, commit to git with a descriptive message.
-8. End the chat.
+7. **Propagation check (mandatory).** Before committing, the assistant
+   grep-searches all other chapters, reference files, and the adoc/
+   mirror for any content that references or depends on what was changed.
+   It reports: (a) files that need updating and the specific lines, or
+   (b) explicit confirmation that no other file is affected. This step is
+   not optional and should not require prompting.
+8. Apply any cross-chapter corrections identified in step 7. If a
+   correction touches a second chapter, keep it minimal (a single-line
+   fix or cross-reference); anything larger becomes its own session.
+9. Save to disk, commit to git with a descriptive message.
+10. End the chat.
 ```
 
 Steps 2–4 are the most important. **Most drift gets caught at the
@@ -376,6 +385,9 @@ Before you start any CE work session, run through this list mentally:
       session's changes)?
 - [ ] Do I know what "done" looks like for this session, and how I'll
       commit the result?
+- [ ] Has the propagation check been run (§2.1 step 7) — has the
+      assistant searched for cross-chapter effects and reported them
+      explicitly?
 
 If any answer is no, fix that before continuing. None of these checks
 are time-consuming; skipping them is what produced the previous mess.
