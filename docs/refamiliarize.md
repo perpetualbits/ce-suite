@@ -124,8 +124,12 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
-P1–P7 are resolved. P8 (Sail formal model) is deferred. Eight enhancement
-items (E1–E8) have been added based on a review of `docs/future-directions.md`:
+P1–P7 are resolved. P8 (Sail formal model) is deferred. All E-series (E1–E8) done.
+One new item found during P7 adoc verification:
+
+- **F11** — ch08 `0.` line-wrap artifact — **open** (next session)
+
+E-series all done:
 
 - **E1** — Capability Profiles (new appendix) ✓ done
 - **E2** — CLIC Integration (ch18) ✓ done
@@ -134,12 +138,18 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 - **E5** — Nested Virtualization CSRs (ch13, ch14) ✓ done
 - **E6** — Power Gating Integration (ch04 or ch17) ✓ done
 - **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative) ✓ done
-- **E8** — Return values for `ec.ib` and `ec.oe` ✓ fully done (charter v0.14 + ch03 + full sweep of all chapters and reference files)
+- **E8** — Return values for `ec.ib` and `ec.oe` ✓ fully done
 
 ### A.6 What's *next* (the suggested work order)
 
-P1–P7 are done. The active authoring work is the E-series enhancements.
-Suggested order (see work-items.md for rationale):
+**F11** — ch08 Markdown line-wrap fix — is the first open item. One sentence
+in `docs/chapters/ch08-cpe-usage-examples.md` §8.1 wraps so that `0.` falls at
+the start of a line inside a bullet point, which asciidoctor misreads as an
+ordered-list item (warning found during P7 `make html`). Fix: rewrite
+`bit \`[XLEN-1]\` =\n0. The pointer form` as `bit \`[XLEN-1]\` = 0; the pointer
+form`. Then `make adoc` to regenerate the adoc, commit, done.
+
+P7 done ✓. P1–P7 all done. E-series all done. History follows.
 
 ~~**E8**~~ fully done ✓. ~~**E4**~~ fully done ✓ — normative Bank Exhaustion
 Protocol added to ch03 §3.1 (`ec.ob`) and §3.3 (`ec.ig`); ch15 `ec.ob` error
@@ -179,8 +189,10 @@ admission control (`runtime/period` CPU feasibility then `ms.ir` DRAM bandwidth)
 mapping from task parameters; `ec.ob` self-manages Contract across context switches; cgroup bandwidth
 caps via parent ECID `bw_cap`; CPE + MSE combination for end-to-end provable WCET.
 
-**All E-series enhancements (E1–E8) are now complete.** The active work remaining is P6 (opcode/name
-allocation with RISC-V International), P7 (AsciiDoc conversion), and P8 (Sail formal model).
+**All E-series enhancements (E1–E8) and all P-series content items (P1–P7) are now complete.**
+The active work remaining is F11 (ch08 minor Markdown fix revealed by P7 adoc verification —
+next session), P6 (opcode/name allocation with RISC-V International — process item, not writing),
+and P8 (Sail formal model — deferred large project).
 
 ### A.7 Where things live
 

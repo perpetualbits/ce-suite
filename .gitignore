@@ -20,6 +20,7 @@ __pycache__/
 venv/
 
 # Build outputs (future: RTL synthesis, simulation)
+build/
 hw/build/
 hw/sim/work/
 hw/sim/*.vcd

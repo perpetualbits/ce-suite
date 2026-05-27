@@ -181,6 +181,23 @@ items tracked in work-items.md.
 
 ---
 
+### F11 · ch08 Markdown line-wrap produces spurious `0.` list item in adoc
+
+**Affects:** `docs/chapters/ch08-cpe-usage-examples.md`, §8.1 "All examples assume" bullet.
+
+**Found during:** P7 adoc verification (`make html`). asciidoctor warning:
+`ch08-cpe-usage-examples.adoc: line 23: list item index: expected 1, got 0`.
+
+**Root cause:** The sentence "bit `[XLEN-1]` =\n0. The pointer form…" wraps so that
+`0.` falls at the start of a new line inside a bullet point. AsciiDoc interprets this
+as an ordered list item starting at 0 (which it does not support).
+
+**Fix:** Rewrite the sentence so `0.` is not at a line start. One option:
+change `= \n0. The pointer form` to `= 0; the pointer form`. Then run `make adoc`
+to regenerate `ch08-cpe-usage-examples.adoc`.
+
+---
+
 ## Category G — Gaps requiring new content
 
 Items where the spec is silent and content needs to be created.
@@ -241,6 +258,7 @@ an illegal-instruction trap); silent ignore prohibited.
 15. ~~**G1** (diagrams)~~ — **DONE**.
 16. ~~**F8** (binary encoding)~~ — **DONE**.
 17. ~~**G3** (RV32 width audit)~~ — **DONE**.
+18. **F11** (ch08 `0.` line-wrap artifact from P7 adoc verification) — **open**.
 
 ---
 
@@ -373,13 +391,14 @@ International and cannot be resolved by editing the spec alone.
 
 ---
 
-### P7 · AsciiDoc conversion (mechanical)
+### P7 · AsciiDoc conversion (mechanical) ✓ RESOLVED
 
 **Affects:** All chapters.
 
-RISC-V International specs use AsciiDoc with a specific toolchain. The Markdown
-source needs conversion before a formal submission can be prepared. This is largely
-mechanical but non-trivial given the volume of tables, code blocks, and cross-references.
+All 25 `.adoc` files generated and verified. `Makefile` added with `adoc`, `html`,
+`pdf`, `check`, and `clean` targets. `make html` produces `build/index.html` (805 KB,
+549 headings, 144 tables) via asciidoctor. One minor Markdown formatting artifact
+remains in ch08 — tracked as F11.
 
 ---
 
@@ -401,7 +420,7 @@ and is noted here for completeness. Not a near-term authoring task.
 4. ~~**P4** — Discovery mechanism (depends on P1 ✓).~~ — **DONE** (ch16).
 5. ~~**P5** — Memory ordering (independent; can be done any time).~~ — **DONE** (ch17).
 6. **P6** — Opcode/name allocation (process item; engage RISC-V International).
-7. **P7** — AsciiDoc conversion (mechanical; do last).
+7. ~~**P7** — AsciiDoc conversion (mechanical; do last).~~ — **DONE**.
 8. **P8** — Sail formal model (large separate project; deferred).
 
 ---
