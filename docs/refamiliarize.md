@@ -207,7 +207,10 @@ corrected in both the Markdown source and the adoc mirror.
 ~~**F12 ch13**~~ done ✓ — ch13 §4.1 `cpe_caps` DELEG bit: `§4.3.7` → `§4.3.6`
 corrected in both the Markdown source and the adoc mirror.
 
-**Next session: F12 ch02** — ch02 §3.4: `§4.3 item 7` → `§4.3.6`.
+~~**F12 ch02**~~ done ✓ — ch02 §3.4: `§4.3 item 7` → `§4.3.6` corrected in both
+the Markdown source and the adoc mirror. **F12 fully resolved.**
+
+**All F-series items (F1–F12) now complete. All work items resolved except P6 (process) and P8 (deferred).**
 
 ### A.7 Where things live
 

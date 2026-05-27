@@ -221,7 +221,7 @@ parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
 
 *Contract delegation* is handled by the extension that owns the
 Contract: `ms.it` for MSE Contracts, `qs.it` for QoS Contracts (charter
-§4.3 item 7). `ec.it` does not transfer Contracts.
+§4.3.6). `ec.it` does not transfer Contracts.
 
 Neither instruction takes a Group ID as a separate argument, because
 GroupID = ECID.

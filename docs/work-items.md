@@ -236,8 +236,7 @@ ch09 and ch17 (and now canonical):
 - ~~**ch11 §11.5.4:** "charter §4.3.5" for dissolution — should be §4.3.4.~~ ✓ fixed
 - ~~**ch13 §4.1, `cpe_caps` DELEG bit:** "charter §4.3.7" for per-extension delegation
   instructions — should be §4.3.6 (§4.3.7 does not exist).~~ ✓ fixed
-- **ch02 §3.4:** "charter §4.3 item 7" for Contract delegation — should be §4.3.6.
-  **OPEN** — session after ch13.
+- ~~**ch02 §3.4:** "charter §4.3 item 7" for Contract delegation — should be §4.3.6.~~ ✓ fixed
 
 ---
 
@@ -303,7 +302,7 @@ an illegal-instruction trap); silent ignore prohibited.
 17. ~~**F8** (binary encoding)~~ — **DONE**.
 18. ~~**G3** (RV32 width audit)~~ — **DONE**.
 19. ~~**F11** (ch08 `0.` line-wrap artifact from P7 adoc verification)~~ — **DONE**.
-20. **F12** (§4.3.N drift in ch11 §11.5.3/§11.5.4, ch13 §4.1, ch02 §3.4) — **OPEN**.
+20. ~~**F12** (§4.3.N drift in ch11 §11.5.3/§11.5.4, ch13 §4.1, ch02 §3.4)~~ — **DONE**.
 
 ---
 
