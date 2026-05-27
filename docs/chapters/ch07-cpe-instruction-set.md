@@ -130,6 +130,10 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
 ## 7.4 Partition Descriptor (`rs2` for `cp.ir`)
 
+Per charter §4.3.0 and ch00 §0.7.0, this descriptor is the *creation parameters*
+for a CPE Contract identified by `(rs1, CPE)`. The Contract exists from the
+successful completion of `cp.ir` until its matching `cp.or` or `ec.oe`.
+
 `rs2` is an XLEN-wide value that is either an inline descriptor or a pointer
 to a `CPE_Assignment_Params` struct:
 

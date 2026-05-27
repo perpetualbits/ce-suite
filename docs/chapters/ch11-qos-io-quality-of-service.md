@@ -171,6 +171,10 @@ specifies the QoS-specific parameters each Contract carries.
 
 ### 11.5.1 Contract parameters
 
+Per charter §4.3.0 and ch00 §0.7.0, a QoS Contract is identified by
+`(owning_ECID, QoS, domain_id)`. An ECID may simultaneously own multiple QoS
+Contracts distinguished by `domain_id`.
+
 Each QoS Contract holds three fields set by the privileged actor that creates it:
 
 | Field | Width | Meaning |

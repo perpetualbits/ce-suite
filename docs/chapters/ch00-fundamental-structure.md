@@ -231,24 +231,75 @@ VMT banks are allocated and managed separately from non-VMT banks.
 
 ## 0.7 Contracts
 
+### §0.7.0 — Contract: object model
+
+Charter §4.3.0 is the normative statement; this section restates and concretizes it.
+
+**Definition.** A Contract is a privileged-actor-created binding of a slice of a
+global multiplexed resource to one owning ECID's Group, tracked by hardware for
+the duration of the binding.
+
+**Identity.** A Contract is identified by the tuple `(owning_ECID, resource_class)`:
+
+- `MSE` — DRAM bandwidth and latency (Chapter 9).
+- `QoS(domain_id)` — I/O fabric bandwidth and latency, per domain (Chapter 11).
+- `CPE` — private cache way allocation (Chapter 7).
+
+There is no separately allocated Contract ID. An ECID may hold at most one MSE
+Contract, at most one CPE Contract, and one QoS Contract per `domain_id`.
+
+**State.** Contract state lives in two places. *Parameters* (`bw_class`, `lat_class`,
+`l1_way_mask`, etc.) are stored in the owning ECID's Bank CP field (§0.6) and
+loaded atomically into per-hart hardware registers by `ec.ob`. *Admission-control
+state* (running sums, group caps, the existence of the binding) lives in
+implementation-defined per-controller SRAM, keyed by ECID; the architectural
+requirement is that admission is atomic and chip-global (§0.7.4).
+
+**Lifecycle.** A Contract is created when a privileged actor successfully executes
+`ms.ir`, `qs.ir`, or `cp.ir` (assignment from its own resources) or `ms.it`,
+`qs.it`, or `cp.it` (delegation from a parent Contract). The Contract persists
+until `*.or` or `*.ot`, or `ec.oe` on the owning ECID. Failed creation leaves no
+Contract (§0.7.4).
+
+**Example.** When a privileged actor calls `ms.ir rs1=7, rs2=<bw_class=4, lat_class=1>`,
+hardware atomically creates the MSE Contract `(ECID 7, MSE)` with those parameters
+stored in ECID 7's Bank CP field; the binding persists until `ms.or` or `ec.oe` on
+ECID 7.
+
+**Creation parameters vs. Contract object.** The `rs2` operand of `*.ir`/`*.it`
+instructions carries *creation parameters*, not the Contract itself. The Contract
+is the resulting hardware binding. Chapter 7 §7.4, Chapter 9 §9.4, and Chapter 11
+§11.5 specify the parameter encodings.
+
+### §0.7.1 — Definition and resource classes
+
 A **Contract** is a slice of a global, multiplexed resource:
 
 - **MSE Contracts** — memory bandwidth and latency guarantees.
 - **QoS Contracts** — I/O and NoC bandwidth and latency guarantees.
 - **CPE Contracts** — cache ways or a fraction of cache capacity.
 
-Four invariants govern all Contracts:
+### §0.7.2 — Single ownership
 
-1. **Single ownership.** A Contract has exactly one owning Group at any moment.
-   Ownership can be transferred but not duplicated.
-2. **Hierarchical splitting.** A privileged actor may split a Contract into
-   child Contracts. Each child is a strict subset of its parent; the sum of all
-   children's allocations never exceeds the parent's.
-3. **Atomic admission.** Splitting or binding a Contract requires chip-global
-   arbitration that succeeds or fails atomically. On failure, no state changes.
-4. **Dissolution.** When the owning Group is destroyed, the Contract dissolves
-   and its resources return to the parent Contract. Contract trees are bounded
-   by the same delegation depth D as ECID trees.
+A Contract has exactly one owning Group at any moment. Ownership can be
+transferred but not duplicated.
+
+### §0.7.3 — Hierarchical splitting
+
+A privileged actor may split a Contract into child Contracts. Each child is a
+strict subset of its parent; the sum of all children's allocations never exceeds
+the parent's.
+
+### §0.7.4 — Atomic admission
+
+Splitting or binding a Contract requires chip-global arbitration that succeeds or
+fails atomically. On failure, no state changes.
+
+### §0.7.5 — Dissolution
+
+When the owning Group is destroyed, the Contract dissolves and its resources
+return to the parent Contract. Contract trees are bounded by the same delegation
+depth D as ECID trees.
 
 ---
 

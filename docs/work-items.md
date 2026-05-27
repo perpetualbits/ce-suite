@@ -70,6 +70,30 @@ where rs2 = domain_id; 0 = all domains. Consistent with `qs.ir`; rd-as-input pro
 
 ---
 
+### D5 · Contract object model ✓ RESOLVED (v0.15)
+
+**Decision:** Charter §4.3.0 added as a new normative subsection establishing: (a) the
+Contract identity tuple `(owning_ECID, resource_class)` — no separately allocated
+Contract ID; (b) the two-location state model — creation parameters in the Bank CP
+field (§0.6), admission-control state in implementation-defined per-controller SRAM;
+(c) the lifecycle from `*.ir`/`*.it` to `*.or`/`*.ot`/`ec.oe`. The existing four
+invariants (§4.3.1 single ownership, §4.3.2 hierarchical splitting, §4.3.3 atomic
+admission, §4.3.4 dissolution) and remaining items (§4.3.5 delegation depth, §4.3.6
+per-extension delegation instructions) are unchanged in substance; they are now
+formal numbered subsections rather than an informal numbered list.
+
+**Deliberately out of scope:** No Contract ID namespace (ECID + class suffices). No
+unified `Contract_descriptor` struct (the three resource classes have different storage
+needs). No encoding changes to any `*.ir`/`*.it` instruction. No modification of
+instruction semantics.
+
+**Propagated to:** charter §4.3 restructured; ch00 §0.7.0 added (model restated with
+concrete example); ch07 §7.4 single-sentence cross-reference; ch09 §9.4.1
+single-sentence cross-reference; ch11 §11.5.1 single-sentence cross-reference;
+refamiliarize.md §A.3 updated.
+
+---
+
 ## Category F — Specification fixes
 
 These items can be resolved once the relevant D items are decided, or independently
@@ -197,6 +221,28 @@ as an ordered list item starting at 0 (which it does not support).
 
 ---
 
+### F12 · §4.3.N cross-reference numbering drift in ch11, ch13, ch02
+
+**Affects:** `ch11-qos-io-quality-of-service.md`, `ch13-csr-reference.md`,
+`ch02-bank-group-delegation.md`.
+
+**Found during:** D5 v0.15 propagation check (charter §4.3 restructuring).
+
+With the formal §4.3.0–§4.3.6 subsection numbering established in v0.15, the
+following pre-existing references are inconsistent with the convention used in
+ch09 and ch17 (and now canonical):
+
+- **ch11 §11.5.3:** "charter §4.3.3" for hierarchical splitting — should be §4.3.2.
+- **ch11 §11.5.4:** "charter §4.3.5" for dissolution — should be §4.3.4.
+- **ch13 §4.1, `cpe_caps` DELEG bit:** "charter §4.3.7" for per-extension delegation
+  instructions — should be §4.3.6 (§4.3.7 does not exist).
+- **ch02 §3.4:** "charter §4.3 item 7" for Contract delegation — should be §4.3.6.
+
+**Not fixed this session** (propagation-check rule: scope was charter + ch00 + three
+single-sentence additions). Needs a dedicated F-series correction session.
+
+---
+
 ## Category G — Gaps requiring new content
 
 Items where the spec is silent and content needs to be created.
@@ -244,20 +290,22 @@ an illegal-instruction trap); silent ignore prohibited.
 2. ~~**D2** (`ec.it` selection)~~ — **DONE** (v0.10).
 3. ~~**D3** (CPE delegation)~~ — **DONE** (v0.11).
 4. ~~**D4** (`qs.or` domain selector)~~ — **DONE** (v0.12).
-5. ~~**F5** (charter §6.1 CME subset)~~ — **DONE**.
-6. ~~**F3** (`ec.ir` clarification)~~ — **DONE**.
-7. ~~**F1** (CPE redesign)~~ — **DONE**.
-8. ~~**F2** (`qs.or`/`qs.ot` fix)~~ — **DONE** (with D4).
-9. ~~**F4** (`ms.it` encoding)~~ — **DONE**.
-10. ~~**F6** (`ec.is`/`ec.os`)~~ — **DONE** (option 2: `s` removed).
-11. ~~**F7** (`ec.iv`/`ec.ov` incompleteness flag)~~ — **DONE**.
-12. ~~**F9** (CPE QUERY)~~ — **DONE** (resolved in F1).
-13. ~~**F10** (working notes stale note)~~ — **DONE**.
-14. ~~**G2** (reserved-bit policy)~~ — **DONE**.
-15. ~~**G1** (diagrams)~~ — **DONE**.
-16. ~~**F8** (binary encoding)~~ — **DONE**.
-17. ~~**G3** (RV32 width audit)~~ — **DONE**.
-18. ~~**F11** (ch08 `0.` line-wrap artifact from P7 adoc verification)~~ — **DONE**.
+5. ~~**D5** (Contract object model)~~ — **DONE** (v0.15).
+6. ~~**F5** (charter §6.1 CME subset)~~ — **DONE**.
+7. ~~**F3** (`ec.ir` clarification)~~ — **DONE**.
+8. ~~**F1** (CPE redesign)~~ — **DONE**.
+9. ~~**F2** (`qs.or`/`qs.ot` fix)~~ — **DONE** (with D4).
+10. ~~**F4** (`ms.it` encoding)~~ — **DONE**.
+11. ~~**F6** (`ec.is`/`ec.os`)~~ — **DONE** (option 2: `s` removed).
+12. ~~**F7** (`ec.iv`/`ec.ov` incompleteness flag)~~ — **DONE**.
+13. ~~**F9** (CPE QUERY)~~ — **DONE** (resolved in F1).
+14. ~~**F10** (working notes stale note)~~ — **DONE**.
+15. ~~**G2** (reserved-bit policy)~~ — **DONE**.
+16. ~~**G1** (diagrams)~~ — **DONE**.
+17. ~~**F8** (binary encoding)~~ — **DONE**.
+18. ~~**G3** (RV32 width audit)~~ — **DONE**.
+19. ~~**F11** (ch08 `0.` line-wrap artifact from P7 adoc verification)~~ — **DONE**.
+20. **F12** (§4.3.N drift in ch11 §11.5.3/§11.5.4, ch13 §4.1, ch02 §3.4) — **OPEN**.
 
 ---
 

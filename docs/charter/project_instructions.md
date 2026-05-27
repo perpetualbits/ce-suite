@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.14
+**Version:** 0.15
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -274,30 +274,88 @@ Full byte-level layouts are in Chapter 0. This section fixes the
 
 ### 4.3 Contracts
 
-1. A Contract is a slice of a global, multiplexed resource — memory
-   bandwidth/latency for MSE, I/O bandwidth/latency for QoS, cache ways
-   or fraction for CPE.
-2. **Single ownership.** A Contract has exactly one owning ECID's Group
-   at any moment.
-3. **Hierarchical splitting.** A privileged actor may split a Contract
-   into child Contracts. Each child is a strict subset of its parent;
-   the sum of all children's allocations must never exceed the parent's.
-4. **Atomic admission.** Splitting or binding a Contract requires
-   chip-global hardware arbitration that succeeds or fails atomically.
-   On failure, no state is changed.
-5. **Dissolution.** When a Contract's last member ECID releases it, or
-   the owning Group is destroyed, the Contract dissolves and its
-   resources return to the parent Contract.
-6. **Delegation depth.** Contract trees are bounded by the same D as
-   ECID delegation (see §5).
-7. **Per-extension delegation instructions.** Contract delegation and
-   revocation are handled by the extension that owns the Contract type,
-   not by `ec.it`. Specifically: `ms.it`/`ms.ot` for MSE Contracts,
-   `qs.it`/`qs.ot` for QoS Contracts, and `cp.it`/`cp.ot` for CPE
-   Contracts. The CME instruction `ec.it` handles **Bank delegation
-   only** — one Bank per call, implementation-chosen from the parent's Group.
-   CPE's subset is therefore `{r, t}` (resource assign/revoke + delegation).
-   Full `cp.it`/`cp.ot` semantics are in Chapter 7.
+#### §4.3.0 — Contract: object model
+
+**Definition.** A Contract is a privileged-actor-created binding of a slice of a
+global multiplexed resource to one owning ECID's Group, tracked by hardware for
+the duration of the binding.
+
+**Identity.** A Contract is identified by the tuple `(owning_ECID, resource_class)`,
+where `resource_class` is one of:
+
+- `MSE` — DRAM bandwidth and latency.
+- `QoS(domain_id)` — I/O fabric bandwidth and latency, per domain.
+- `CPE` — private cache way allocation.
+
+There is no separately allocated Contract ID. Contracts are addressed solely via
+their owning ECID and resource class. An ECID may simultaneously own at most one
+MSE Contract, at most one CPE Contract, and one QoS Contract per `domain_id`.
+
+**State.** A Contract's state occupies two locations:
+
+- **Parameters** — the resource-class-specific fields (`bw_class`, `lat_class`,
+  `l1_way_mask`, `l2_way_mask`, etc.) are stored in the owning ECID's Bank, in
+  the CP field defined by Chapter 0 §0.6. They are loaded atomically into
+  per-hart hardware registers by `ec.ob` on context switch.
+- **Admission-control state** — running sums, group caps, and the existence
+  record of the binding live in implementation-defined per-controller or per-hart
+  SRAM, keyed by ECID. The exact placement is not architectural; the
+  architectural requirement is that admission decisions are atomic and chip-global
+  (§4.3.3).
+
+**Lifecycle.** A Contract is created by a privileged actor executing one of
+`ms.ir`, `qs.ir`, `cp.ir` (assignment from the privileged actor's own resources)
+or `ms.it`, `qs.it`, `cp.it` (delegation from a parent Contract). The Contract
+exists from the successful completion of that instruction until the matching
+`*.or`/`*.ot` or the forced destruction of its owning ECID via `ec.oe`. Failed
+creation leaves no Contract behind (§4.3.3).
+
+**Creation parameters vs. Contract object.** The `rs2` operand of `*.ir` and
+`*.it` instructions carries the *creation parameters* for a new Contract. The
+Contract itself is the binding that results from successful execution; it is not
+the parameters. The per-extension chapters specify the parameter encoding (§6.1
+names the instructions; Chapter 7 §7.4, Chapter 9 §9.4, Chapter 11 §11.5 specify
+the parameters).
+
+**What this section does not specify.** No Contract ID namespace (ECID + class
+suffices). No unified `Contract_descriptor` struct shape (the three resource
+classes have legitimately different storage needs; forcing uniformity would
+constrain implementations without benefit). No specific hardware layout for
+admission-control SRAM (implementation choice).
+
+#### §4.3.1 — Single ownership
+
+A Contract has exactly one owning ECID's Group at any moment.
+
+#### §4.3.2 — Hierarchical splitting
+
+A privileged actor may split a Contract into child Contracts. Each child is a
+strict subset of its parent; the sum of all children's allocations must never
+exceed the parent's.
+
+#### §4.3.3 — Atomic admission
+
+Splitting or binding a Contract requires chip-global hardware arbitration that
+succeeds or fails atomically. On failure, no state is changed.
+
+#### §4.3.4 — Dissolution
+
+When a Contract's last member ECID releases it, or the owning Group is destroyed,
+the Contract dissolves and its resources return to the parent Contract.
+
+#### §4.3.5 — Delegation depth
+
+Contract trees are bounded by the same D as ECID delegation (see §5).
+
+#### §4.3.6 — Per-extension delegation instructions
+
+Contract delegation and revocation are handled by the extension that owns the
+Contract type, not by `ec.it`. Specifically: `ms.it`/`ms.ot` for MSE Contracts,
+`qs.it`/`qs.ot` for QoS Contracts, and `cp.it`/`cp.ot` for CPE Contracts. The
+CME instruction `ec.it` handles **Bank delegation only** — one Bank per call,
+implementation-chosen from the parent's Group. CPE's subset is therefore `{r, t}`
+(resource assign/revoke + delegation). Full `cp.it`/`cp.ot` semantics are in
+Chapter 7.
 
 ### 4.4 Banks vs ECS
 
@@ -616,7 +674,19 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.14 (this version).** E8 resolved: `ec.ib` and `ec.oe` both gain `rd`
+- **v0.15 (this version).** D5 resolved: §4.3.0 — Contract: object model added as
+  a new normative subsection at the start of §4.3. The subsection establishes the
+  Contract identity tuple `(owning_ECID, resource_class)`, the two-location state
+  model (parameters in Bank CP field; admission-control state in per-controller
+  SRAM), the lifecycle from `*.ir`/`*.it` to `*.or`/`*.ot`/`ec.oe`, and the
+  distinction between creation parameters and the Contract object itself.
+  Explicitly out of scope: no Contract ID namespace, no unified descriptor struct,
+  no encoding changes. Existing items 2–7 of §4.3 formalized as §4.3.1–§4.3.6;
+  changelog references updated from "§4.3 item 7" to "§4.3.6". Propagated to
+  ch00 §0.7.0 (new subsection restating the model with a concrete example),
+  ch07 §7.4 (single-sentence cross-reference), ch09 §9.4.1 (single-sentence
+  cross-reference), ch11 §11.5.1 (single-sentence cross-reference).
+- **v0.14.** E8 resolved: `ec.ib` and `ec.oe` both gain `rd`
   operands returning success-path information. `ec.ib rd, rs1` returns the bank
   slot index (0-based within the owning Group) of the bank written. `ec.oe rd, rs1`
   returns the total count of ECIDs freed, including the target. Callers write to
@@ -633,11 +703,11 @@ the rest of the spec.
   added to §6.1. D4 resolved: `qs.or`/`qs.ot` domain selector passed in `rs2`
   (0 = all domains); reading from `rd` prohibited (§6.7 added).
 - **v0.11.** D3 resolved — CPE Contracts are delegatable; `cp.it`
-  and `cp.ot` are required; CPE subset is `{r, t}`; §4.3 item 7 updated to confirm
+  and `cp.ot` are required; CPE subset is `{r, t}`; §4.3.6 updated to confirm
   this. Full instruction semantics deferred to Chapter 7 (F1). This unblocks F1.
 - **v0.10.** D2 resolved — `ec.it` delegates Banks only, one per
   call; Contract delegation is extension-owned (`ms.it`, `qs.it`, `cp.it` per D3);
-  stated in §4.3 item 7. Propagated to ch03 §4 and ch02 §3.4.
+  stated in §4.3.6. Propagated to ch03 §4 and ch02 §3.4.
 - **v0.9.** D1 resolved — unified error/status policy (§6.6):
   every CE Suite instruction that can fail writes 0 (success) or a non-zero
   error code in `rd`; `x0` discards the result. Status CSRs (`cme_status`,
@@ -664,4 +734,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.14.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.15.*

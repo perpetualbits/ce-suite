@@ -143,6 +143,11 @@ carries.
 
 ==== 9.4.1 Contract parameters
 
+Per charter §4.3.0 and ch00 §0.7.0, an MSE Contract is identified by
+`(owning_ECID, MSE)` and consists of the parameters below stored in
+the bank’s CP field plus admission-control state in
+implementation-defined per-controller SRAM.
+
 Each MSE Contract holds two fields set by the privileged actor that
 creates it:
 

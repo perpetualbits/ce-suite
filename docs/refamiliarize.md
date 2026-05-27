@@ -45,15 +45,15 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.14 of the charter; E1–E8 all done)
+### A.3 Chapter status (as of v0.15 of the charter; E1–E8 all done)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
 
 | Chapter | State | Notes |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.14 — current | D1–D4 locked; F1–F10, G1–G3 resolved; E8 chartered |
-| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13; E3: §0.3 dirty-group tracking paragraph added |
+| **Charter** (Project Instructions) | v0.15 — current | D1–D5 locked; F1–F11, G1–G3 resolved; E8 chartered; D5: §4.3.0 Contract object model |
+| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.15; §0.7.0 Contract object model added; E3: §0.3 dirty-group tracking paragraph added |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added; E3: `ec.ib` dirty-save mode (rs1=x0) and `ec.ob` bitmap clearing added |
@@ -108,6 +108,10 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
     `cp.ot` are required. *(v0.11)*
 15. **`qs.or`/`qs.ot` use `rs2` for the domain selector.** `rd` is write-only;
     "rd as input" is prohibited. *(v0.12)*
+16. **Contract identity is `(owning_ECID, resource_class)`; no Contract ID.**
+    Parameters live in the Bank CP field; admission-control state in per-controller
+    SRAM. Lifecycle: `*.ir`/`*.it` creates, `*.or`/`*.ot`/`ec.oe` destroys.
+    Charter §4.3.0; ch00 §0.7.0. *(v0.15)*
 
 ### A.5 What's *open*
 
@@ -188,9 +192,19 @@ mapping from task parameters; `ec.ob` self-manages Contract across context switc
 caps via parent ECID `bw_cap`; CPE + MSE combination for end-to-end provable WCET.
 
 **All E-series enhancements (E1–E8) and all P-series content items (P1–P7) are now complete.**
-The active work remaining is F11 (ch08 minor Markdown fix revealed by P7 adoc verification —
-next session), P6 (opcode/name allocation with RISC-V International — process item, not writing),
-and P8 (Sail formal model — deferred large project).
+
+~~**D5**~~ fully done ✓ (v0.15) — Charter §4.3.0 "Contract: object model" added: identity
+tuple `(owning_ECID, resource_class)`; two-location state model (parameters in Bank CP field,
+admission-control state in per-controller SRAM); lifecycle from `*.ir`/`*.it` to
+`*.or`/`*.ot`/`ec.oe`; distinction between creation parameters and the Contract object.
+Existing §4.3 items formalized as §4.3.1–§4.3.6. Propagated to ch00 §0.7.0 (model restated
+with concrete example), ch07 §7.4, ch09 §9.4.1, ch11 §11.5.1 (single-sentence
+cross-references). Work-items F12 logged: pre-existing §4.3.N drift in ch11/ch13/ch02.
+
+**Next session: F12** — fix the §4.3.N cross-reference drift exposed by v0.15:
+ch11 §11.5.3 (`§4.3.3` → `§4.3.2`), ch11 §11.5.4 (`§4.3.5` → `§4.3.4`),
+ch13 §4.1 (`§4.3.7` → `§4.3.6`), ch02 §3.4 (`§4.3 item 7` → `§4.3.6`).
+These are three separate chapters — address one per session per Rule 2.
 
 ### A.7 Where things live
 
