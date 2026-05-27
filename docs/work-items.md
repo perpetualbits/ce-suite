@@ -490,20 +490,36 @@ ch15; this item adds the protocol description to ch03.
 
 ---
 
-### E5 · Nested Virtualization CSRs
+### E5 · Nested Virtualization CSRs ✓ RESOLVED
 
 **Affects:** ch13 (two new RO CSRs: `current_ecid_level` and
 `current_ecid_parent`); ch14 (privilege access rules for the new CSRs).
 
-Add two read-only per-hart CSRs that expose the running ECID's delegation level
-and parent ECID directly, without requiring a full EC[e] table lookup. Hardware
-already holds both values in EC[e].delegation_L and EC[e].parent_ecid. Exposing
-them as CSRs costs one address each in the RO custom range. A nested hypervisor
-deciding whether it can delegate to a guest needs this on every scheduling
-decision; an EC table read for each is unnecessarily expensive.
+**Decision:** Two read-only per-hart CME CSRs added:
 
-**Provisional addresses:** Two slots in 0xFC0–0xFCF range (currently 4 slots
-remain unassigned in that range per ch13 §1).
+- **`current_ecid_level` — 0xFD1.** Bits 1:0 hold the delegation level `L` of
+  the running ECID, mirroring `EC[current_ecid].delegation_L`. Updated atomically
+  with `current_ecid` on every successful `ec.ob`. Together with `cme_del_cap`,
+  lets a nested hypervisor check delegation headroom (`L < D`) without an
+  `EC[e]` table lookup.
+
+- **`current_ecid_parent` — 0xFD2.** Bits 15:0 hold the parent ECID number of
+  the running context, mirroring `EC[current_ecid].parent_ecid`. Reads as 0 for
+  root ECIDs (L = 0). Updated atomically with `current_ecid` on every successful
+  `ec.ob`.
+
+**Address note:** The 0xFC0–0xFCF range was already fully assigned when E5 was
+implemented (the "4 slots remain unassigned" claim in this item was stale).
+Addresses 0xFD1–0xFD2 are used instead — the next available slots in the same
+M-mode RO encoding class. Address 0xFD0 is provisionally assigned to `ce_present`
+by Chapter 16.
+
+**Privilege access:** S-mode, HS-mode, and VS-mode may read both CSRs when
+enabled (same rules as `current_ecid`, per ch14 §14.6).
+
+**Propagated to:** ch13 §1 (address table + note), §3.10–§3.11 (new CSR
+definitions), §7 (illegal-access table), §8.2 (address summary); ch14 §14.6.2–§14.6.3
+(CSR accessibility), §14.7 (illegal-access table).
 
 **Depends on:** No blocking dependencies.
 
@@ -565,8 +581,8 @@ These are independent and can be done in any order, with one exception:
 
 1. ~~**E8**~~ — fully resolved ✓.
 2. ~~**E4**~~ — fully resolved ✓.
-3. **E5** — small; two CSRs; can follow E4 immediately. **START HERE.**
-4. **E6** — small normative note; can be combined with a ch04 or ch17 session.
+3. ~~**E5**~~ — fully resolved ✓ (two new CSRs: `current_ecid_level` at 0xFD1, `current_ecid_parent` at 0xFD2; privilege rules added to ch14).
+4. **E6** — small normative note; can be combined with a ch04 or ch17 session. **START HERE.**
 5. **E3** — small; touches ch03 and ch00; do after E8 if ch03 is being revised.
 6. **E1** — new appendix; self-contained; do once baseline enhancements are stable.
 7. **E2** — new chapter or section; self-contained; substantial but straightforward.

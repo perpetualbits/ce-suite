@@ -226,19 +226,27 @@ unconditional and not affected by `S_EN` or `VS_EN`.
 ### 14.6.2 S-mode / HS-mode (when `S_EN = 1`)
 
 When `cme_priv_ctl.S_EN = 1`, S-mode and HS-mode gain read-only access to
-`current_ecid` (0xFC0). This is the only CE Suite CSR accessible below M-mode;
-all others remain M-mode only.
+`current_ecid` (0xFC0), `current_ecid_level` (0xFD1), and `current_ecid_parent`
+(0xFD2). These are the only CE Suite CSRs accessible below M-mode; all others
+remain M-mode only.
 
 | CSR | Address | S/HS access when `S_EN = 1` |
 |---|---|---|
 | `current_ecid` | 0xFC0 | Read-only |
+| `current_ecid_level` | 0xFD1 | Read-only |
+| `current_ecid_parent` | 0xFD2 | Read-only |
 | All other CE Suite CSRs | 0x7C0–0x7CE, 0xFC1–0xFCF | Illegal instruction |
 | `cme_priv_ctl` | 0x7CF | Illegal instruction (M-mode only always) |
 | `hcme_ctrl` | 0x6C0 | M and HS only (§14.4.2) |
 
 `current_ecid` exposes the ECID number currently bound to this hart. S-mode
 reads it to obtain its own ECID number for context-switch bookkeeping (e.g.,
-to pass as `rs1` to `ec.ib`). The value is read-only; writes trap.
+to pass as `rs1` to `ec.ib`). `current_ecid_level` exposes the running ECID's
+delegation level `L`; together with `cme_del_cap`, it lets a hypervisor check
+whether it can still delegate (iff `L < D`) without an `EC[e]` table lookup.
+`current_ecid_parent` exposes the parent ECID number, enabling a nested
+hypervisor to identify its supervisor context directly. All three CSR values
+are read-only; writes trap.
 
 Capability CSRs (`cpe_caps`, `mse_slot_ns`, `mse_max_nesting`, etc.) remain
 M-mode only. M-mode firmware is expected to read these at boot and publish the
@@ -248,7 +256,8 @@ table) for use by S-mode.
 ### 14.6.3 VS-mode (when `S_EN = 1` and `VS_EN = 1`)
 
 VS-mode receives the same CSR access as S-mode when both enable bits are set:
-read-only access to `current_ecid` (0xFC0) only.
+read-only access to `current_ecid` (0xFC0), `current_ecid_level` (0xFD1), and
+`current_ecid_parent` (0xFD2).
 
 ### 14.6.4 U-mode / VU-mode (never accessible)
 
@@ -270,8 +279,8 @@ The following actions are denied and raise illegal instruction:
 | CE instruction from VS | `S_EN = 0` or `VS_EN = 0` |
 | CE instruction from U or VU | Always |
 | `ec.iv` / `ec.ov` from any non-M level | Always (vault instructions are M-mode only) |
-| Any CE CSR read/write from S/HS (except `current_ecid`) | Always |
-| Any CE CSR read/write from VS (except `current_ecid`) | Always |
+| Any CE CSR read/write from S/HS (except `current_ecid`, `current_ecid_level`, `current_ecid_parent`) | Always |
+| Any CE CSR read/write from VS (except `current_ecid`, `current_ecid_level`, `current_ecid_parent`) | Always |
 | Any CE CSR read/write from U/VU | Always |
 | `cme_priv_ctl` access from below M-mode | Always |
 | `hcme_ctrl` access from VS, S, U, VU | Always |
