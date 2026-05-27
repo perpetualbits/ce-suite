@@ -1,6 +1,6 @@
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.13
+**Version:** 0.14
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -405,7 +405,7 @@ changelog entry) before they may appear in any chapter.
    ```text
    ec.ob rd, rs1, rs2 # rd = result, rs1 = target ECID, rs2 = restore mask
    ec.om rd, rs1, rs2 # rd = result, rs1 = target ECID, rs2 = mask
-   ec.oe rs1          # rs1 = target ECID to destroy (no rd — always succeeds)
+   ec.oe rd, rs1      # rd = ECIDs freed, rs1 = target ECID to destroy
    ```
 
 This is a **change** from earlier draft chapters (notably Ch2 and Ch5),
@@ -447,7 +447,7 @@ The CME instruction set **must include** `ec.oe` (Execution Context:
 out of existence):
 
 ```text
-ec.oe rs1     # rs1 = ECID to destroy
+ec.oe rd, rs1     # rd = ECIDs freed, rs1 = ECID to destroy
 ```
 
 Semantics:
@@ -459,6 +459,9 @@ Semantics:
 4. Increments the generation counter for each freed `EC[e]` slot.
 5. **Always succeeds.** Forward progress is guaranteed; zombies cannot
    stall reclamation.
+6. **`rd` returns the total count of ECIDs freed**, including the target
+   itself. Each ECID in the destroyed subtree is counted exactly once.
+   Callers that do not need the count write to `x0`.
 
 `ec.oe` is privileged. The mnemonic replaces `ec.od` (v0.7) and the
 earlier `ec.or` (pre-hiatus); both are retired (see §2.1). The trailing
@@ -483,16 +486,21 @@ operand; the status CSRs (`cme_status`, `mse_status`, `qos_status`,
 `cpe_status`) are updated in parallel for diagnostic use but are **not**
 the primary error channel.
 
-#### Exceptions (no `rd`)
+#### Success-path `rd` for `ec.ib` and `ec.oe`
 
-Two CME instructions take no `rd` operand because they cannot produce a
-soft failure code:
+Two CME instructions return success-path information in `rd` rather than
+an error code, because they cannot produce a soft failure:
 
-- **`ec.ib rs1`** — saves the running context; either succeeds or raises
-  a trap. No soft failure is possible (the hardware always has a bank
-  allocated before a context switch reaches this instruction).
-- **`ec.oe rs1`** — forced destroy; always succeeds (§6.5). No failure
-  is possible.
+- **`ec.ib rd, rs1`** — saves the running context; either succeeds or
+  raises a trap. `rd` returns the bank slot index (0-based within the
+  owning Group) of the bank written. Callers that do not need the index
+  write to `x0`.
+- **`ec.oe rd, rs1`** — forced destroy; always succeeds (§6.5). `rd`
+  returns the total count of ECIDs freed, including the target itself.
+  Callers that do not need the count write to `x0`.
+
+These instructions do not return an error code in `rd`; they raise a trap
+on any error path. The `rd = x0` discard convention applies.
 
 #### Trap path
 
@@ -608,7 +616,14 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.13 (this version).** Structural renumbering: ch02 ↔ ch03 swapped so that
+- **v0.14 (this version).** E8 resolved: `ec.ib` and `ec.oe` both gain `rd`
+  operands returning success-path information. `ec.ib rd, rs1` returns the bank
+  slot index (0-based within the owning Group) of the bank written. `ec.oe rd, rs1`
+  returns the total count of ECIDs freed, including the target. Callers write to
+  `x0` to discard. §6.5 syntax updated (new item 6); §6.6 "Exceptions (no rd)"
+  replaced by "Success-path rd for ec.ib and ec.oe"; §6.2 example updated.
+  Unblocks E8 ch03 propagation session.
+- **v0.13.** Structural renumbering: ch02 ↔ ch03 swapped so that
   Bank/Group/Delegation Semantics precedes the CME Instruction Set Reference;
   CPE/MSE/QoS usage examples and ISRs renumbered (ch08 = CPE examples, ch09 = MSE ISR,
   ch10 = MSE examples, ch11 = QoS ISR). §7.3 updated; all cross-references propagated.
@@ -649,4 +664,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.12.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.14.*

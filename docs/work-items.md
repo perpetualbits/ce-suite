@@ -538,29 +538,28 @@ this is informative guidance for OS integrators.
 
 ---
 
-### E8 · Return values for `ec.ib` and `ec.oe`
+### E8 · Return values for `ec.ib` and `ec.oe` — charter revised ✓; ch03 next
 
-**Affects:** Charter §6.5 (`ec.oe`) and §6.6 (`ec.ib`) — charter revision
-required first. Then ch03 (instruction operand tables and descriptions).
+**Affects:** ~~Charter §6.5 (`ec.oe`) and §6.6 (`ec.ib`)~~ ✓ Done (charter v0.14).
+**Remaining:** ch03 — update `ec.ib` and `ec.oe` operand syntax, descriptions,
+and encoding table (§3.10 / encoding appendix).
 
-Add meaningful `rd` return values to the two instructions currently defined as
-having no `rd`. Using rd = x0 (the RISC-V discard register) makes this
-zero-cost in the encoding:
+**Decision (v0.14):**
 
-- `ec.ib rd, rs1` — rd returns the bank slot index (or a generation token) into
-  which the context was saved. Currently a hypervisor that needs to know which
-  bank holds a saved guest must do a follow-on CSR read.
-- `ec.oe rd, rs1` — rd returns a count of resources freed (ECIDs reclaimed,
-  Banks released, Contracts dissolved). Useful for capacity accounting without
-  polling separate CSRs.
+- `ec.ib rd, rs1` — `rd` returns the bank slot index (0-based within the owning
+  Group) of the bank written. A hypervisor no longer needs a follow-on CSR read
+  to determine which bank holds the saved guest state.
+- `ec.oe rd, rs1` — `rd` returns the total count of ECIDs freed, including the
+  target itself. Each ECID in the destroyed subtree is counted exactly once.
+  Useful for ECID quota accounting without polling separate CSRs.
 
-The original reasoning for no-rd ("always-succeed instructions don't need error
-reporting") was correct but narrow — it excluded the success-path information
-case. rd = x0 already provides the discard path for callers that don't need the
-result.
+Callers that do not need the value write to `x0`.
 
-**Depends on:** Charter revision session must precede chapter work. This is a
-two-session item: (1) charter revision bumping to v0.14, (2) propagation to ch03.
+**Propagated to charter:** §6.2 example, §6.5 (syntax + item 6), §6.6
+("Exceptions no rd" → "Success-path rd for ec.ib and ec.oe"), Changelog.
+
+**Next session:** Propagate to ch03 — update Overview item 3, `ec.ib` syntax
+block, `ec.oe` syntax block, timing table, encoding table.
 
 ---
 
@@ -568,8 +567,9 @@ two-session item: (1) charter revision bumping to v0.14, (2) propagation to ch03
 
 These are independent and can be done in any order, with one exception:
 
-1. **E8** — requires charter revision first (two sessions). Do this early so
-   ch03 is stable before any downstream work.
+1. **E8** — charter revised (v0.14) ✓. **Next:** ch03 propagation session —
+   update `ec.ib` and `ec.oe` tables, descriptions, and encoding section.
+   Do before other ch03 work so instruction tables are stable.
 2. **E4** — small and unblocking; do early to close a real spec gap.
 3. **E5** — small; two CSRs; can be combined with E8's ch13 propagation pass.
 4. **E6** — small normative note; can be combined with a ch04 or ch17 session.

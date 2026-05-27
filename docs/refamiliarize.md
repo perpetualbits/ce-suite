@@ -45,14 +45,14 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.13 of the charter; P6/P7 done; E-series queued)
+### A.3 Chapter status (as of v0.14 of the charter; E8 chartered; ch03 propagation next)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
 
 | Chapter | State | Notes |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.13 — current | D1–D4 locked; F1–F10, G1–G3 resolved |
+| **Charter** (Project Instructions) | v0.14 — current | D1–D4 locked; F1–F10, G1–G3 resolved; E8 chartered |
 | **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.13 |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
@@ -94,8 +94,11 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 11. **CE is opt-in.** Firmware can disable CE entirely. Any privilege level
     can ignore CE even when enabled.
 12. **`rd` is the primary error channel.** Every instruction that can fail
-    writes 0 (success) or non-zero (error) in `rd`. Exceptions: `ec.ib` and
-    `ec.oe` carry no `rd`. *(v0.9)*
+    writes 0 (success) or non-zero (error) in `rd`. `ec.ib` and `ec.oe`
+    cannot fail softly (they trap on error), but both carry `rd` for
+    success-path information: `ec.ib rd, rs1` returns the bank slot index
+    used; `ec.oe rd, rs1` returns the count of ECIDs freed. Use `x0` to
+    discard. *(v0.9, extended v0.14)*
 13. **`ec.it` delegates Banks only, one per call.** Contract delegation uses
     per-extension instructions: `ms.it`, `qs.it`, `cp.it`. *(v0.10)*
 14. **CPE Contracts are delegatable.** CPE subset is `{r, t}`; `cp.it` and
@@ -129,17 +132,18 @@ items (E1–E8) have been added based on a review of `docs/future-directions.md`
 - **E5** — Nested Virtualization CSRs (ch13, ch14)
 - **E6** — Power Gating Integration (ch04 or ch17)
 - **E7** — SCHED_DEADLINE / MSE Integration (ch05, informative)
-- **E8** — Return values for `ec.ib` and `ec.oe` (charter revision first, then ch03)
+- **E8** — Return values for `ec.ib` and `ec.oe`; charter revised (v0.14) ✓; ch03 propagation is next
 
 ### A.6 What's *next* (the suggested work order)
 
 P1–P7 are done. The active authoring work is the E-series enhancements.
 Suggested order (see work-items.md for rationale):
 
-**E8 first** — requires a charter revision session (v0.14); do this before
-other ch03 work so the instruction tables are stable. **E4 and E5** are small
-and can follow immediately. **E3 and E6** touch ch00/ch04 and are also small.
-**E1, E2, E7** are self-contained and can be done in any order afterward.
+**E8** — charter revised (v0.14) ✓. **Next: propagate E8 to ch03** (update
+`ec.ib` and `ec.oe` operand syntax, descriptions, and encoding table). **E4
+and E5** are small and can follow immediately after. **E3 and E6** touch
+ch00/ch04 and are also small. **E1, E2, E7** are self-contained and can be
+done in any order afterward.
 
 ### A.7 Where things live
 
