@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com>
 """
 md2adoc.py — Convert CE Suite Markdown files to AsciiDoc via pandoc,
 then clean up pandoc's defensive passthrough escapes for underscores and

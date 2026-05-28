@@ -85,6 +85,7 @@ Categories:
 - [x] Makefile
 - [x] tools/ce-sizing-calculator.py
 - [x] tools/cme-sim.py
+- [x] tools/md2adoc.py
 
 ## SKIP (no header)
 
@@ -105,5 +106,4 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] tools/md2adoc.py
 - [ ] working_notes_for_authors.md
