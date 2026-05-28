@@ -43,12 +43,34 @@ function clause execute(CE_ECIB(rd, rs1)) = {
           /* Sealed bank — stub: Illegal_Instruction (should be CE trap) */
           Illegal_Instruction()
         else {
-          /* Save register state into the bank.
-           * Register group copy is abstracted; fleshed out in S5. */
-          bank_pool[idx] = { bank_pool[idx] with
+          /* Save register groups indicated by mask (ch03 §3.7) */
+          let b = bank_pool[idx];
+
+          var gs : vector(31, dec, bits(64)) = b.gprs;
+          if mask[0] == 0b1 then  /* bit 0: GPR group (x1..x31) */
+            foreach (i from 1 to 31) {
+              gs[i-1] = X(Regidx(to_bits(5, i)))
+            };
+
+          var fs : vector(32, dec, bits(64)) = b.fprs;
+          if mask[1] == 0b1 then  /* bit 1: FPR group (f0..f31) */
+            foreach (i from 0 to 31) {
+              fs[i] = zero_extend(F(Fregidx(to_bits(5, i))))
+            };
+
+          /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO in later Sail versions */
+
+          let new_pc : bits(64) =
+            if mask[4] == 0b1 then zero_extend(get_arch_pc())  /* bit 4: PC */
+            else b.pc;
+
+          bank_pool[idx] = { b with
             owner_ecid = current_ecid,
             valid      = true,
-            mask       = mask
+            mask       = mask,
+            gprs       = gs,
+            fprs       = fs,
+            pc         = new_pc
           };
 
           /* Clear dirty bits for saved groups */

@@ -147,7 +147,11 @@ corresponding architectural register group into the bank struct.
 
 **Depends on:** S4
 
-**Status:** ☐
+**Status:** ✓ Done — GPR (bit 0), FPR (bit 1), and PC (bit 4) saves implemented.
+VEC/MAT/CSR/SATP (bits 2,3,5,6) remain TODO stubs. Added `fregidx` newtype,
+`F` overload, and `get_arch_pc` to `ce_standalone_prelude.sail` to mirror
+sail-riscv's `fdext_regs.sail` / `pc_access.sail`. Both `make check` and
+`make check-riscv` exit 0.
 
 ---
 

@@ -81,6 +81,24 @@ function wX(Regidx(r), v) = { if unsigned(r) != 0 then xregs[unsigned(r)] = v }
 
 overload X = {rX, wX}
 
+/* FPR access — mirrors sail-riscv's fdext_regs.sail / freg_type.sail */
+newtype fregidx = Fregidx : bits(5)
+type flenbits = bits(64)            /* standalone: D-extension (64-bit FP) assumed */
+
+register fpr_file : vector(32, dec, flenbits) = vector_init(zeros())
+
+val rF_bits : fregidx -> flenbits
+function rF_bits(Fregidx(r)) = fpr_file[unsigned(r)]
+
+val wF_bits : (fregidx, flenbits) -> unit
+function wF_bits(Fregidx(r), v) = { fpr_file[unsigned(r)] = v }
+
+overload F = {rF_bits, wF_bits}
+
+/* PC accessor — mirrors sail-riscv's pc_access.sail */
+val get_arch_pc : unit -> xlenbits
+function get_arch_pc() = PC
+
 /* Execution result — mirrors sail-riscv's ExecutionResult */
 union ExecutionResult = {
   Retire_Success      : unit,
