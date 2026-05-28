@@ -78,6 +78,7 @@ Categories:
 - [x] scratchpads/general/mermaid-sketch.md
 - [x] scratchpads/mse/101-scratchpad.md
 - [x] scratchpads/mse/102-scratchpad.md
+- [x] sw/README.md
 
 ## CODE (BSD-3-Clause)
 
@@ -99,7 +100,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] sw/README.md
 - [ ] tools/ce-sizing-calculator.py
 - [ ] tools/ce_sizing_baseline_percentages.csv
 - [ ] tools/ce_sizing_current_config.csv
