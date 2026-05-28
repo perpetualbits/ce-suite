@@ -62,7 +62,6 @@ Categories:
 - [x] docs/chapters/ch17-memory-ordering.md
 - [x] docs/chapters/ch18-clic-integration.md
 - [x] docs/chapters/ch19-interop-ratified-extensions.md
-- [x] docs/charter/CHANGELOG.md
 - [x] docs/charter/project_instructions.md
 - [x] docs/future-directions.md
 - [x] docs/refamiliarize.md

@@ -14,13 +14,11 @@ detailed design work that follows from locked architectural decisions.
 
 ---
 
-## ⚑ Current priority — Category PUB (publication readiness)
+## ⚑ Current priority — Sail pre-work
 
-All D/F/G/P/E/I items are resolved. The remaining authoring work before the spec
-can be shared publicly is removing internal editorial scaffolding from the chapter
-and reference files. See **Category PUB** below for item definitions and the
-**PUB execution order** for the file-by-file sequence. One file per session;
-commit between each.
+PUB cleanup is complete. P6 (opcode allocation) and P8 (Sail) remain. The
+immediate pre-Sail items are tracked in P6 and P8 below. No further authoring
+sessions are required before Sail work can begin.
 
 ---
 
@@ -435,6 +433,13 @@ Custom-0 (`0001011`) is used as a placeholder. Real submission requires:
 This is a process item, not an authoring item — it requires engagement with RISC-V
 International and cannot be resolved by editing the spec alone.
 
+**Sail encoding freeze.** For the purposes of Sail v1 modelling, the encoding
+defined in ch03 §3.10 (custom-0 opcode `0001011`, R-type, funct3/funct7 scheme)
+is treated as frozen. Sail decode functions will be written against this encoding.
+If RISC-V International assigns a different opcode, the Sail decode tables will
+need to be updated, but the execute functions will be unaffected. This decision
+does not require a charter change — it is a modelling scope decision.
+
 **Submission materials prepared** (`docs/submission/`):
 - `submission-brief.md` — technical brief covering the three allocation requests
   (ISA names, opcode, CSRs), full 24-instruction inventory with encoding tables,
@@ -466,6 +471,23 @@ remains in ch08 — tracked as F11.
 RISC-V ratification increasingly requires a Sail formal model of instruction
 semantics. This is a significant engineering effort independent of the spec text
 and is noted here for completeness. Not a near-term authoring task.
+
+**Vault instructions out of scope for Sail v1.** `ec.iv` and `ec.ov` are
+defined as instruction shells in the spec; their cryptographic execute semantics
+(key derivation, attestation, sealing format) are deferred to a future revision.
+Sail v1 will model the decode for these instructions but not their execute
+semantics. They will be represented as `undefined` or `unimplemented` in the
+Sail execute function. This is a deliberate scope boundary, not a gap.
+
+**Chip-global admission control abstraction.** The spec requires that Contract
+creation (`ms.ir`, `qs.ir`, `cp.ir`, `ms.it`, `qs.it`, `cp.it`) involves
+chip-globally atomic admission control (ch00 §0.7.4). Sail models a single hart
+and cannot represent chip-global state directly. For Sail v1, admission control
+will be modelled as an abstract function `admit_contract(ecid, class, params)`
+that is axiomatised to either succeed (returning the new Contract state) or fail
+atomically — the internal global accounting is treated as a black box. This is
+sufficient for modelling instruction behaviour on a single hart; multi-hart
+admission interactions are out of scope for Sail v1.
 
 ---
 
@@ -798,16 +820,15 @@ addresses and CSR addresses throughout the spec.
 
 ---
 
-## Category PUB — Publication readiness (CURRENT PRIORITY)
+## Category PUB — Publication readiness ✓ COMPLETE
 
-These items remove internal editorial scaffolding from the publishable spec files.
-None of them change any normative rule or add new content. One file per session;
-commit between each. The four items below define *what* to remove; the execution
-order below defines *which file next*.
+All four PUB items are resolved. Internal editorial scaffolding has been removed
+from all publishable spec files. The adoc mirrors were regenerated via
+`md2adoc.py` (updated to auto-emit SPDX headers) and the PDF/HTML builds cleanly.
 
 ---
 
-### PUB1 · Remove retired-instruction rename history
+### PUB1 · Remove retired-instruction rename history ✓ RESOLVED
 
 The rename chain `ec.or → ec.od → ec.oe` is internal revision history. Readers of
 a published spec need only the current name `ec.oe`; they do not need to know it
@@ -827,7 +848,7 @@ was ever called anything else.
 
 ---
 
-### PUB2 · Remove work-item tracking tags from spec text
+### PUB2 · Remove work-item tracking tags from spec text ✓ RESOLVED
 
 P-series, F-series, and E-series labels are the project's internal tracking system.
 They are invisible to implementers and reviewers of the published spec.
@@ -850,7 +871,7 @@ They are invisible to implementers and reviewers of the published spec.
 
 ---
 
-### PUB3 · Remove or convert "charter §X" citations
+### PUB3 · Remove or convert "charter §X" citations ✓ RESOLVED
 
 The charter (`docs/charter/project_instructions.md`) is an internal authoring
 document. Published specs do not cite their own design notes. In nearly every case
@@ -887,7 +908,7 @@ convert to an in-spec section number.
 
 ---
 
-### PUB4 · Remove meta-document references
+### PUB4 · Remove meta-document references ✓ RESOLVED
 
 References to internal file paths, the charter as an external document, and
 "earlier drafts" design history do not belong in published spec text.
@@ -911,10 +932,10 @@ References to internal file paths, the charter as an external document, and
 
 ---
 
-## PUB execution order (file by file)
+## PUB execution order (file by file) ✓ ALL 20 SESSIONS COMPLETE
 
-One session per file; commit between each. Files are ordered so that the most
-visible internal scaffolding is cleared first.
+All 20 files processed. `md2adoc.py` updated to auto-emit SPDX headers;
+`make adoc` regenerated all mirrors; PDF and HTML rebuild cleanly.
 
 | # | File | PUB items | Notes |
 |---|------|-----------|-------|
