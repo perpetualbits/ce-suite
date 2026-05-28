@@ -33,6 +33,7 @@ Categories:
 - [x] docs/adoc/chapters/ch15-trap-table.adoc
 - [x] docs/adoc/chapters/ch16-discovery.adoc
 - [x] docs/adoc/chapters/ch17-memory-ordering.adoc
+- [x] docs/adoc/chapters/ch18-clic-integration.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -44,7 +45,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/chapters/ch18-clic-integration.adoc
 - [ ] docs/adoc/chapters/ch19-interop-ratified-extensions.adoc
 - [ ] docs/adoc/index.adoc
 - [ ] docs/adoc/reference/glossary.adoc
