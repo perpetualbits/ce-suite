@@ -195,7 +195,7 @@ Banks remain locked (unavailable for reuse) until the DMA transfer completes. Ow
 - **Seal** (`ec.iv`): encrypts a bank's contents and sets the lock bit. No access is permitted until the bank is unsealed.
 - **Unseal** (`ec.ov`): decrypts the bank for the authorized ECID and clears the lock bit.
 
-Key derivation, attestation, and rotation are charter open items (charter §8.7) and are not specified here.
+Key derivation, attestation, and rotation are deferred to a future revision and are not specified here.
 
 ---
 
