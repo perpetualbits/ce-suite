@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.15
+**Version:** 0.16
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -225,13 +225,26 @@ modern operating systems run concurrently.
 
 CE is opt-in at every level.
 
-1. **Firmware disable.** The BIOS or M-mode firmware may disable CE
-   entirely for the system. When CE is disabled, all CE CSRs read as
-   zero (or the implementation-defined "unimplemented" pattern), all
-   CE instructions trap as illegal, and the system behaves as a
-   standard RISC-V system without CE. This is essential for
-   testing — kernel bugs suspected of involving CE can be isolated
-   by booting with CE off.
+1. **Firmware disable.** M-mode firmware controls CE availability
+   through the `ce_ctrl` CSR (address 0x7D0, M-mode RW). Each of the
+   four extensions has an independent enable bit:
+
+   | Bit | Field | Description |
+   |-----|-------|-------------|
+   | 0 | `CME_EN` | 1 = CME enabled |
+   | 1 | `CPE_EN` | 1 = CPE enabled |
+   | 2 | `MSE_EN` | 1 = MSE enabled |
+   | 3 | `QOS_EN` | 1 = QoS enabled |
+   | XLEN−1:4 | — | WIRI |
+
+   Reset value: 0x0 (all extensions disabled). Firmware explicitly
+   enables whichever extensions are required. When a bit is 0, all
+   instructions for that extension trap as illegal and all CSRs for
+   that extension read as 0. If hardware for an extension is absent,
+   the corresponding bit is RO 0 — software cannot enable what is not
+   implemented. Extensions may be enabled and disabled independently;
+   there is no required ordering.
+
 2. **Privileged ignore.** Even when CE is enabled in firmware, any
    privilege level may choose to ignore it. An OS or hypervisor may
    run an entirely conventional kernel and userspace without using
@@ -668,16 +681,23 @@ the rest of the spec.
    not architectural. May be promoted to an optional appendix.
 6. **Secure Vault key management.** `ec.iv`/`ec.ov` semantics for sealed
    banks are specified; key derivation, attestation, and rotation are not.
-7. **CE-disable CSR naming and bit layout.** §3.7 establishes that CE
-   may be disabled at firmware level, but the specific CSR(s), reset
-   defaults, and per-extension granularity (can CME be enabled while
-   MSE is disabled?) are not yet pinned.
 
 ---
 
 ## Changelog
 
-- **v0.15 (this version).** D5 resolved: §4.3.0 — Contract: object model added as
+- **v0.16 (this version).** §8.7 resolved: `ce_ctrl` CSR (0x7D0, M-mode RW)
+  defined as the CE-disable mechanism. Four independent per-extension enable
+  bits — `CME_EN` (bit 0), `CPE_EN` (bit 1), `MSE_EN` (bit 2), `QOS_EN`
+  (bit 3) — reset to 0 (all disabled); firmware explicitly enables. If
+  hardware for an extension is absent the corresponding bit is RO 0.
+  Extensions may be enabled independently with no required ordering. §3.7
+  updated with the normative CSR definition; §8.7 removed from open items.
+  Propagated to: ch13 §1.1 (CE-disable CSR deferred note replaced with
+  normative `ce_ctrl` entry and address-table addition); ch00 §0.2 (disable
+  section updated to name `ce_ctrl`); ch16 (CE-disabled behavior note updated).
+
+- **v0.15.** D5 resolved: §4.3.0 — Contract: object model added as
   a new normative subsection at the start of §4.3. The subsection establishes the
   Contract identity tuple `(owning_ECID, resource_class)`, the two-location state
   model (parameters in Bank CP field; admission-control state in per-controller

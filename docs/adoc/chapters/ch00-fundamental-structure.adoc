@@ -60,12 +60,14 @@ destroys its entire subtree and reclaims all resources. The radix tree
 is a kernel data structure; the architectural view is the
 `EC[e]` array (§0.3). Algorithms are in Appendix A.
 
-*CE disable and ignore.* Firmware may disable CE entirely; when
-disabled, all CE CSRs read as zero and all CE instructions trap as
-illegal. Even when CE is enabled, any privilege level may choose to
-ignore it and run a conventional kernel or userspace. This opt-in
-property applies uniformly to all five extensions: CME, CPE, MSE, QoS,
-and the ECID substrate.
+*CE disable and ignore.* Firmware controls CE availability through the
+`ce_ctrl` CSR (0x7D0, M-mode RW; Chapter 13 §1.1). Each extension
+has an independent enable bit; all reset to 0. When an extension’s
+enable bit is 0, all its instructions trap as illegal and all its CSRs
+read as 0. Extensions may be enabled independently. Even when CE is
+enabled, any privilege level may choose to ignore it and run a
+conventional kernel or userspace. This opt-in property applies uniformly
+to all five extensions: CME, CPE, MSE, QoS, and the ECID substrate.
 
 '''''
 

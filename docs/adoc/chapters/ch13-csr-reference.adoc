@@ -39,12 +39,44 @@ without architectural impact on the bit-field definitions.
 All CE Suite CSRs are *per-hart*: each hart holds its own independent
 instance. No CE Suite CSR is shared across harts.
 
-==== 1.1 CE-disable CSR
+==== 1.1 `ce_ctrl` — CE extension enable (0x7D0)
 
-CE may be disabled by firmware; when disabled, CE CSRs read as 0 (see §2
-— CE disabled convention). The naming, bit layout, and per-extension
-granularity of the CE-disable CSR are deferred to a future revision and
-are not specified in this chapter.
+The `ce_ctrl` CSR controls which CE Suite extensions are active on
+this hart. It is M-mode read/write and resets to 0 (all extensions
+disabled). Firmware explicitly enables whichever extensions are
+required.
+
+[width="100%",cols="14%,17%,20%,17%,32%",options="header",]
+|===
+|Bit |Field |Access |Reset |Description
+|0 |`CME_EN` |WARL |0 |1 = CME enabled; 0 = CME instructions trap,
+CME CSRs read 0
+
+|1 |`CPE_EN` |WARL |0 |1 = CPE enabled; 0 = CPE instructions trap,
+CPE CSRs read 0
+
+|2 |`MSE_EN` |WARL |0 |1 = MSE enabled; 0 = MSE instructions trap,
+MSE CSRs read 0
+
+|3 |`QOS_EN` |WARL |0 |1 = QoS enabled; 0 = QoS instructions trap,
+QoS CSRs read 0
+
+|XLEN−1:4 |— |WIRI |0 |Reserved
+|===
+
+*WARL range.* If hardware for an extension is absent, the corresponding
+bit is RO 0; writing 1 has no effect. Software checks `ce_present`
+(0xFD0, Chapter 16) to determine which extensions are implemented before
+enabling them.
+
+*Independence.* Extensions may be enabled and disabled independently in
+any order. There is no required enable sequence.
+
+*Effect.* When an extension’s enable bit is 0, all instructions for that
+extension trap as illegal instruction and all CSRs for that extension
+read as 0, regardless of their individual addresses or access types.
+This is the mechanism behind the "`CE disabled`" behavior described in
+§2.
 
 '''''
 
@@ -855,6 +887,7 @@ silently ignored
 |0x7CC |`qos_bw_cap` |QoS |WARL |Domain-scoped
 |0x7CD |`qos_violation` |QoS |W1C |Domain-scoped
 |0x7CE |`qos_violation_en` |QoS |RW |Domain-scoped
+|0x7D0 |`ce_ctrl` |CE substrate |WARL |Per-hart
 |===
 
 ==== 8.2 M-mode RO CSRs (0xFC0–0xFCF, 0xFD1–0xFD2)

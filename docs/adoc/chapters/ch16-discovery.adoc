@@ -105,12 +105,13 @@ implemented
 practice all harts in a system will report the same bit pattern, but
 software must not assume this without reading the CSR on each hart.
 
-*CE-disabled behavior.* When CE is disabled by firmware,
-`ce_present` reads as 0 — consistent with the rule that all CE CSRs
-read as 0 when CE is disabled (Chapter 13 §2). This is intentional:
-`ce_present = 0` is the correct answer to "`is CE available?`" when
-CE is disabled. No software-visible distinction exists between CE absent
-and CE disabled.
+*CE-disabled behavior.* When an extension’s enable bit in `ce_ctrl`
+(0x7D0) is 0, that extension’s CSRs read as 0 — including the relevant
+bits of `ce_present`. When all four extension bits are 0,
+`ce_present` reads as 0 entirely, consistent with Chapter 13 §2.
+This is intentional: `ce_present = 0` is the correct answer to "`is
+CE available?`" when CE is disabled. No software-visible distinction
+exists between CE absent and CE disabled.
 
 *CE-absent behavior.* When the hardware does not implement CE at all,
 address 0xFD0 is unimplemented and access traps as an illegal
