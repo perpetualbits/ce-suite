@@ -185,7 +185,7 @@ ec.ob  x0, host_ecid, FULL_MASK  # restore host kernel
 
 - Each ECID's delegation level L is stored in `EC[e].delegation_L`. The L1
   ECID must have L < D to be permitted to delegate `l2_ecid` (see Chapter 1,
-  §1.9 and the charter §5.1).
+  §1.9).
 - From `l2_ecid`'s perspective its Group appears as Group 0; it cannot observe
   the host-level ECID numbers above it in the delegation tree.
 
