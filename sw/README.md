@@ -1,39 +1,49 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 <!-- SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com> -->
 
-# Software (kernel-side support)
+# CE Suite — Linux kernel patches
 
-**Status: not yet populated.**
+This tree holds CE Suite patches for the Linux kernel and associated
+userland tooling. The primary target is the RISC-V `arch/riscv/` subtree,
+but CE Suite touches the scheduler, cgroup subsystem, KVM, interrupt
+framework, and power management as well.
 
-This tree is the placeholder for kernel-side software supporting the
-CE Suite. The primary target is Linux, but the design generalizes to
-other OSes (see `docs/chapters/ch05-linux-integration.md`).
-
-## Planned layout
+## Layout
 
 ```
 sw/
-├── linux-patches/    # Linux kernel patches for CE support
-└── tests/            # userland and kernel tests for CE behavior
+├── README.md             # this file
+├── work-items.md         # full Linux patch work plan
+└── linux-patches/        # numbered patch files (git format-patch output)
+    └── README.md
 ```
 
 ## Scope
 
-Eventually this tree will hold:
+| Area | What changes |
+|------|-------------|
+| `arch/riscv/` | ISA detection, boot init, context switch, trap handler, SMP migration, KVM |
+| `kernel/sched/` | SCHED_DEADLINE + MSE integration |
+| `include/linux/` | CE-aware `task_struct` extensions, cgroup CE types |
+| `drivers/` | QoS domain drivers (future) |
+| `tools/testing/selftests/riscv/` | CE Suite kernel selftests |
+| `Documentation/arch/riscv/` | CE Suite Linux documentation |
 
-- Kernel patches teaching Linux to use CME instructions
-  (`ec.ib`/`ec.ob`/`ec.im`/`ec.om`/`ec.od`) in the context-switch path.
-- The radix-tree ECID allocator (see Appendix A).
-- CPE, MSE, and QoS hooks.
-- Userland tooling (e.g., `setcontract`, analogous to `cgcreate`).
-- Tests that validate CE behavior on real silicon (or FPGA prototypes
-  built in `../hw/`).
+## Development target
 
-## Before any kernel work begins
+Linux kernel patches are developed and tested against the CE Suite QEMU
+implementation (`../qemu/`). A QEMU CE Suite build is the prerequisite for
+any kernel work; real silicon or FPGA is the eventual target.
 
-1. Spec chapters 5, 7 (and eventually 8, 9) must be coherent enough to
-   implement against.
-2. A working CME implementation in `../hw/` is the prerequisite for
-   anything beyond stub patches.
+See `../qemu/work-items.md` for the QEMU work plan. CE Suite QEMU Phase 10
+(CME validation complete) is the recommended starting point for kernel work.
 
-Until then, this directory is reserved.
+## Key design decision: SBI interface for ce_ctrl
+
+`ce_ctrl` (0x7D0) is M-mode only. Linux (S-mode) cannot write it directly.
+The boot sequence requires either:
+- Firmware (OpenSBI) pre-enables CE Suite before booting Linux, OR
+- A new SBI extension (`SBI_EXT_CE`) exposes a `ce_enable(hart, mask)` call.
+
+This decision is tracked as **L1** in `work-items.md` and must be resolved
+before any boot or context-switch patches can be written.
