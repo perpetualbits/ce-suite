@@ -40,6 +40,7 @@ Categories:
 - [x] docs/adoc/reference/instruction-card.adoc
 - [x] docs/adoc/submission/motivation.adoc
 - [x] docs/adoc/submission/submission-brief.adoc
+- [x] docs/chapters/appendix-a-ecid.md
 
 ## CODE (BSD-3-Clause)
 
@@ -61,7 +62,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/chapters/appendix-a-ecid.md
 - [ ] docs/chapters/appendix-b-profiles.md
 - [ ] docs/chapters/ch00-fundamental-structure.md
 - [ ] docs/chapters/ch01-execution-context-model.md

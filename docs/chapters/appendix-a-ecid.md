@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com> -->
+
 # Appendix A — ECID Allocation, Delegation, and Destruction
 
 **Status:** Normative reference for kernel implementers.
