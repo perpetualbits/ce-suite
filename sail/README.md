@@ -46,6 +46,31 @@ sail/
 └── Makefile
 ```
 
+## sail-riscv integration points (identified in S2)
+
+CE Suite adds clauses to four scattered declarations in sail-riscv.
+All four are declared in `model/sys/insts_begin.sail` (instruction/execute)
+and `model/core/csr_begin.sail` (CSRs):
+
+| sail-riscv declaration | file | CE Suite adds |
+|---|---|---|
+| `scattered union instruction` | `sys/insts_begin.sail` | 12 CME + 4 CPE + 4 MSE + 4 QoS instruction variants |
+| `scattered function execute` | `sys/insts_begin.sail` | one `function clause execute` per CE instruction |
+| `scattered mapping encdec` | `sys/insts_begin.sail` | one `mapping clause encdec` per CE instruction |
+| `scattered function read_CSR` | `core/csr_begin.sail` | CE Suite CSR read clauses |
+| `scattered function write_CSR` | `core/csr_begin.sail` | CE Suite CSR write clauses |
+
+The pattern to follow is the Zicond extension
+(`model/extensions/Zicond/zicond_types.sail` + `zicond_insts.sail`):
+types added `before sys`, instructions `requires sys`.
+
+**Important (for S4):** sail-riscv now uses a `.sail_project` module system
+(`model/riscv.sail_project`), not a flat file list. The current `make check-riscv`
+target references `prelude.sail`, `riscv_types.sail`, `riscv_regs.sail` — none of
+which exist at those paths. S4 must rewrite that target to use `sail --project`
+with `SAIL_RISCV/model/riscv.sail_project` and inject CE Suite files into the
+module graph.
+
 ## Build
 
 ```

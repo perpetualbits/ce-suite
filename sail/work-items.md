@@ -66,7 +66,13 @@ Identify: which sail-riscv files define `ast`, `execute`, `read_CSR`,
 **Deliverable:** A short note (comment in `sail/README.md`) documenting which
 sail-riscv files are included and in what order.
 
-**Status:** ☐
+**Status:** ✓ Done — sail-riscv uses `.sail_project` module system, not flat
+files. Four scattered declarations are the CE Suite hooks:
+`scattered union instruction` and `scattered function execute` in
+`sys/insts_begin.sail`; `scattered function read_CSR` / `write_CSR` in
+`core/csr_begin.sail`. Pattern to follow: Zicond extension. Integration note
+and S4 Makefile warning documented in `sail/README.md`.
+sail-riscv cloned to `~/git/sail-riscv`.
 
 ---
 
