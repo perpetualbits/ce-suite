@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com> -->
+
 # CE Suite — RISC-V ISA Extension Proposal: Opcode and Name Allocation Request
 
 **Version:** 0.1 (draft)
