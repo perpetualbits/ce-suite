@@ -49,18 +49,18 @@ Categories:
 
 - [x] .gitignore
 - [x] CLAUDE.md
+- [x] docs/archive/README.md
+- [x] docs/archive/ce-tree-of-truths.md
+- [x] docs/archive/chapter0-also-half-correct.md
+- [x] docs/archive/chapter0-half-correct.md
+- [x] docs/archive/chapter4-original.md
+- [x] docs/archive/fpga-board-spec.md
+- [x] docs/archive/google-ai-whitepaper.md
+- [x] docs/archive/rewrite-plan.md
+- [x] docs/archive/ucs.md
+- [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/archive/README.md
-- [ ] docs/archive/ce-tree-of-truths.md
-- [ ] docs/archive/chapter0-also-half-correct.md
-- [ ] docs/archive/chapter0-half-correct.md
-- [ ] docs/archive/chapter4-original.md
-- [ ] docs/archive/fpga-board-spec.md
-- [ ] docs/archive/google-ai-whitepaper.md
-- [ ] docs/archive/rewrite-plan.md
-- [ ] docs/archive/ucs.md
-- [ ] docs/archive/working_with_chatgpt.md
 - [ ] docs/chapters/appendix-a-ecid.md
 - [ ] docs/chapters/appendix-b-profiles.md
 - [ ] docs/chapters/ch00-fundamental-structure.md
