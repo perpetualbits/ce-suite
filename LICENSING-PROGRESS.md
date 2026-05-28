@@ -13,6 +13,7 @@ Categories:
 ## SPEC (CC BY 4.0)
 
 - [x] README.md
+- [x] SETUP_INSTRUCTIONS
 
 ## CODE (BSD-3-Clause)
 
@@ -25,7 +26,6 @@ Categories:
 - [x] LICENSE
 
 ## UNCLASSIFIED
-- [ ] SETUP_INSTRUCTIONS
 - [ ] docs/adoc/chapters/appendix-a-ecid.adoc
 - [ ] docs/adoc/chapters/appendix-b-profiles.adoc
 - [ ] docs/adoc/chapters/ch00-fundamental-structure.adoc
