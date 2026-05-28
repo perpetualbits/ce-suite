@@ -16,19 +16,19 @@ union clause instruction = CE_CPIT : (regidx, regidx, regidx)    /* rd, rs1(src_
 union clause instruction = CE_CPOT : (regidx, regidx)            /* rd, rs1(child_ecid) */
 
 mapping clause encdec = CE_CPIR(rd, rs1, rs2) <->
-  0b0000000 @ rs2 @ rs1 @ 0b001 @ rd @ 0b0001011
+  0b0000000 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b001 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_CPOR(rd, rs1) <->
-  0b0000001 @ 0b00000 @ rs1 @ 0b001 @ rd @ 0b0001011
+  0b0000001 @ 0b00000 @ encdec_reg(rs1) @ 0b001 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_CPIT(rd, rs1, rs2) <->
-  0b0000010 @ rs2 @ rs1 @ 0b001 @ rd @ 0b0001011
+  0b0000010 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b001 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_CPOT(rd, rs1) <->
-  0b0000011 @ 0b00000 @ rs1 @ 0b001 @ rd @ 0b0001011
+  0b0000011 @ 0b00000 @ encdec_reg(rs1) @ 0b001 @ encdec_reg(rd) @ 0b0001011
 
 /* Execute stubs — TODO in Sail v2 */
-function clause execute(CE_CPIR(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_CPOR(rd, rs1))      = { raise(IllegalInstruction()) }
-function clause execute(CE_CPIT(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_CPOT(rd, rs1))      = { raise(IllegalInstruction()) }
+function clause execute(CE_CPIR(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_CPOR(rd, rs1))      = Illegal_Instruction()
+function clause execute(CE_CPIT(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_CPOT(rd, rs1))      = Illegal_Instruction()

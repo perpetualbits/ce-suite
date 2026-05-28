@@ -30,5 +30,5 @@ function clause read_CSR(0x7D0) = zero_extend(ce_ctrl)
  * Sail v1 assumes all four extensions are present. */
 function clause write_CSR(0x7D0, value) = {
   ce_ctrl = value[3..0];
-  zero_extend(ce_ctrl)
+  Ok(zero_extend(ce_ctrl))
 }

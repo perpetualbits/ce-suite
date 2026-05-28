@@ -27,6 +27,7 @@ $include <generic_equality.sail>
 $include <hex_bits.sail>
 $include <hex_bits_signed.sail>
 $include <dec_bits.sail>
+$include <result.sail>
 
 /* Utility functions from sail-riscv prelude — replicated for standalone */
 
@@ -60,20 +61,23 @@ function to_bits(l, n) = get_slice_int(l, n, 0)
 /* XLEN — RV64 assumed for standalone check */
 type xlenbits = bits(64)
 
-/* Register index */
-type regidx = bits(5)
+/* Register index — newtype matching sail-riscv's core/types.sail */
+newtype regidx = Regidx : bits(5)
 
 /* CSR address */
 type csreg = bits(12)
+
+/* encdec_reg — maps regidx <-> bits(5); same pattern as sail-riscv */
+mapping encdec_reg : regidx <-> bits(5) = { Regidx(b) <-> b }
 
 /* Register file */
 register xregs : vector(32, dec, xlenbits) = vector_init(zeros())
 
 val rX : regidx -> xlenbits
-function rX(r) = if unsigned(r) == 0 then zeros() else xregs[unsigned(r)]
+function rX(Regidx(r)) = if unsigned(r) == 0 then zeros() else xregs[unsigned(r)]
 
 val wX : (regidx, xlenbits) -> unit
-function wX(r, v) = { if unsigned(r) != 0 then xregs[unsigned(r)] = v }
+function wX(Regidx(r), v) = { if unsigned(r) != 0 then xregs[unsigned(r)] = v }
 
 overload X = {rX, wX}
 
@@ -84,16 +88,6 @@ union ExecutionResult = {
 }
 
 let RETIRE_SUCCESS : ExecutionResult = Retire_Success()
-
-/* Exceptions — plain union (not scattered) in Sail 0.20 */
-union exception = {
-  CE_BankFault       : unit,
-  IllegalInstruction : unit
-}
-
-/* raise — wraps Sail's throw for use as an expression */
-val raise : forall ('a : Type). exception -> 'a
-function raise(e) = throw e
 
 /* Scattered declarations that CE Suite adds clauses to.
  * In integrated mode these are declared by sail-riscv. */
@@ -108,5 +102,5 @@ scattered mapping encdec
 val read_CSR : csreg -> xlenbits
 scattered function read_CSR
 
-val write_CSR : (csreg, xlenbits) -> xlenbits
+val write_CSR : (csreg, xlenbits) -> result(xlenbits, unit)
 scattered function write_CSR

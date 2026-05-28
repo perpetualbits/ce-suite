@@ -16,18 +16,18 @@ union clause instruction = CE_MSIT : (regidx, regidx, regidx)    /* rd, rs1(src_
 union clause instruction = CE_MSOT : (regidx, regidx)            /* rd, rs1(child_ecid) */
 
 mapping clause encdec = CE_MSIR(rd, rs1, rs2) <->
-  0b0000000 @ rs2 @ rs1 @ 0b010 @ rd @ 0b0001011
+  0b0000000 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b010 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_MSOR(rd, rs1) <->
-  0b0000001 @ 0b00000 @ rs1 @ 0b010 @ rd @ 0b0001011
+  0b0000001 @ 0b00000 @ encdec_reg(rs1) @ 0b010 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_MSIT(rd, rs1, rs2) <->
-  0b0000010 @ rs2 @ rs1 @ 0b010 @ rd @ 0b0001011
+  0b0000010 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b010 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_MSOT(rd, rs1) <->
-  0b0000011 @ 0b00000 @ rs1 @ 0b010 @ rd @ 0b0001011
+  0b0000011 @ 0b00000 @ encdec_reg(rs1) @ 0b010 @ encdec_reg(rd) @ 0b0001011
 
-function clause execute(CE_MSIR(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_MSOR(rd, rs1))      = { raise(IllegalInstruction()) }
-function clause execute(CE_MSIT(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_MSOT(rd, rs1))      = { raise(IllegalInstruction()) }
+function clause execute(CE_MSIR(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_MSOR(rd, rs1))      = Illegal_Instruction()
+function clause execute(CE_MSIT(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_MSOT(rd, rs1))      = Illegal_Instruction()

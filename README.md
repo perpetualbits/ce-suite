@@ -144,7 +144,7 @@ The documents in `docs/` are arranged by normative authority:
 | Chapter 19 (Interoperability with Ratified Extensions) | Done |
 | Appendix A (ECID) | Done |
 | Appendix B (Capability Profiles) | Done |
-| `sail/` | Work plan complete; implementation started (S1 done) |
+| `sail/` | Work plan complete; S1–S4 done (toolchain + both type-checks pass) |
 | `qemu/` | Work plan complete; implementation not yet started |
 | `sw/` | Work plan complete; implementation not yet started |
 | `hw/` | Future work |

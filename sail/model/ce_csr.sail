@@ -21,7 +21,7 @@ function clause read_CSR(0x7C0) =
   if cme_enabled() then cme_ec_table_base else zeros()
 function clause write_CSR(0x7C0, value) = {
   if cme_enabled() then cme_ec_table_base = value else ();
-  cme_ec_table_base
+  Ok(cme_ec_table_base)
 }
 
 /* 0xFC1 — cme_del_cap (RO) */
@@ -48,7 +48,7 @@ function clause read_CSR(0x7C3) =
   if cme_enabled() then cme_seal_key else zeros()
 function clause write_CSR(0x7C3, value) = {
   if cme_enabled() then cme_seal_key = value else ();
-  cme_seal_key
+  Ok(cme_seal_key)
 }
 
 /* 0xFD1 — current_ecid_level (RO, S/HS/VS accessible when S_EN=1) */

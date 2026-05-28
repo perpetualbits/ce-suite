@@ -18,18 +18,18 @@ union clause instruction = CE_QSIT : (regidx, regidx, regidx)    /* rd, rs1(src_
 union clause instruction = CE_QSOT : (regidx, regidx, regidx)    /* rd, rs1(child_ecid), rs2(domain_id) */
 
 mapping clause encdec = CE_QSIR(rd, rs1, rs2) <->
-  0b0000000 @ rs2 @ rs1 @ 0b011 @ rd @ 0b0001011
+  0b0000000 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b011 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_QSOR(rd, rs1, rs2) <->
-  0b0000001 @ rs2 @ rs1 @ 0b011 @ rd @ 0b0001011
+  0b0000001 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b011 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_QSIT(rd, rs1, rs2) <->
-  0b0000010 @ rs2 @ rs1 @ 0b011 @ rd @ 0b0001011
+  0b0000010 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b011 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_QSOT(rd, rs1, rs2) <->
-  0b0000011 @ rs2 @ rs1 @ 0b011 @ rd @ 0b0001011
+  0b0000011 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b011 @ encdec_reg(rd) @ 0b0001011
 
-function clause execute(CE_QSIR(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_QSOR(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_QSIT(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
-function clause execute(CE_QSOT(rd, rs1, rs2)) = { raise(IllegalInstruction()) }
+function clause execute(CE_QSIR(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_QSOR(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_QSIT(rd, rs1, rs2)) = Illegal_Instruction()
+function clause execute(CE_QSOT(rd, rs1, rs2)) = Illegal_Instruction()

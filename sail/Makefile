@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com>
 
-SAIL      ?= sail
-SAIL_RISCV ?= $(error Set SAIL_RISCV to your sail-riscv checkout path)
+SAIL       ?= sail
+SAIL_RISCV ?= $(HOME)/git/sail-riscv
 
 # CE Suite sources (no sail-riscv dependencies)
 # Order matters: types before state, cme_types before state (EC_entry/Bank)
@@ -29,16 +29,14 @@ CE_STANDALONE_SOURCES = \
 check:
 	$(SAIL) -just_check $(CE_STANDALONE_SOURCES)
 
-# Type-check integrated with sail-riscv base model
-# NOTE (S4): sail-riscv now uses a .sail_project module system.
-# This target needs rewriting to use:
-#   sail --project $(SAIL_RISCV)/model/riscv.sail_project ...
-# See sail/README.md integration-points section.
+# Type-check integrated with sail-riscv base model.
+# Uses scripts/inject_ce_files.py to generate the ordered file list from
+# sail-riscv's riscv.sail_project, injecting CE Suite files before
+# postlude/insts_end.sail where scattered unions/functions are closed.
 check-riscv:
 	$(SAIL) -just_check \
-	  $(SAIL_RISCV)/model/prelude/prelude.sail \
-	  $(SAIL_RISCV)/model/prelude/errors.sail \
-	  $(CE_SOURCES)
+	  $(shell python3 scripts/inject_ce_files.py \
+	    $(SAIL) $(SAIL_RISCV)/model $(CE_SOURCES))
 
 clean:
 	rm -rf _build/

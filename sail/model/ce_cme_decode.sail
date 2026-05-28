@@ -9,7 +9,8 @@
  * Encoding: funct7[6:0] | rs2[4:0] | rs1[4:0] | 000 | rd[4:0] | 0001011
  *
  * Sail mapping clauses require literal bit patterns; symbolic constants
- * are inlined here (sail does not pattern-match let-bound constants).
+ * are inlined here.  regidx is a newtype in sail-riscv so encdec_reg()
+ * is used to convert it to bits(5) for bit-string concatenation.
  */
 
 /* CME fast-path bank operations (ch03 §3.1) */
@@ -37,7 +38,7 @@ union clause instruction = CE_ECIV : (regidx, regidx, regidx)    /* rd, rs1(ecid
 union clause instruction = CE_ECOV : (regidx, regidx, regidx)    /* rd, rs1(ecid), rs2(mask) */
 
 /* ------------------------------------------------------------------ */
-/* Decode mappings — literals only; no symbolic constants             */
+/* Decode mappings — literals only; encdec_reg converts regidx       */
 /* opcode = 0b0001011, funct3 = 0b000 (CME)                          */
 /* funct7 values: ECIB=0b0000000 ECOB=0b0000001 ECIM=0b0000010       */
 /*                ECOM=0b0000011 ECIG=0b0000100 ECOG=0b0000101       */
@@ -46,37 +47,37 @@ union clause instruction = CE_ECOV : (regidx, regidx, regidx)    /* rd, rs1(ecid
 /* ------------------------------------------------------------------ */
 
 mapping clause encdec = CE_ECIB(rd, rs1) <->
-  0b0000000 @ 0b00000 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000000 @ 0b00000 @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECOB(rd, rs1, rs2) <->
-  0b0000001 @ rs2 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000001 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECIM(rd, rs1, rs2) <->
-  0b0000010 @ rs2 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000010 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECOM(rd, rs1, rs2) <->
-  0b0000011 @ rs2 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000011 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECIG(rd, rs1) <->
-  0b0000100 @ 0b00000 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000100 @ 0b00000 @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECOG(rd, rs1) <->
-  0b0000101 @ 0b00000 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000101 @ 0b00000 @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECIT(rd, rs1, rs2) <->
-  0b0000110 @ rs2 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000110 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECOT(rd, rs1) <->
-  0b0000111 @ 0b00000 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0000111 @ 0b00000 @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECIR(rd, rs1) <->
-  0b0001000 @ 0b00000 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0001000 @ 0b00000 @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECOE(rd, rs1) <->
-  0b0001001 @ 0b00000 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0001001 @ 0b00000 @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECIV(rd, rs1, rs2) <->
-  0b0001010 @ rs2 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0001010 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011
 
 mapping clause encdec = CE_ECOV(rd, rs1, rs2) <->
-  0b0001011 @ rs2 @ rs1 @ 0b000 @ rd @ 0b0001011
+  0b0001011 @ encdec_reg(rs2) @ encdec_reg(rs1) @ 0b000 @ encdec_reg(rd) @ 0b0001011

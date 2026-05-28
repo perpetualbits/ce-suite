@@ -110,7 +110,18 @@ correct sail-riscv include path list.
 
 **Depends on:** S2, S3
 
-**Status:** ☐
+**Status:** ✓ Done — `make check-riscv` exits 0 (warnings only).
+Integration approach: `scripts/inject_ce_files.py` uses `sail --list-files`
+to get the sail-riscv ordered file list, injects CE Suite files immediately
+before `postlude/insts_end.sail` (where scattered unions are closed).
+Fixes required beyond S3:
+- `write_CSR` must return `result(xlenbits, unit)` — add `Ok()` wrapper
+- `regidx` is a `newtype` in sail-riscv; standalone prelude updated to match
+- `encdec_reg(rs1)` needed in decode mappings (not plain `rs1`)
+- `encdec_reg(rs1) == 0b00000` for x0 check in execute (not `rs1 == 0b00000`)
+- Removed `raise()`/exception stubs from execute — use `Illegal_Instruction()`
+  (the sail-riscv `ExecutionResult` variant) uniformly in both modes
+Default SAIL_RISCV: `$(HOME)/git/sail-riscv`.
 
 ---
 
