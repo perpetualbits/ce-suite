@@ -62,6 +62,7 @@ Categories:
 - [x] docs/chapters/ch17-memory-ordering.md
 - [x] docs/chapters/ch18-clic-integration.md
 - [x] docs/chapters/ch19-interop-ratified-extensions.md
+- [x] docs/charter/CHANGELOG.md
 
 ## CODE (BSD-3-Clause)
 
@@ -83,7 +84,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/charter/CHANGELOG.md
 - [ ] docs/charter/project_instructions.md
 - [ ] docs/future-directions.md
 - [ ] docs/refamiliarize.md
