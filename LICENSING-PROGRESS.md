@@ -35,6 +35,7 @@ Categories:
 - [x] docs/adoc/chapters/ch17-memory-ordering.adoc
 - [x] docs/adoc/chapters/ch18-clic-integration.adoc
 - [x] docs/adoc/chapters/ch19-interop-ratified-extensions.adoc
+- [x] docs/adoc/index.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -46,7 +47,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/index.adoc
 - [ ] docs/adoc/reference/glossary.adoc
 - [ ] docs/adoc/reference/instruction-card.adoc
 - [ ] docs/adoc/submission/motivation.adoc
