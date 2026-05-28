@@ -10,8 +10,8 @@ instruction within that extension.
 *Error convention.* Every instruction that can fail writes `0` (success)
 or a non-zero error code in `rd`. Two exceptions return success-path
 information in `rd` rather than an error code: `ec.ib` (bank slot index
-written) and `ec.oe` (count of ECIDs freed). Both trap on error; use `x0`
-to discard.
+written) and `ec.oe` (count of ECIDs freed). Both trap on error; use
+`x0` to discard.
 
 '''''
 
@@ -20,8 +20,8 @@ to discard.
 [width="100%",cols="13%,9%,23%,12%,17%,14%,12%",options="header",]
 |===
 |funct7 |Mnemonic |Syntax |rd |rs1 |rs2 |Description
-|`0000000` |`ec.ib` |`ec.ib rd, rs1` |bank slot index |mask register |— |Save
-running context to on-chip bank
+|`0000000` |`ec.ib` |`ec.ib rd, rs1` |bank slot index |mask register |—
+|Save running context to on-chip bank
 
 |`0000001` |`ec.ob` |`ec.ob rd, rs1, rs2` |result |target ECID |mask
 register |Restore context from bank (fast switch)
@@ -47,8 +47,8 @@ delegated bank from a child ECID
 |`0001000` |`ec.ir` |`ec.ir rd, rs1` |new ECID/0 |leaf flag (0/1) |—
 |Allocate a new child ECID
 
-|`0001001` |`ec.oe` |`ec.oe rd, rs1` |ECIDs freed count |target ECID |— |Forced
-destroy: remove ECID and entire delegation subtree
+|`0001001` |`ec.oe` |`ec.oe rd, rs1` |ECIDs freed count |target ECID |—
+|Forced destroy: remove ECID and entire delegation subtree
 
 |`0001010` |`ec.iv` |`ec.iv rd, rs1, rs2` |result |target ECID |mask
 register |Seal a bank (vault — cryptographically protected)
@@ -59,13 +59,12 @@ register |Unseal a bank (vault)
 
 *Notes.* - `ec.ib` and `ec.oe` return success-path data in `rd` (not
 error codes); `rs2` encodes as `00000` (unused). - `ec.ir`: `rs1 = 0` →
-leaf child (cannot delegate further);
-`rs1 = 1` → delegating child (delegation_L = parent_L {plus} 1,
-requires parent_L ++<++ D). - `ec.it` delegates *one bank* per call,
-implementation-chosen from the parent’s group. To delegate N banks, call
-`ec.it` N times. - `ec.iv`/`ec.ov` are specified as instruction shells;
-full key-derivation and sealing-format semantics await resolution of
-charter §8.6.
+leaf child (cannot delegate further); `rs1 = 1` → delegating child
+(delegation_L = parent_L {plus} 1, requires parent_L ++<++
+D). - `ec.it` delegates *one bank* per call, implementation-chosen from
+the parent’s group. To delegate N banks, call `ec.it` N times. -
+`ec.iv`/`ec.ov` are specified as instruction shells; full key-derivation
+and sealing-format semantics are deferred to a future revision.
 
 '''''
 
@@ -137,10 +136,10 @@ selector |Revoke a delegated QoS contract from a child ECID
 |===
 
 *Notes.* - `qs.or` and `qs.ot`: rs2 = domain_id; `0` = revoke all
-domains simultaneously (charter §6.7). All four QoS instructions use all
-three register fields. - `qs.it` inline form (rs2 = delegation
-descriptor directly in a register) requires RV64 on many-field
-encodings; pointer form available for RV32.
+domains simultaneously. All four QoS instructions use all three register
+fields. - `qs.it` inline form (rs2 = delegation descriptor directly in a
+register) requires RV64 on many-field encodings; pointer form available
+for RV32.
 
 '''''
 

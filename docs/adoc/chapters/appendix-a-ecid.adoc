@@ -119,7 +119,7 @@ implementation-defined; the algorithm below uses
 ECID allocation is always performed by the privileged actor that owns
 the containing prefix — the kernel (L0), a hypervisor (L1), or a nested
 hypervisor (L2). User mode may never allocate ECIDs. The maximum
-delegation depth is D ≤ 3 (charter §5.1).
+delegation depth is D ≤ 3.
 
 Two operations cover the full allocation surface:
 
@@ -230,9 +230,9 @@ cannot forge or overwrite it directly.
 *Contracts* are split from the parent’s Contract via the appropriate
 admission instruction (`ms.it` for MSE, `qs.it` for QoS, `cp.ir` for
 CPE). Each split requires chip-global arbitration and either succeeds
-atomically or fails with no state change (charter §4.3, atomic admission
-invariant). The parent’s remaining Contract is reduced by the amount
-allocated to the child.
+atomically or fails with no state change (atomic admission invariant).
+The parent’s remaining Contract is reduced by the amount allocated to
+the child.
 
 ==== A.4.2 Delegation invariants
 
@@ -260,11 +260,11 @@ not permitted when `EC[parent].delegation_L == D`.
 
 ==== A.5.1 Guarantee
 
-The instruction `ec.oe rd, rs1` (charter §6.5) destroys the ECID in `rs1`
-and its entire delegation subtree. `rd` receives the count of ECIDs freed. It *always succeeds*. A zombie,
-blocked, or hostile EC cannot stall its own destruction. The kernel need
-not wait for the target to be cooperatively scheduled or to voluntarily
-release resources.
+The instruction `ec.oe rd, rs1` destroys the ECID in `rs1` and its
+entire delegation subtree. It *always succeeds*. A zombie, blocked, or
+hostile EC cannot stall its own destruction. The kernel need not wait
+for the target to be cooperatively scheduled or to voluntarily release
+resources.
 
 ==== A.5.2 Algorithm: destroy ECID subtree
 
@@ -379,7 +379,7 @@ difference between an owner ECID and any other allocated ECID; the
 `owner_ecid` field in the prefix node is a software record, not a
 hardware distinction.
 
-Calling `ec.oe x0, 0x0010` (destroy Hypervisor A) would collapse the entire
+Calling `ec.oe 0x0010` (destroy Hypervisor A) would collapse the entire
 subtree rooted at that node: ECIDs 0x1010, 0x1011, 0x1012, 0x1013,
 0x1020, 0x1101, 0x1102, and 0x0010 itself would all be destroyed, their
 Banks freed, and their Contracts dissolved. The range 0x1000–0x1FFF

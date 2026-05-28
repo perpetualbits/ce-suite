@@ -5,10 +5,10 @@
 
 === 15.1 Overview
 
-This chapter (P3 work item) resolves the ambiguity in earlier chapters:
-for every CE Suite instruction and every documented error condition, it
-specifies whether the outcome is a *synchronous exception (trap)* or a
-*return code in `rd`*.
+This chapter resolves the ambiguity in earlier chapters: for every CE
+Suite instruction and every documented error condition, it specifies
+whether the outcome is a *synchronous exception (trap)* or a *return
+code in `rd`*.
 
 The two mechanisms are distinct and must not be confused:
 
@@ -85,9 +85,9 @@ out). The corresponding status CSR (`cme_status`, `cpe_status`,
 `mse_status`, `qos_status`) is updated in parallel for
 diagnostic logging.
 
-Silent ignore of errors is prohibited by the charter (§6.6): an
-implementation must either return an error code or trap; it must not
-silently succeed when a constraint is violated.
+Silent ignore of errors is prohibited: an implementation must either
+return an error code or trap; it must not silently succeed when a
+constraint is violated.
 
 '''''
 
@@ -112,10 +112,10 @@ pointer-form rs2)
 
 ==== 15.3.2 New cause: `CE_EXC_BANK_FAULT` (cause 16)
 
-`ec.ib` carries `rd` for the bank slot index (not an error code) — it always
-succeeds or traps. If the bank SRAM hardware raises a fault during the save
-(uncorrectable ECC error, bus error), the instruction cannot return a soft error
-code and must trap.
+`ec.ib` carries `rd` for the bank slot index (not an error code) — it
+always succeeds or traps. If the bank SRAM hardware raises a fault
+during the save (uncorrectable ECC error, bus error), the instruction
+cannot return a soft error code and must trap.
 
 `ec.ob` also performs a bank SRAM read; the same hardware fault applies.
 Although `ec.ob` carries `rd`, a hardware bank SRAM error is
@@ -173,13 +173,15 @@ seal again without unsealing first
 authentication failed
 |===
 
-Note: `ec.ib` and `ec.oe` return success-path information in `rd`, not error
-codes from this table. `ec.ib` returns the bank slot index (trap path: §15.3.2);
-`ec.oe` returns the count of ECIDs freed (always succeeds).
+Note: `ec.ib` and `ec.oe` return success-path information in `rd`, not
+error codes from this table. `ec.ib` returns the bank slot index (trap
+path: §15.3.2); `ec.oe` returns the count of ECIDs freed (always
+succeeds).
 
-The normative software recovery protocol when `CME_ERR_NO_BANK` (code 2) is
-returned by `ec.ig` or `ec.ob` is specified in Chapter 3: §3.3 (`ec.ig` —
-Bank Exhaustion Recovery) and §3.1 (`ec.ob` — Bank Exhaustion Recovery).
+The normative software recovery protocol when
+`CME_ERR_NO_BANK` (code 2) is returned by `ec.ig` or `ec.ob`
+is specified in Chapter 3: §3.3 (`ec.ig` — Bank Exhaustion Recovery) and
+§3.1 (`ec.ob` — Bank Exhaustion Recovery).
 
 '''''
 
@@ -713,12 +715,13 @@ remap the ECS struct or terminate the faulting task.
 
 === 15.7 Quick-Reference Summary
 
-*Instructions that return success-path data in `rd` (not error codes):*
+*Instructions with success-path `rd` (no soft failure):*
 
-[cols=",,",options="header",]
+[width="100%",cols="34%,33%,33%",options="header",]
 |===
 |Instruction |`rd` on success |Trap cause if hardware error
-|`ec.ib` |bank slot index (0-based in owning Group) |16 (`CE_EXC_BANK_FAULT`)
+|`ec.ib` |bank slot index (0-based in owning Group) |16
+(`CE_EXC_BANK_FAULT`)
 
 |`ec.oe` |ECIDs freed count (including target) |— (never traps)
 |===
@@ -752,7 +755,7 @@ when they fail.
 table in §15.4 in hand; the per-instruction descriptions reference error
 names that are now numerically assigned here.
 
-*P4* (discovery mechanism, not yet written) will define how software
-probes for CE Suite presence and which sub-extensions are implemented.
+*Chapter 16* (discovery mechanism) defines how software probes for CE
+Suite presence and which sub-extensions are implemented.
 
-link:ch16-discovery.md[Next: Chapter 16 — (P4) Discovery Mechanism]
+link:ch16-discovery.md[Next: Chapter 16 — Discovery Mechanism]

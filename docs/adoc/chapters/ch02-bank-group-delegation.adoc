@@ -139,7 +139,7 @@ transitions are atomic: the owner field changes from `old_ecid` to
 
 A Bank cannot be accessed by an ECID other than its owner. Attempting to
 issue `ec.ib` or `ec.ob` against a Bank owned by a different ECID raises
-a trap (charter §6.6).
+a trap.
 
 '''''
 
@@ -223,8 +223,8 @@ parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
 `ec.it` N times.
 
 *Contract delegation* is handled by the extension that owns the
-Contract: `ms.it` for MSE Contracts, `qs.it` for QoS Contracts (charter
-§4.3.6). `ec.it` does not transfer Contracts.
+Contract: `ms.it` for MSE Contracts, `qs.it` for QoS Contracts. `ec.it`
+does not transfer Contracts.
 
 Neither instruction takes a Group ID as a separate argument, because
 GroupID = ECID.
@@ -251,9 +251,8 @@ per bank being delegated; each call is O(1).
 ==== 2.4.3 Delegation-level invariants
 
 Delegation depth is bounded by the implementation’s cap `D`, where
-`D ≤ 3` (charter §5.1). The four levels support the realistic
-virtualization hierarchy: L0 host kernel, L1 hypervisor, L2 nested
-hypervisor, L3 guest.
+`D ≤ 3` The four levels support the realistic virtualization hierarchy:
+L0 host kernel, L1 hypervisor, L2 nested hypervisor, L3 guest.
 
 [width="100%",cols="14%,86%",options="header",]
 |===
@@ -265,9 +264,9 @@ Contracts.
 |===
 
 An attempt to create a child ECID from an ECID at level `L = D` raises a
-trap or returns an error code in `rd` (charter §6.6). The parent’s
-delegation level `L` is stored in `EC[parent].delegation_L`
-and is checked by hardware at the time of `ec.ir` and `ec.it`.
+trap or returns an error code in `rd`. The parent’s delegation level `L`
+is stored in `EC[parent].delegation_L` and is checked by
+hardware at the time of `ec.ir` and `ec.it`.
 
 Contract trees are bounded by the same D. A Contract created at level
 `L` can be split into children only if `L ++<++ D`. This ensures the
@@ -316,9 +315,9 @@ ECID via `ec.oe`.
 
 ==== 2.5.2 Forced destruction: `ec.oe`
 
-`ec.oe rd, rs1` destroys ECID `rs1` and its entire subtree, reclaiming all
-resources. `rd` receives the count of ECIDs freed; use `x0` to discard. This instruction always succeeds. The target context cannot
-stall, block, or defend against it. See Chapter 3 §3.5 for the
+`ec.oe rd, rs1` destroys ECID `rs1` and its entire subtree, reclaiming
+all resources. This instruction always succeeds. The target context
+cannot stall, block, or defend against it. See Chapter 3 §3.5 for the
 step-by-step semantics.
 
 `ec.oe` is the path for:
@@ -358,7 +357,7 @@ The following invariants must hold at all times in a conforming
 implementation. They are checked at the time of each `ec.ig`, `ec.og`,
 `ec.it`, `ec.ot`, `ec.oe`, and `ec.ir` operation. Violations raise a
 defined trap or return a documented failure code; silent ignore is
-prohibited (charter §6.6).
+prohibited.
 
 [arabic]
 . *Unique Bank ownership.* No Bank may have more than one owner ECID.

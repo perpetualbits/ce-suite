@@ -11,22 +11,23 @@ rules govern every instruction in this chapter:
 [arabic]
 . *ECID-first operands.* Any instruction that targets a context other
 than the currently running one takes an *ECID number* as its primary
-operand — never a raw pointer, never a bank ID. (Charter §6.2)
+operand — never a raw pointer, never a bank ID.
 . *Implicit current ECID.* Instructions that operate on the currently
 running context consult `current_ecid` implicitly and omit the ECID
-operand. (Charter §6.2)
+operand.
 . *Unified error reporting via `rd`.* Every instruction that can fail
 writes 0 (success) or a non-zero error code in `rd`; pass `x0` to
 discard. Status CSRs (`cme_status` etc.) are updated for diagnostics
 but are not the primary channel. Two exceptions return success-path
-information in `rd` rather than an error code: `ec.ib` (bank slot index
-written) and `ec.oe` (ECIDs freed count). Both trap on error; use `x0` to
-discard. Silent ignore is prohibited. (Charter §6.6)
+information in `rd` rather than an error code: `ec.ib` returns the bank
+slot index written; `ec.oe` returns the count of ECIDs freed. Both trap
+on the error path — `rd` is never an error code for these two. Use `x0`
+to discard either. Silent ignore is prohibited.
 
 All CME instructions are privileged unless noted otherwise. The mnemonic
-scheme is `ec.++<++dir++><++target++>++` (Charter §6.1), where
-`++<++dir++>++` ∈ `++{++i, o}` and `++<++target++>++` is a letter naming
-the target or kind. CME uses the subset `++{++b, m, g, t, r, e, v}`:
+scheme is `ec.++<++dir++><++target++>++`, where `++<++dir++>++` ∈
+`++{++i, o}` and `++<++target++>++` is a letter naming the target or
+kind. CME uses the subset `++{++b, m, g, t, r, e, v}`:
 
 [cols=",,,",options="header",]
 |===
@@ -42,10 +43,7 @@ the target or kind. CME uses the subset `++{++b, m, g, t, r, e, v}`:
 
 The letter `s` (stream / staging bank) does not appear in CME software
 instructions — staging banks are entirely hardware-internal and have no
-direct software-visible instruction. `ec.or` does not exist as a current
-instruction: it was the original name for the forced-destroy operation,
-renamed first to `ec.od` (v0.7) and then to `ec.oe` (v0.8) for naming
-consistency. See §3.5 for details.
+direct software-visible instruction.
 
 '''''
 
@@ -64,28 +62,30 @@ ____
 ** `rd`: Bank slot index (0-based within the owning Group) of the bank
 written; write `x0` to discard.
 ** `rs1`: Register mask — which register groups to save (see §3.7).
-*Special case*: if `rs1` is the zero register (`x0`, encoding `00000`),
-dirty-save mode is activated (see below). An explicit non-zero mask always
-overrides dirty-save mode.
+*Special case: if `rs1` is the zero register (`x0`, encoding `00000`),
+dirty-save mode is activated* (see below). An explicit non-zero mask
+always overrides dirty-save mode.
 * *Operand notes*: Operates on `current_ecid` implicitly. No
-explicit ECID argument. `ec.ib` always succeeds or raises a trap; no soft
-failure is possible. `rd` returns the bank slot index, not an error code.
+explicit ECID argument. `ec.ib` always succeeds or raises a trap; no
+soft failure is possible. `rd` returns the bank slot index, not an error
+code.
 * *Side effects*: Writes state from the active register file into the
-bank associated with `current_ecid`. Clears the dirty-group bitmap bits
-for every register group saved (see §3.7 and Chapter 0 §0.3).
+bank associated with `current_ecid`. Clears the dirty-group bitmap
+bits for every register group saved (see §3.7 and Chapter 0 §0.3).
 Updates `cme_status`.
 * *Guaranteed cycles*: 1–3 (proportional to number of groups saved).
 
 ===== Dirty-Save Mode (`rs1 = x0`)
 
-When `rs1` encodes the zero register (`x0`, field value `00000`), `ec.ib`
-substitutes the running ECID's dirty-group bitmap (Chapter 0 §0.3) for
-the explicit mask. Hardware saves only the register groups that have been
-written since the last `ec.ib` or `ec.ob`; unmodified groups are skipped.
-The dirty bits for all saved groups are cleared on commit.
+When `rs1` encodes the zero register (`x0`, field value `00000`),
+`ec.ib` substitutes the running ECID’s *dirty-group bitmap* (Chapter 0
+§0.3) for the explicit mask. Hardware saves only the register groups
+that have been written since the last `ec.ib` or `ec.ob`; unmodified
+groups are skipped. The dirty bits for all saved groups are cleared on
+commit.
 
-This mode is analogous to the lazy FP context-switch discipline used with
-RISC-V `mstatus.FS`: a context that never touches FPRs, VEC, or MAT
+This mode is analogous to the lazy FP context-switch discipline used
+with RISC-V `mstatus.FS`: a context that never touches FPRs, VEC, or MAT
 registers incurs no save cost for those groups. Interrupt handlers that
 touch only GPRs save and restore in 1–2 cycles regardless of whether the
 preempted context had dirty VMT state.
@@ -93,21 +93,22 @@ preempted context had dirty VMT state.
 [source,asm]
 ----
     # Dirty-save: save only groups the current context actually modified.
-    ec.ib  x0, x0       # rs1 = x0 → dirty-save; rd = x0 discards slot index
+    ec.ib  rd, x0       # rs1 = x0 → use dirty-group bitmap as mask
+                        # rd = bank slot index of bank written
 
     # Explicit-mask save: always saves exactly these groups.
     li     t0, 0x3      # GPR | FPR
-    ec.ib  x0, t0       # save GPR+FPR; rd = x0 discards slot index
+    ec.ib  rd, t0
 ----
 
-An explicit non-zero mask always overrides dirty-save mode. A context that
-passes a non-zero `rs1` saves exactly the groups in that mask regardless
-of the dirty-group bitmap state, and the dirty bits for those groups are
-cleared.
+An explicit non-zero mask always overrides dirty-save mode. A context
+that passes a non-zero rs1 saves exactly the groups in that mask
+regardless of the dirty-group bitmap state, and the dirty bits for those
+groups are cleared.
 
-*Note on `x0` vs. zero-valued register.* The dirty-save trigger is the
+*Note on `x0` vs. zero-valued register.* The dirty-save trigger is the
 register-field encoding `00000` (x0), not the value zero. An instruction
-`ec.ib x0, a0` where `a0 = 0` uses explicit-mask mode with an all-zeros
+`ec.ib rd, a0` where `a0 = 0` uses explicit-mask mode with an all-zeros
 mask (save nothing) — it does not activate dirty-save mode.
 
 ==== `ec.ob` — Restore context from bank for target ECID
@@ -117,21 +118,22 @@ ____
 ____
 
 * *Syntax*: `ec.ob rd, rs1, rs2`
-** `rd`: 0 on success; `CME_ERR_INVALID_ECID` if the target ECID is not
-allocated or has a generation mismatch; `CME_ERR_NO_BANK` if the target
-ECID has no bank resident (see Bank Exhaustion Recovery below);
-`CME_ERR_PERMISSION` if the caller is not an authorized ancestor.
+** `rd`: 0 on success; `CME_ERR_INVALID_ECID` if the target
+ECID is not allocated or has a generation mismatch;
+`CME_ERR_NO_BANK` if the target ECID has no bank resident
+(see Bank Exhaustion Recovery below); `CME_ERR_PERMISSION` if
+the caller is not an authorized ancestor.
 ** `rs1`: Target ECID number.
 ** `rs2`: Register mask — which register groups to restore (see §3.7).
 * *Side effects*: Restores registers from the bank owned by ECID `rs1`.
-Clears the dirty-group bitmap bits for every register group restored; the
-resumed context begins with a clean bitmap for those groups. If the PC bit
-is set in the mask, execution jumps to the restored program counter on
-commit.
+Clears the dirty-group bitmap bits for every register group restored;
+the resumed context begins with a clean bitmap for those groups. If the
+PC bit is set in the mask, execution jumps to the restored program
+counter on commit.
 * *Guaranteed cycles*: 1–3.
 
 ____
-*Typical switch sequence*: `ec.ib x0, mask` (save current), then
+*Typical switch sequence*: `ec.ib mask` (save current), then
 `ec.ob x0, next_ecid, mask` (restore next, discard result). The
 transition between `current_ecid` and `next_ecid` is complete
 when `ec.ob` commits.
@@ -139,20 +141,21 @@ ____
 
 ===== Bank Exhaustion Recovery
 
-When `ec.ob` returns `CME_ERR_NO_BANK` (code 2; defined in Chapter 15
-§15.4), the target ECID has no bank resident — its context was previously
-spilled to ECS in RAM via `ec.im`, or was never banked. The normative
-recovery protocol:
+When `ec.ob` returns `CME_ERR_NO_BANK` (code 2; defined in
+Chapter 15 §15.4), the target ECID has no bank resident — its context
+was previously spilled to ECS in RAM via `ec.im`, or was never banked.
+The normative recovery protocol:
 
 [arabic]
 . *Free a bank slot.* Follow the `ec.ig` bank exhaustion recovery
 sequence (§3.3): select a victim ECID `v` that is banked and is not the
 currently running context, issue `ec.im x0, v, mask` to spill it to
-`EC[v].ecs_ptr` in RAM, then issue `ec.og x0, v` to release the victim's
-bank to the free pool.
+`EC[v].ecs_ptr` in RAM, then issue `ec.og x0, v` to release
+the victim’s bank to the free pool.
 . *Fill the target.* Issue `ec.om rd, rs1, mask` to load the target
-ECID's state from `EC[rs1].ecs_ptr` in RAM into the freed bank. `ec.om`
-claims a bank from the free pool and assigns it to the target's Group.
+ECID’s state from `EC[rs1].ecs_ptr` in RAM into the freed
+bank. `ec.om` claims a bank from the free pool and assigns it to the
+target’s Group.
 . *Retry.* Re-issue the original `ec.ob` call; the target ECID now has a
 bank resident and the restore completes normally.
 
@@ -214,11 +217,11 @@ ____
 
 === 3.3 Bank–Group Assignment
 
-Banks belong to Groups; GroupID equals the owning ECID number (charter
-§4.1). These instructions assign or release banks from a given ECID’s
-Group without touching the ECID itself. The Group maintains no explicit
-member list; ownership is encoded in each bank’s up-pointer and checked
-at the bank (the reversal trick).
+Banks belong to Groups; GroupID equals the owning ECID number. These
+instructions assign or release banks from a given ECID’s Group without
+touching the ECID itself. The Group maintains no explicit member list;
+ownership is encoded in each bank’s up-pointer and checked at the bank
+(the reversal trick).
 
 ==== `ec.ig` — Assign a free bank to an ECID’s Group
 
@@ -236,27 +239,27 @@ to update.
 
 ===== Bank Exhaustion Recovery
 
-When `ec.ig` returns `CME_ERR_NO_BANK` (code 2; defined in Chapter 15
-§15.4), the hart’s free-bank pool is exhausted. The normative recovery
-protocol:
+When `ec.ig` returns `CME_ERR_NO_BANK` (code 2; defined in
+Chapter 15 §15.4), the hart’s free-bank pool is exhausted. The normative
+recovery protocol:
 
 [arabic]
 . *Select a victim.* Choose a banked ECID `v` on this hart that is not
-the currently running context (`v ≠ current_ecid`) and is eligible to be
-spilled. A per-hart LRU list of banked ECIDs is a common kernel data
-structure for this.
+the currently running context (`v ≠ current_ecid`) and is eligible
+to be spilled. A per-hart LRU list of banked ECIDs is a common kernel
+data structure for this.
 . *Spill the victim.* Issue `ec.im x0, v, mask` to transfer the victim’s
-bank state to `EC[v].ecs_ptr` in RAM. If `ec.im` returns a non-zero code,
-select a different victim and repeat from step 1.
-. *Release the victim’s bank.* Issue `ec.og x0, v` to return the victim’s
-bank from its Group to the free pool. (`ec.im` alone does not free the
-bank; `ec.og` is the instruction that releases it.)
+bank state to `EC[v].ecs_ptr` in RAM. If `ec.im` returns a
+non-zero code, select a different victim and repeat from step 1.
+. *Release the victim’s bank.* Issue `ec.og x0, v` to return the
+victim’s bank from its Group to the free pool. (`ec.im` alone does not
+free the bank; `ec.og` is the instruction that releases it.)
 . *Retry.* Re-issue the original `ec.ig` call; the freed bank is now
 available.
 
 If no eligible victim exists (all banked ECIDs are the currently running
-context or are otherwise ineligible), the bank request cannot be satisfied
-until a running context is switched out.
+context or are otherwise ineligible), the bank request cannot be
+satisfied until a running context is switched out.
 
 ==== `ec.og` — Release a bank from an ECID’s Group
 
@@ -281,7 +284,7 @@ from a tenant, use `ec.ot` or `ec.oe`.
 
 These instructions delegate Group resources (banks, contracts, child
 ECIDs) from a parent ECID to a child, or revoke them. The delegation
-tree is bounded by depth D ≤ 3 (charter §5).
+tree is bounded by depth D ≤ 3.
 
 ==== `ec.it` — Delegate one bank to a child ECID
 
@@ -297,8 +300,7 @@ violation, or invalid ECID.
 * *Scope*: Banks only. `ec.it` transfers exactly *one* bank per call;
 the implementation selects which bank from `rs1`’s Group. To delegate N
 banks, call `ec.it` N times. Contract delegation is handled by
-per-extension instructions: `ms.it` for MSE, `qs.it` for QoS (charter
-§4.3).
+per-extension instructions: `ms.it` for MSE, `qs.it` for QoS.
 * *Side effects*: The selected bank’s owner field is updated from `rs1`
 to `rs2`. Requires `rs1` to be a privileged ancestor of `rs2`. Requires
 `rs2` to have `L ++<++ D` if the child is to be able to re-delegate the
@@ -359,10 +361,10 @@ existence)
 ____
 
 * *Syntax*: `ec.oe rd, rs1`
-** `rd`: Total count of ECIDs freed (target plus all descendants); write
+** `rd`: Total count of ECIDs freed, including the target itself; write
 `x0` to discard.
 ** `rs1`: Target ECID to destroy.
-* *Semantics* (per charter §6.5):
+* *Semantics*:
 [arabic]
 . Revokes all Contracts held by `rs1` and every descendant in its
 subtree.
@@ -373,19 +375,12 @@ parent Group.
 slot.
 . *Always succeeds.* Zombies and hostile contexts cannot stall
 reclamation.
+. *`rd` returns the total count of ECIDs freed*, including the target
+itself. Each ECID in the destroyed subtree is counted exactly once.
+Callers that do not need the count write to `x0`.
 * *Privileged*: Yes. The caller must be a parent or privileged ancestor
 of `rs1`.
 * *Cycles*: O(log N) average; proportional to subtree size.
-
-*Why there is no `ec.or`.* In the earliest drafts the forced-destroy
-instruction was named `ec.or` ("`ECID out of resource`"). It was renamed
-to `ec.od` at v0.7 to avoid visual ambiguity with bitwise OR, then
-renamed again to `ec.oe` at v0.8 to restore the convention that the
-trailing letter names the _target kind_ rather than the operation (`e` =
-existence; the instruction takes an ECID _out of existence_). Charter
-§2.1 lists both retired names. There is no current instruction named
-`ec.or`; the `r`-target is used only for the allocation direction
-(`ec.ir`).
 
 '''''
 
@@ -395,10 +390,10 @@ ____
 *Status — instruction shells only.* `ec.iv` and `ec.ov` are defined as
 instruction placeholders. The cryptographic semantics — key derivation,
 key rotation, attestation, sealed-bank representation, and unsealing
-authentication — are *not yet normative* (charter §8, open item 6). An
-implementer cannot build a secure vault from this chapter alone. Do not
-rely on vault instruction semantics for any security-critical design
-until they are fully specified.
+authentication — are *not yet normative* and are deferred to a future
+revision. An implementer cannot build a secure vault from this chapter
+alone. Do not rely on vault instruction semantics for any
+security-critical design until they are fully specified.
 ____
 
 These operations seal and unseal banks under hardware-managed
@@ -497,7 +492,7 @@ array for this hart.
 `EC[e]` entries are located via
 `cme_ec_table_base {plus} e * stride`, where `stride` is
 implementation-defined but fixed per hart. The `ecs_ptr` field is at
-offset 0 within each entry (charter §3.2).
+offset 0 within each entry (§0 of this specification).
 
 '''''
 
@@ -597,7 +592,8 @@ instructions.
 
 ==== 3.10.4 Encoding examples
 
-`ec.ib x0, a0` — save current context, mask in a0 (x10 = `01010`), discard bank slot index:
+`ec.ib x0, a0` — save current context, mask in a0 (x10 = `01010`),
+discard bank slot index:
 
 ....
  31      25  24    20  19    15 14  12 11     7 6      0
@@ -654,7 +650,7 @@ Every CME instruction that can fail writes its result in `rd`: *0* =
 success, *non-zero* = error code. Callers who do not need the result
 write `rd = x0`. `cme_status` is updated in parallel for diagnostic
 use (e.g., exception handlers logging the cause) but is not the primary
-error channel (charter §6.6).
+error channel.
 
 Any instruction that encounters an invalid ECID (unallocated slot,
 generation mismatch, privilege violation, or Group ownership failure)
@@ -663,17 +659,16 @@ must either:
 * Raise a defined trap to the OS or hypervisor, or
 * Return a documented error code in `rd`.
 
-Silent ignore is prohibited (charter §6.6).
+Silent ignore is prohibited.
 
 *Success-path `rd` for `ec.ib` and `ec.oe`:*
 
 * *`ec.ib rd, rs1`* — always succeeds or raises a trap; no soft failure.
-`rd` returns the bank slot index (0-based within the owning Group). Use
-`x0` to discard.
+`rd` returns the bank slot index (0-based within the owning Group) of
+the bank written.
 * *`ec.oe rd, rs1`* — always succeeds; `rd` returns the total count of
-ECIDs freed, including the target and all descendants. Use `x0` to
-discard. Forward progress is guaranteed; zombies cannot stall
-reclamation.
+ECIDs freed, including the target. Forward progress is guaranteed;
+zombies cannot stall reclamation.
 
 '''''
 
@@ -692,10 +687,10 @@ reclamation.
     Bank[A] (owner A) ── empty / stale
     Bank[B] (owner B) ── [B's GPRs, FPRs, PC, ...]   ← waiting in SRAM
 
-  ─── Step 1: ec.ib x0, mask ─────────────────────────────────────────
+  ─── Step 1: ec.ib mask ─────────────────────────────────────────────
     Active reg file  ──→  Bank[A]         (state saved to SRAM)
     current_ecid unchanged  (still A)
-    rd = bank slot index; always succeeds or traps.
+    rd = bank slot index (0-based in owning Group); x0 discards. Always succeeds or traps.
 
   ─── Step 2: ec.ob x0, B, mask ──────────────────────────────────────
     EC[B].bank_ref   ──→  Bank[B] located

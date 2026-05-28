@@ -244,11 +244,6 @@ hardware arbitration that succeeds or fails atomically. On failure, no
 state is changed. Half-applied splits are a worse failure mode than
 outright rejection — atomic semantics prevent them.
 
-Why Contracts and not Pools? Earlier drafts placed a Pool layer between
-ECIDs and Contracts. Every Pool always pointed to exactly one Contract,
-making the Pool redundant. Removing Pools collapsed the model without
-losing anything.
-
 '''''
 
 === 1.9 Delegation

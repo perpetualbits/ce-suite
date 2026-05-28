@@ -138,7 +138,7 @@ ____
 [source,asm]
 ----
     # Switch from best-effort task to real-time task.
-    ec.ib  x0, FULL_MASK              # save be_ecid context (current_ecid implicit)
+    ec.ib  x0, FULL_MASK          # save be_ecid context (current_ecid implicit)
     ec.ob  x0, rt_ecid, FULL_MASK # restore rt_ecid; MSE Contract restored automatically
 ----
 
@@ -286,7 +286,7 @@ automatically as part of the destroy sequence.
 
 [source,asm]
 ----
-    ec.oe  x0, rt_ecid               # forced destroy; MSE Contract revoke is implicit
+    ec.oe  x0, rt_ecid           # forced destroy; MSE Contract revoke is implicit
     # bw_class returned to parent's cap headroom automatically.
 ----
 

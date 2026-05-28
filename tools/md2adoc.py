@@ -14,6 +14,12 @@ import subprocess
 import sys
 
 
+SPDX_HEADER = (
+    '// SPDX-License-Identifier: CC-BY-4.0\n'
+    '// SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com>\n'
+    '\n'
+)
+
 PASSTHROUGH_FIXES = [
     ('++_++', '_'),
     ('++[++', '['),
@@ -75,7 +81,7 @@ def convert(src: str, dst: str) -> None:
     text = fix_source_blocks(text)
     text = fix_tables(text)
     with open(dst, 'w') as f:
-        f.write(text)
+        f.write(SPDX_HEADER + text)
     print(f'  {src} -> {dst}')
 
 
