@@ -56,6 +56,7 @@ Categories:
 - [x] docs/chapters/ch11-qos-io-quality-of-service.md
 - [x] docs/chapters/ch12-qos-usage-examples.md
 - [x] docs/chapters/ch13-csr-reference.md
+- [x] docs/chapters/ch14-privilege-model.md
 
 ## CODE (BSD-3-Clause)
 
@@ -77,7 +78,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/chapters/ch14-privilege-model.md
 - [ ] docs/chapters/ch15-trap-table.md
 - [ ] docs/chapters/ch16-discovery.md
 - [ ] docs/chapters/ch17-memory-ordering.md
