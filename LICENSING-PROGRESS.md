@@ -21,10 +21,9 @@ Categories:
 ## SKIP (no header)
 
 - [x] .gitignore
+- [x] CLAUDE.md
 
 ## UNCLASSIFIED
-
-- [ ] CLAUDE.md
 - [ ] LICENSE
 - [ ] Makefile
 - [ ] README.md
