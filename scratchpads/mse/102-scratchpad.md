@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com> -->
+
 # Context Extensions: Recent Refinements and Real-Time Scheduling Discussion
 
 ### Key Additions and Insights Since Last Revision
