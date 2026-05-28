@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com> -->
+
 # Chapter 2 — Bank, Group, and Delegation Semantics
 
 ## Scope

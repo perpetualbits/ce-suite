@@ -44,6 +44,7 @@ Categories:
 - [x] docs/chapters/appendix-b-profiles.md
 - [x] docs/chapters/ch00-fundamental-structure.md
 - [x] docs/chapters/ch01-execution-context-model.md
+- [x] docs/chapters/ch02-bank-group-delegation.md
 
 ## CODE (BSD-3-Clause)
 
@@ -65,7 +66,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/chapters/ch02-bank-group-delegation.md
 - [ ] docs/chapters/ch03-cme-instruction-set.md
 - [ ] docs/chapters/ch04-hardware-microarch.md
 - [ ] docs/chapters/ch05-linux-integration.md
