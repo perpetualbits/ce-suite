@@ -267,7 +267,11 @@ counter on each freed slot. Add assertions that stale references are detectable.
 
 **Depends on:** S9, S10
 
-**Status:** ☐
+**Status:** ✓ Done — ec.ob now extracts expected_gen from X(rs1)[23..16]
+alongside target_ecid from X(rs1)[15..0] (Sail v1 convention). Combined
+condition ~entry.allocated | entry.generation != expected_gen returns
+CME_ERR_INVALID_ECID. ce_cme_test_s11.sail verifies stale gen=6 → error
+and correct gen=7 → success for a slot at generation 7. Both checks pass.
 
 ---
 

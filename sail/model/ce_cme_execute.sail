@@ -101,8 +101,15 @@ function clause execute(CE_ECIB(rd, rs1)) = {
 function clause execute(CE_ECOB(rd, rs1, rs2)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    let target_ecid : ecid_t = truncate(X(rs1), 16);
-    let mask        : regmask_t = X(rs2);
+    /* rs1 packs (expected_generation | target_ecid):
+     *   bits 15:0  = ECID slot index  (ecid_t)
+     *   bits 23:16 = expected generation counter (generation_t)
+     * Software holds the (ECID, generation) pair from ec.ir and passes
+     * it here; hardware validates against EC[e].generation (ch00 §0.2). */
+    let rs1_val      = X(rs1);
+    let target_ecid  : ecid_t      = truncate(rs1_val, 16);
+    let expected_gen : generation_t = rs1_val[23..16];
+    let mask         : regmask_t   = X(rs2);
 
     /* Look up EC[target_ecid] */
     match lookup_ec(target_ecid) {
@@ -111,7 +118,8 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
         RETIRE_SUCCESS
       },
       Some(entry) => {
-        if ~(entry.allocated) then {
+        /* Fail if unallocated or generation mismatch (stale reference) */
+        if ~(entry.allocated) | (entry.generation != expected_gen) then {
           X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
           RETIRE_SUCCESS
         } else {
