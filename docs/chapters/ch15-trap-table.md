@@ -2,7 +2,7 @@
 
 ## 15.1 Overview
 
-This chapter (P3 work item) resolves the ambiguity in earlier chapters: for
+This chapter resolves the ambiguity in earlier chapters: for
 every CE Suite instruction and every documented error condition, it specifies
 whether the outcome is a **synchronous exception (trap)** or a **return code
 in `rd`**.
@@ -64,7 +64,7 @@ error conditions return a non-zero code in `rd`. The instruction completes
 status CSR (`cme_status`, `cpe_status`, `mse_status`, `qos_status`) is
 updated in parallel for diagnostic logging.
 
-Silent ignore of errors is prohibited by the charter (§6.6): an implementation
+Silent ignore of errors is prohibited: an implementation
 must either return an error code or trap; it must not silently succeed when a
 constraint is violated.
 
@@ -471,7 +471,7 @@ and under what conditions; Chapter 15 defines what happens when they fail.
 §15.4 in hand; the per-instruction descriptions reference error names that are
 now numerically assigned here.
 
-**P4** (discovery mechanism, not yet written) will define how software probes
-for CE Suite presence and which sub-extensions are implemented.
+**Chapter 16** (discovery mechanism) defines how software probes for CE Suite
+presence and which sub-extensions are implemented.
 
-[Next: Chapter 16 — (P4) Discovery Mechanism](ch16-discovery.md)
+[Next: Chapter 16 — Discovery Mechanism](ch16-discovery.md)
