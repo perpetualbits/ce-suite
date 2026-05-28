@@ -124,7 +124,7 @@ transitions are atomic: the owner field changes from `old_ecid` to
 
 A Bank cannot be accessed by an ECID other than its owner. Attempting to
 issue `ec.ib` or `ec.ob` against a Bank owned by a different ECID raises a
-trap (charter §6.6).
+trap.
 
 ---
 
@@ -206,7 +206,7 @@ parent ECID in `rs1`, child ECID in `rs2`. To delegate N banks, call
 `ec.it` N times.
 
 **Contract delegation** is handled by the extension that owns the Contract:
-`ms.it` for MSE Contracts, `qs.it` for QoS Contracts (charter §4.3.6).
+`ms.it` for MSE Contracts, `qs.it` for QoS Contracts.
 `ec.it` does not transfer Contracts.
 
 Neither instruction takes a Group ID as a separate argument, because
@@ -232,7 +232,7 @@ being delegated; each call is O(1).
 ### 2.4.3 Delegation-level invariants
 
 Delegation depth is bounded by the implementation's cap `D`, where `D ≤ 3`
-(charter §5.1). The four levels support the realistic virtualization
+The four levels support the realistic virtualization
 hierarchy: L0 host kernel, L1 hypervisor, L2 nested hypervisor, L3 guest.
 
 | Condition | Meaning                                                            |
@@ -241,7 +241,7 @@ hierarchy: L0 host kernel, L1 hypervisor, L2 nested hypervisor, L3 guest.
 | `L = D`   | This ECID may bind resources for itself but may not delegate.      |
 
 An attempt to create a child ECID from an ECID at level `L = D` raises a
-trap or returns an error code in `rd` (charter §6.6). The parent's
+trap or returns an error code in `rd`. The parent's
 delegation level `L` is stored in `EC[parent].delegation_L` and is
 checked by hardware at the time of `ec.ir` and `ec.it`.
 
@@ -331,7 +331,7 @@ The following invariants must hold at all times in a conforming
 implementation. They are checked at the time of each `ec.ig`, `ec.og`,
 `ec.it`, `ec.ot`, `ec.oe`, and `ec.ir` operation. Violations raise a
 defined trap or return a documented failure code; silent ignore is
-prohibited (charter §6.6).
+prohibited.
 
 1. **Unique Bank ownership.** No Bank may have more than one owner ECID.
 2. **Unique Contract ownership.** No Contract may have more than one owner
