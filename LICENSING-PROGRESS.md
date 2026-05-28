@@ -41,6 +41,7 @@ Categories:
 - [x] docs/adoc/submission/motivation.adoc
 - [x] docs/adoc/submission/submission-brief.adoc
 - [x] docs/chapters/appendix-a-ecid.md
+- [x] docs/chapters/appendix-b-profiles.md
 
 ## CODE (BSD-3-Clause)
 
@@ -62,7 +63,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/chapters/appendix-b-profiles.md
 - [ ] docs/chapters/ch00-fundamental-structure.md
 - [ ] docs/chapters/ch01-execution-context-model.md
 - [ ] docs/chapters/ch02-bank-group-delegation.md
