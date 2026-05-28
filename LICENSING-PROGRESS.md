@@ -31,6 +31,7 @@ Categories:
 - [x] docs/adoc/chapters/ch13-csr-reference.adoc
 - [x] docs/adoc/chapters/ch14-privilege-model.adoc
 - [x] docs/adoc/chapters/ch15-trap-table.adoc
+- [x] docs/adoc/chapters/ch16-discovery.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -42,7 +43,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/chapters/ch16-discovery.adoc
 - [ ] docs/adoc/chapters/ch17-memory-ordering.adoc
 - [ ] docs/adoc/chapters/ch18-clic-integration.adoc
 - [ ] docs/adoc/chapters/ch19-interop-ratified-extensions.adoc
