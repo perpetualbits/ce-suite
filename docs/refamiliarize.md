@@ -66,7 +66,6 @@ ownership layer that ties the other four together.
 | **Chapter 10** (MSE Usage Examples) | Done | — |
 | **Chapter 11** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Chapter 12** (QoS Usage Examples) | Done | qs.it inline requires RV64; pointer form noted |
-| **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 | **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs (0x7C0–0x7CF, 0xFC0–0xFCF); E5: +2 CME RO CSRs at 0xFD1–0xFD2 (`current_ecid_level`, `current_ecid_parent`) |
 | **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); E5: S/HS/VS read access for new CSRs added |
 | **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4: ec.ob CME_ERR_NO_BANK corrected + cross-ref |
@@ -74,6 +73,7 @@ ownership layer that ties the other four together.
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
 | **Chapter 18** (CLIC Interrupt Integration) | Done | E2: interrupt-EC pattern; boot allocation; M-mode prologue/epilogue; CPE partition isolation; nested interrupts; bank provisioning |
 | **Chapter 19** (Interoperability with Ratified Extensions) | Done | I1: RVA23S64 mandatory set + RVA23.1 optional; per-EC CSR slot obligations; Smstateen gate bit (provisional bit 58); Ssqosid bridges-to CE Contracts |
+| **Appendix A** (ECID) | Done | Radix-tree algorithms and diagrams |
 | **Appendix B** (Capability Profiles) | Done | E1: four standard profiles (CE-Embedded/MinimalRT/RT/Full); naming convention over ce_present + cme_del_cap + cme_bank_count |
 
 ### A.4 What's been *decided* (locked in v0.7–v0.12)
@@ -233,14 +233,14 @@ docs/
 │   ├── ch10-mse-usage-examples.md
 │   ├── ch11-qos-io-quality-of-service.md
 │   ├── ch12-qos-usage-examples.md
-│   ├── appendix-a-ecid.md
 │   ├── ch13-csr-reference.md
 │   ├── ch14-privilege-model.md
 │   ├── ch15-trap-table.md
 │   ├── ch16-discovery.md
 │   ├── ch17-memory-ordering.md
 │   ├── ch18-clic-integration.md
-│   └── ch19-interop-ratified-extensions.md
+│   ├── ch19-interop-ratified-extensions.md
+│   └── appendix-a-ecid.md
 ├── adoc/                            # AsciiDoc conversion (P7); mirrors chapters/
 │   ├── index.adoc                   # master book document
 │   ├── chapters/                    # one .adoc per chapter/appendix

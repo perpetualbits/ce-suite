@@ -48,16 +48,30 @@ ce-suite/
 │   ├── chapters/                     # the spec proper
 │   │   ├── ch00-fundamental-structure.md
 │   │   ├── ch01-execution-context-model.md
-│   │   ├── ch02-cme-instruction-set.md
-│   │   ├── ch03-bank-group-delegation.md
+│   │   ├── ch02-bank-group-delegation.md
+│   │   ├── ch03-cme-instruction-set.md
 │   │   ├── ch04-hardware-microarch.md
 │   │   ├── ch05-linux-integration.md
 │   │   ├── ch06-cme-usage-examples.md
 │   │   ├── ch07-cpe-instruction-set.md
-│   │   ├── ch08-mse-memory-scheduling.md
-│   │   ├── ch09-qos-io-quality-of-service.md
-│   │   └── appendix-a-ecid.md
+│   │   ├── ch08-cpe-usage-examples.md
+│   │   ├── ch09-mse-memory-scheduling.md
+│   │   ├── ch10-mse-usage-examples.md
+│   │   ├── ch11-qos-io-quality-of-service.md
+│   │   ├── ch12-qos-usage-examples.md
+│   │   ├── ch13-csr-reference.md
+│   │   ├── ch14-privilege-model.md
+│   │   ├── ch15-trap-table.md
+│   │   ├── ch16-discovery.md
+│   │   ├── ch17-memory-ordering.md
+│   │   ├── ch18-clic-integration.md
+│   │   ├── ch19-interop-ratified-extensions.md
+│   │   ├── appendix-a-ecid.md
+│   │   └── appendix-b-profiles.md
 │   ├── work-items.md                 # tracked inconsistencies and open items
+│   ├── submission/                   # RISC-V International submission materials
+│   │   ├── submission-brief.md
+│   │   └── motivation.md
 │   └── future-directions.md         # non-normative: ideas, research notes, future extensions
 │   ├── reference/                    # quick reference materials
 │   │   └── instruction-card.md
@@ -88,7 +102,7 @@ The documents in `docs/` are arranged by normative authority:
    charter wins and the other thing is wrong.
 2. **`docs/chapters/ch00-fundamental-structure.md`** — the formal data model.
    Versioned in lockstep with the charter.
-3. **`docs/chapters/ch01..ch09`** — derivative spec chapters. Must be
+3. **`docs/chapters/ch01..ch19`** and appendices — derivative spec chapters. Must be
    consistent with the charter and Chapter 0.
 4. **`docs/refamiliarize.md`**, **`docs/working_notes_for_authors.md`** —
    onboarding and workflow companions. Not normative on the architecture,
@@ -103,13 +117,29 @@ The documents in `docs/` are arranged by normative authority:
 
 | Component | State |
 |---|---|
-| Charter (project instructions) | **v0.11 — current** |
-| Chapter 0 (Fundamental Structure) | Done — aligned to charter v0.11 |
-| Chapters 1–6 | Done — ECID-first; known issues tracked in `docs/work-items.md` |
-| Chapter 7 (CPE) | **Being redesigned** — see work item F1 in `docs/work-items.md` |
-| Chapter 8 (MSE) | Done — ms.{ir,or,it,ot}, BE/contract slot model |
-| Chapter 9 (QoS) | Done — qs.{ir,or,it,ot}, per-domain contracts |
+| Charter (project instructions) | **v0.15 — current** |
+| Chapter 0 (Fundamental Structure) | Done — aligned to charter v0.15 |
+| Chapter 1 (Execution Context Model) | Done |
+| Chapter 2 (Bank/Group/Delegation Semantics) | Done |
+| Chapter 3 (CME Instruction Set Reference) | Done |
+| Chapter 4 (Hardware Microarchitecture) | Done |
+| Chapter 5 (Linux Kernel Integration) | Done |
+| Chapter 6 (CME Usage Examples) | Done |
+| Chapter 7 (CPE Instruction Set Reference) | Done — F1 redesign complete |
+| Chapter 8 (CPE Usage Examples) | Done |
+| Chapter 9 (MSE Memory Scheduling) | Done — ms.{ir,or,it,ot} |
+| Chapter 10 (MSE Usage Examples) | Done |
+| Chapter 11 (QoS I/O Quality of Service) | Done — qs.{ir,or,it,ot} |
+| Chapter 12 (QoS Usage Examples) | Done |
+| Chapter 13 (CSR Reference) | Done — P1 resolved; 31 CSRs |
+| Chapter 14 (Privilege Model) | Done — P2 resolved |
+| Chapter 15 (Trap and Exception Table) | Done — P3 resolved |
+| Chapter 16 (Discovery) | Done — P4 resolved |
+| Chapter 17 (Memory Ordering) | Done — P5 resolved |
+| Chapter 18 (CLIC Interrupt Integration) | Done — E2 |
+| Chapter 19 (Interoperability with Ratified Extensions) | Done — I1 |
 | Appendix A (ECID) | Done — radix-tree algorithms and diagrams |
+| Appendix B (Capability Profiles) | Done — E1: four standard profiles |
 | `hw/` | empty; future work |
 | `sw/` | empty; future work |
 
