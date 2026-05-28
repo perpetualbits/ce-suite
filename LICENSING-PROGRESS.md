@@ -59,6 +59,7 @@ Categories:
 - [x] docs/chapters/ch14-privilege-model.md
 - [x] docs/chapters/ch15-trap-table.md
 - [x] docs/chapters/ch16-discovery.md
+- [x] docs/chapters/ch17-memory-ordering.md
 
 ## CODE (BSD-3-Clause)
 
@@ -80,7 +81,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/chapters/ch17-memory-ordering.md
 - [ ] docs/chapters/ch18-clic-integration.md
 - [ ] docs/chapters/ch19-interop-ratified-extensions.md
 - [ ] docs/charter/CHANGELOG.md
