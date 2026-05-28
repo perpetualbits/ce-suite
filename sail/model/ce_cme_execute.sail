@@ -43,7 +43,7 @@ function clause execute(CE_ECIB(rd, rs1)) = {
       raise(CE_BankFault())
     },
     Some(slot) => {
-      let idx = unsigned(slot);
+      let idx = unsigned(truncate(slot, 3));
       /* Check bank is not sealed (sealed bank cannot be saved over) */
       if bank_pool[idx].sealed then raise(CE_BankFault());
 
@@ -61,7 +61,7 @@ function clause execute(CE_ECIB(rd, rs1)) = {
 
       /* Update cme_reg_mask and cme_status */
       cme_reg_mask = mask;
-      cme_status = cme_status with [7..0] = CME_OK;
+      cme_status[7..0] = CME_OK;
 
       /* rd = bank slot index (0-based within owning Group) */
       X(rd) = zero_extend(slot);
@@ -103,7 +103,7 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
             RETIRE_SUCCESS
           },
           Some(slot) => {
-            let idx = unsigned(slot);
+            let idx = unsigned(truncate(slot, 3));
 
             /* Refuse sealed banks (ch03 §3.6, ec.ob sealed-bank rule) */
             if bank_pool[idx].sealed then {
@@ -122,7 +122,7 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
 
               /* Update status registers */
               cme_reg_mask = mask;
-              cme_status = cme_status with [7..0] = CME_OK;
+              cme_status[7..0] = CME_OK;
 
               X(rd) = cme_err_to_xlenbits(CME_OK);
               RETIRE_SUCCESS

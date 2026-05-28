@@ -18,7 +18,7 @@ struct EC_entry = {
   allocated    : bool           /* true iff this slot holds a live ECID */
 }
 
-let EC_entry_default : EC_entry = {
+let EC_entry_default : EC_entry = struct {
   ecs_ptr      = zeros(),
   generation   = 0x00,
   delegation_L = 0b00,
@@ -52,6 +52,16 @@ struct Bank = {
 /* Dirty-group bitmap (ch00 §0.3, ch03 §3.1 dirty-save mode)         */
 /* One bit per register group; positions match the register mask.     */
 /* ------------------------------------------------------------------ */
+
+let Bank_default : Bank = struct {
+  owner_ecid = 0x0000,
+  valid      = false,
+  sealed     = false,
+  gprs       = vector_init(zeros()),
+  fprs       = vector_init(zeros()),
+  pc         = zeros(),
+  mask       = zeros()
+}
 
 type dirty_bitmap_t = bits(8)  /* bits 0–6 used; bit 7 reserved */
 

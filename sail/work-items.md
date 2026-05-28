@@ -83,7 +83,19 @@ Fixes all type errors in the CE Suite model files.
 
 **Depends on:** S1
 
-**Status:** ☐
+**Status:** ✓ Done — `make check` exits 0 (warnings only; no errors).
+Fixes required in skeleton:
+- `struct { ... }` keyword needed for new record literals (not `{ ... }`)
+- `{ record with field = v }` correct for updates (no `struct` keyword)
+- `cme_status[7..0] = v` for slice assignment (not `with [n..m]` syntax)
+- `var` not `let` for mutable locals (find_bank result)
+- `union clause instruction` throughout (not `union ast` / `union clause ast`)
+- Decode mappings require literal bit patterns, not symbolic constants
+- `lookup_ec`: foreach loop instead of direct index (bounds proof issue)
+- `bank_pool[idx]`: `truncate(slot, 3)` to give Sail a 3-bit index type
+- New `ce_standalone_prelude.sail`: stubs for xlenbits, regidx, X(), zeros(),
+  zero_extend(), to_bits(), `%` operator, `~` for bool, scattered declarations
+- Source order: ce_cme_types before ce_state (EC_entry/Bank defined before use)
 
 ---
 

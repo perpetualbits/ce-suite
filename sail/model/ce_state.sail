@@ -54,20 +54,20 @@ register dirty_bitmap : dirty_bitmap_t = 0x00
 /* ------------------------------------------------------------------ */
 
 /* Bank pool: NV banks, indexed 0..cme_bank_count_NV-1 */
-register bank_pool : vector(8, dec, Bank) =
-  vector_init({ owner_ecid = 0x0000, valid = false, sealed = false,
-                gprs = vector_init(zeros()), fprs = vector_init(zeros()),
-                pc = zeros(), mask = zeros() })
+register bank_pool : vector(8, dec, Bank) = vector_init(Bank_default)
 
 /* ------------------------------------------------------------------ */
 /* Convenience accessors                                               */
 /* ------------------------------------------------------------------ */
 
-/* Look up EC[e]. Returns None() if e is out of range. */
+/* Look up EC[e]. Returns None() if e is out of range or unallocated slot index. */
 function lookup_ec(e : ecid_t) -> option(EC_entry) = {
-  let idx = unsigned(e);
-  if idx < CE_MAX_ECIDS then Some(ec_array[idx])
-  else None()
+  var result : option(EC_entry) = None();
+  foreach (i from 0 to 63) {
+    if i == unsigned(e) then result = Some(ec_array[i])
+    else ()
+  };
+  result
 }
 
 /* Check if an ECID slot is allocated with the expected generation. */
@@ -80,7 +80,7 @@ function ec_valid(e : ecid_t, gen : generation_t) -> bool = {
 
 /* Find the bank owned by a given ECID. Returns None() if not banked. */
 function find_bank(e : ecid_t) -> option(bank_slot_t) = {
-  let result : option(bank_slot_t) = None();
+  var result : option(bank_slot_t) = None();
   foreach (i from 0 to 7) {
     if bank_pool[i].valid & (bank_pool[i].owner_ecid == e)
     then result = Some(to_bits(8, i))
