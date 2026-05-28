@@ -41,7 +41,13 @@ opam install sail
 
 Verify: `sail --version` prints a version ≥ 0.17.
 
-**Status:** ☐
+**Status:** ✓ Done — Sail 0.20.1 via OPAM 2.5.0; OCaml 5.2.1; z3 4.13.3.
+Installed: `sudo apt install opam libgmp-dev pkg-config bubblewrap z3`,
+then `opam init --bare`, `opam switch create default ocaml-base-compiler`,
+`opam install sail`. Binary at `~/.opam/default/bin/sail`; sourced via
+`~/.opam/opam-init/init.sh` in `.bashrc`.
+Note: `make check` finds a syntax error in `ce_state.sail` line 58 and a
+`let`-mutability bug in `find_bank` — both deferred to S3.
 
 ---
 
