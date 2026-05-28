@@ -157,14 +157,14 @@ that activates it on the same hart.
 
 ### 17.4.3 Hart-locality of Contract assignments
 
-ECIDs are hart-local (charter §3.1). `ms.ir` on Hart H can only target an ECID
+ECIDs are hart-local. `ms.ir` on Hart H can only target an ECID
 allocated on Hart H; it updates Hart H's per-hart memory controller registers
 and Hart H's EC[e] entry. No other hart's EC[e] entries are affected.
 
 The chip-global impact — updating the shared bandwidth accounting in the memory
-controller — is handled by **hardware-level atomic admission control** (charter
-§4.3.3). Software does not need to issue a `FENCE` to make this global update
-visible to the memory controller.
+controller — is handled by **hardware-level atomic admission control**. Software
+does not need to issue a `FENCE` to make this global update visible to the memory
+controller.
 
 ### 17.4.4 Cross-hart coordination
 
@@ -279,7 +279,7 @@ required for the full release barrier.
 
 ## 17.6 Ordering Summary
 
-The table below answers the four questions that §P5 poses for each category of
+The table below answers the four questions posed for each category of
 CE Suite instruction. Column headings:
 
 - **Issues mem access?** — does the instruction load or store to the RISC-V
