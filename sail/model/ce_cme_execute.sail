@@ -203,28 +203,79 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.ig — Assign a free bank to an ECID's Group (ch03 §3.3) — STUB  */
+/* ec.ig — Assign a free bank to an ECID's Group (ch03 §3.3)         */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIG(rd, rs1)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S12: allocate from free bank pool; CME_ERR_NO_BANK if empty */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let target_ecid : ecid_t = truncate(X(rs1), 16);
+
+    /* Find the first free bank slot */
+    var found     : bool = false;
+    var free_slot : nat  = 0;
+    foreach (i from 0 to 7) {
+      if ~found & ~(bank_pool[i].valid) then {
+        found     = true;
+        free_slot = i
+      }
+    };
+
+    if ~found then {
+      X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
+      RETIRE_SUCCESS
+    } else {
+      /* Claim the free slot for target_ecid */
+      foreach (i from 0 to 7) {
+        if i == free_slot then
+          bank_pool[i] = { bank_pool[i] with
+            owner_ecid = target_ecid,
+            valid      = true
+          }
+      };
+      X(rd) = zero_extend(to_bits(8, free_slot));
+      RETIRE_SUCCESS
+    }
   }
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.og — Release a bank from an ECID's Group (ch03 §3.3) — STUB    */
+/* ec.og — Release a bank from an ECID's Group (ch03 §3.3)           */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOG(rd, rs1)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S13: return bank to free pool */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let target_ecid : ecid_t = truncate(X(rs1), 16);
+
+    match find_bank(target_ecid) {
+      None() => {
+        X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
+        RETIRE_SUCCESS
+      },
+      Some(slot) => {
+        let slot_idx = unsigned(truncate(slot, 3));
+
+        /* Release the bank back to the free pool */
+        foreach (i from 0 to 7) {
+          if i == slot_idx then
+            bank_pool[i] = { bank_pool[i] with
+              owner_ecid = zeros(),
+              valid      = false
+            }
+        };
+
+        /* Count banks remaining in the Group after release */
+        var remaining : nat = 0;
+        foreach (i from 0 to 7) {
+          if bank_pool[i].valid & (bank_pool[i].owner_ecid == target_ecid) then
+            remaining = remaining + 1
+        };
+
+        X(rd) = zero_extend(to_bits(8, remaining));
+        RETIRE_SUCCESS
+      }
+    }
   }
 }
 

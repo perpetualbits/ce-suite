@@ -287,7 +287,8 @@ and correct gen=7 → success for a slot at generation 7. Both checks pass.
 
 **Depends on:** S4
 
-**Status:** ☐
+**Status:** ✓ Done — scans bank_pool for first free slot, claims it for
+target_ecid, returns slot index. CME_ERR_NO_BANK if all 8 slots occupied.
 
 ---
 
@@ -300,7 +301,9 @@ and correct gen=7 → success for a slot at generation 7. Both checks pass.
 
 **Depends on:** S12
 
-**Status:** ☐
+**Status:** ✓ Done — uses find_bank to locate the owned bank, releases it
+(valid=false, owner=zeros), counts remaining Group banks for rd.
+Implemented alongside S12 (trivially paired). Both checks pass.
 
 ---
 
