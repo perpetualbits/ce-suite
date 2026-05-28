@@ -95,9 +95,14 @@ function wF_bits(Fregidx(r), v) = { fpr_file[unsigned(r)] = v }
 
 overload F = {rF_bits, wF_bits}
 
-/* PC accessor — mirrors sail-riscv's pc_access.sail */
+/* PC accessors — mirrors sail-riscv's pc_access.sail */
+register nextPC : xlenbits = zeros()
+
 val get_arch_pc : unit -> xlenbits
 function get_arch_pc() = PC
+
+val set_next_pc : xlenbits -> unit
+function set_next_pc(pc) = { nextPC = pc }
 
 /* Execution result — mirrors sail-riscv's ExecutionResult */
 union ExecutionResult = {

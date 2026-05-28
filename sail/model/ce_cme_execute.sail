@@ -129,8 +129,23 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
                 X(rd) = cme_err_to_xlenbits(CME_ERR_ALREADY_SEALED);
                 RETIRE_SUCCESS
               } else {
-                /* Restore register state from bank.
-                 * Register group restore is abstracted; fleshed out in S6. */
+                /* Restore register groups indicated by mask (ch03 §3.7) */
+                let b = bank_pool[idx];
+
+                if mask[0] == 0b1 then  /* bit 0: GPR group (x1..x31) */
+                  foreach (i from 1 to 31) {
+                    X(Regidx(to_bits(5, i))) = b.gprs[i-1]
+                  };
+
+                if mask[1] == 0b1 then  /* bit 1: FPR group (f0..f31) */
+                  foreach (i from 0 to 31) {
+                    F(Fregidx(to_bits(5, i))) = b.fprs[i]
+                  };
+
+                /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO in later Sail versions */
+
+                if mask[4] == 0b1 then  /* bit 4: PC — redirect execution on commit */
+                  set_next_pc(b.pc);
 
                 /* Update current_ecid atomically on commit */
                 current_ecid = target_ecid;

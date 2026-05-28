@@ -167,7 +167,10 @@ sail-riscv this is typically done by setting `nextPC`.
 
 **Depends on:** S4, S5
 
-**Status:** ☐
+**Status:** ✓ Done — GPR (bit 0), FPR (bit 1), and PC (bit 4) restores
+implemented. PC case uses `set_next_pc(b.pc)` to redirect execution on commit
+(sail-riscv pattern). VEC/MAT/CSR/SATP remain TODO stubs. Added `nextPC`
+register and `set_next_pc` to `ce_standalone_prelude.sail`. Both checks pass.
 
 ---
 
