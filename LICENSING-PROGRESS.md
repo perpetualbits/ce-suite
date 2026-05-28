@@ -72,6 +72,7 @@ Categories:
 - [x] docs/submission/submission-brief.md
 - [x] docs/work-items.md
 - [x] docs/working_notes_for_authors.md
+- [x] hw/README.md
 
 ## CODE (BSD-3-Clause)
 
@@ -93,7 +94,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] hw/README.md
 - [ ] scratchpads/README.md
 - [ ] scratchpads/general/big-concatenation.md
 - [ ] scratchpads/general/mermaid-sketch.md
