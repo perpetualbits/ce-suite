@@ -372,7 +372,13 @@ memory model for the normative fence sequences in ch17. Specifically:
 
 **Depends on:** S15, S16
 
-**Status:** ☐
+**Status:** ✓ Done — ce_cme_test_s17.sail encodes the §17.5 migration
+sequence (Hart 0 steps 1–5, Hart 1 steps 7–11) in a single-hart Sail
+test. Fence positions documented as comments at their spec-mandated
+locations. Key assertions: ec.im leaves bank valid (bank remains allocated
+after spill per spec); ec.om claims a new bank for the migrated ECID.
+Verifies ec.im/ec.om use write_ram/read_ram (RVWMO stores/loads). Both
+checks pass. Full cross-hart ordering requires the memory model simulator.
 
 ---
 
