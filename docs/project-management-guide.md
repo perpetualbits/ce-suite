@@ -522,7 +522,7 @@ that prevent drift need to be kept current.
 ---
 
 *This document was written based on the experience of the CE Suite RISC-V
-specification project (2024–2026), co-authored with Claude (Anthropic). The
-lessons here were learned the hard way — through a hiatus caused by exactly the
-drift patterns described above — and then validated by successfully completing
-a 20-chapter specification without repeating them.*
+specification project (2024–2026). The lessons here were learned the hard way —
+through a hiatus caused by exactly the drift patterns described above — and then
+validated by successfully completing a 20-chapter specification without repeating
+them.*
