@@ -11,6 +11,16 @@ detailed design work that follows from locked architectural decisions.
 
 ---
 
+## ⚑ Current priority — Category PUB (publication readiness)
+
+All D/F/G/P/E/I items are resolved. The remaining authoring work before the spec
+can be shared publicly is removing internal editorial scaffolding from the chapter
+and reference files. See **Category PUB** below for item definitions and the
+**PUB execution order** for the file-by-file sequence. One file per session;
+commit between each.
+
+---
+
 ## Category D — Design decisions required
 
 These items require an explicit decision before any chapter can be corrected.
@@ -780,6 +790,154 @@ state is per-hart vs. per-ECID.
 **No new instructions, CSRs, or charter-level decisions were made in this session.**
 The provisional `*stateen0` bit 58 assignment follows the same status as opcode
 addresses and CSR addresses throughout the spec.
+
+---
+
+---
+
+## Category PUB — Publication readiness (CURRENT PRIORITY)
+
+These items remove internal editorial scaffolding from the publishable spec files.
+None of them change any normative rule or add new content. One file per session;
+commit between each. The four items below define *what* to remove; the execution
+order below defines *which file next*.
+
+---
+
+### PUB1 · Remove retired-instruction rename history
+
+The rename chain `ec.or → ec.od → ec.oe` is internal revision history. Readers of
+a published spec need only the current name `ec.oe`; they do not need to know it
+was ever called anything else.
+
+**Affects and what to remove:**
+
+- **`ch03-cme-instruction-set.md`** — two passages:
+  - Lines ~37–39: introductory note "ec.or does not exist as a current instruction…
+    renamed first to ec.od (v0.7) and then to ec.oe (v0.8)…"
+  - Lines ~313–328: entire subsection "**Why there is no `ec.or`.**" explaining
+    the rename history.
+- **`ch00-fundamental-structure.md`** — lines ~370–371: parenthetical
+  "(the name was retired; forced destroy is `ec.oe`)" — simplify to just name `ec.oe`.
+- **`glossary.md`** — entire "Retired terms (do not use)" section (heading + table
+  rows for `ec.or` and `ec.od`).
+
+---
+
+### PUB2 · Remove work-item tracking tags from spec text
+
+P-series, F-series, and E-series labels are the project's internal tracking system.
+They are invisible to implementers and reviewers of the published spec.
+
+**Affects and what to remove:**
+
+- **`ch14-privilege-model.md`** — most extensive: opening "(P2 work item)" in the
+  first paragraph; "**Resolved questions (from the P2 work item):**" subheading
+  and its bullet list; multiple inline "(P2 S-mode relaxations)" parentheticals.
+- **`ch15-trap-table.md`** — opening sentence "(P3 work item) resolves…" — strip
+  the tag; keep the rest of the sentence.
+- **`ch16-discovery.md`** — opening "(P4 work item)" — strip tag only.
+- **`ch13-csr-reference.md`** — several instances: "added in E5"; "(P2 — privilege
+  model integration)"; "work item F7"; "(subject to P2 S-mode relaxations)";
+  "(M-mode-only restriction applies even after P2 relaxations)"; "§0.3, Chapter 1
+  §1.4, and charter §5.1, which did not previously assign a CSR" (history clause).
+- **`ch17-memory-ordering.md`** — one instance: "§P5 poses" → rephrase without
+  the tag (e.g., "The following questions arise for each category…").
+- **`ch18-clic-integration.md`** — one instance: "(E3)" parenthetical inline.
+
+---
+
+### PUB3 · Remove or convert "charter §X" citations
+
+The charter (`docs/charter/project_instructions.md`) is an internal authoring
+document. Published specs do not cite their own design notes. In nearly every case
+the normative rule is already stated in the spec chapter itself; the "(charter §X)"
+parenthetical is just the source attribution, which readers do not need.
+
+**Default action:** delete the parenthetical. Where the cross-reference adds
+genuine reader value (e.g., pointing to a defined section of the spec itself),
+convert to an in-spec section number.
+
+**Affected files (one session each):**
+
+| File | Approximate instance count | Notes |
+|------|---------------------------|-------|
+| `ch03-cme-instruction-set.md` | ~8 | Mix with PUB1 session |
+| `ch13-csr-reference.md` | ~10 | Mix with PUB2 session |
+| `ch09-mse-memory-scheduling.md` | ~12 | Highest count; mostly §4.3.X and §6.X |
+| `ch11-qos-io-quality-of-service.md` | ~12 | Similar pattern to ch09 |
+| `ch00-fundamental-structure.md` | ~4 | Mix with PUB1/PUB4 session |
+| `ch19-interop-ratified-extensions.md` | ~6 | Several "charter §8" open-item refs |
+| `ch02-bank-group-delegation.md` | ~4 | All parenthetical |
+| `ch07-cpe-instruction-set.md` | ~3 | All parenthetical |
+| `appendix-a-ecid.md` | ~3 | All parenthetical |
+| `ch05-linux-integration.md` | ~2 | |
+| `ch17-memory-ordering.md` | ~2 | Mix with PUB2 session |
+| `ch04-hardware-microarch.md` | ~1 | "charter open items (charter §8.7)" |
+| `ch06-cme-usage-examples.md` | ~1 | |
+| `ch14-privilege-model.md` | ~1 | Mix with PUB2 session |
+| `ch15-trap-table.md` | ~1 | Mix with PUB2 session |
+| `ch16-discovery.md` | ~1 | Mix with PUB2 session |
+| `ch18-clic-integration.md` | ~1 | Mix with PUB2 session |
+| `glossary.md` | ~3 | Mix with PUB1/PUB4 session |
+| `instruction-card.md` | ~2 | |
+
+---
+
+### PUB4 · Remove meta-document references
+
+References to internal file paths, the charter as an external document, and
+"earlier drafts" design history do not belong in published spec text.
+
+**Affects and what to remove:**
+
+- **`ch00-fundamental-structure.md`** — lines ~12–14: "The CE Suite charter
+  (`docs/charter/project_instructions.md`) is the normative spine… if a later
+  chapter conflicts with this one, the chapter is wrong." Rewrite as a
+  self-referential statement without the file path: "This chapter, together with
+  the CE Suite Project Instructions, is normative. If a later chapter conflicts
+  with this chapter, the later chapter is wrong."
+- **`ch01-execution-context-model.md`** — one sentence (~line 231): "Earlier
+  drafts placed a Pool layer between ECIDs and Contracts." Delete it; the Pool
+  model is not defined anywhere in the published spec, so the reference to it
+  is meaningless to readers.
+- **`glossary.md`** — intro lines 3–5: "A standalone copy of the normative
+  glossary from charter §2, plus the list of retired terms, for quick lookup.
+  **If this file disagrees with the charter, the charter wins.**" Rewrite without
+  the "copy of charter §2" framing.
+
+---
+
+## PUB execution order (file by file)
+
+One session per file; commit between each. Files are ordered so that the most
+visible internal scaffolding is cleared first.
+
+| # | File | PUB items | Notes |
+|---|------|-----------|-------|
+| 1 | `ch03-cme-instruction-set.md` | PUB1 + PUB3 | Retire history + charter refs |
+| 2 | `ch14-privilege-model.md` | PUB2 + PUB3 | P-series tags most extensive here |
+| 3 | `glossary.md` | PUB1 + PUB3 + PUB4 | Retire terms table + meta intro |
+| 4 | `ch00-fundamental-structure.md` | PUB1 + PUB3 + PUB4 | File path ref + minor retire ref |
+| 5 | `ch13-csr-reference.md` | PUB2 + PUB3 | Multiple E/P tags + charter refs |
+| 6 | `ch15-trap-table.md` | PUB2 + PUB3 | P3 tag + one charter ref |
+| 7 | `ch16-discovery.md` | PUB2 + PUB3 | P4 tag + one charter ref |
+| 8 | `ch17-memory-ordering.md` | PUB2 + PUB3 | P5 ref + two charter refs |
+| 9 | `ch18-clic-integration.md` | PUB2 + PUB3 | E3 tag + one charter ref |
+| 10 | `ch01-execution-context-model.md` | PUB4 | One sentence only |
+| 11 | `ch09-mse-memory-scheduling.md` | PUB3 | Most charter refs of any single file |
+| 12 | `ch11-qos-io-quality-of-service.md` | PUB3 | Similar volume to ch09 |
+| 13 | `ch19-interop-ratified-extensions.md` | PUB3 | Several charter §8 refs |
+| 14 | `ch02-bank-group-delegation.md` | PUB3 | Four parentheticals |
+| 15 | `ch07-cpe-instruction-set.md` | PUB3 | Three parentheticals |
+| 16 | `appendix-a-ecid.md` | PUB3 | Three parentheticals |
+| 17 | `ch04-hardware-microarch.md` | PUB3 | One instance |
+| 18 | `ch05-linux-integration.md` | PUB3 | Two instances |
+| 19 | `ch06-cme-usage-examples.md` | PUB3 | One instance |
+| 20 | `instruction-card.md` | PUB3 | Two instances |
+
+After all 20 sessions: regenerate adoc mirrors (`make adoc`), rebuild PDF
+(`make pdf`), and tick PUB1–PUB4 as resolved.
 
 ---
 
