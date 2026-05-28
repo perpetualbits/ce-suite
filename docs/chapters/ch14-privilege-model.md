@@ -6,22 +6,11 @@ This chapter defines which RISC-V privilege levels may execute CE Suite
 instructions, under what conditions lower-privilege access is allowed, and how
 CE Suite interacts with the RISC-V H extension (virtualization).
 
-Before this chapter (P2 work item), every CE Suite instruction and CSR was
-M-mode only (Chapter 13 §13.7). P2 introduces two new control CSRs that let
-M-mode and HS-mode relax access to lower privilege levels, enabling an OS
-kernel (S/HS-mode) and a guest OS (VS-mode) to manage their own ECID
-hierarchies without trapping into firmware on every context switch.
-
-**Resolved questions (from the P2 work item):**
-
-1. `ec.ir` from S-mode creates L=1 ECIDs — the delegation level of a newly
-   allocated ECID is always `parent_L + 1`, and M-mode is the tree root.
-2. VS-mode holds L=1 ECIDs directly; it does not need to go through HS-mode
-   for every CE operation.
-3. Per-privilege CE-enable: `cme_priv_ctl.S_EN` (M-mode RW, 0x7CF) enables
-   S/HS-mode; `hcme_ctrl.VS_EN` (HS-mode RW, 0x6C0) enables VS-mode.
-4. The H-extension nesting hierarchy maps cleanly to delegation depth D ≤ 3
-   (§14.8).
+By default, every CE Suite instruction and CSR is M-mode only (Chapter 13
+§13.7). This chapter introduces two control CSRs that let M-mode and HS-mode
+relax access to lower privilege levels, enabling an OS kernel (S/HS-mode) and
+a guest OS (VS-mode) to manage their own ECID hierarchies without trapping into
+firmware on every context switch.
 
 ---
 
@@ -183,7 +172,7 @@ Tables use the following notation:
 | `ec.ov` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 **`ec.iv` / `ec.ov` — M-mode only.** The vault seal and unseal operations use
-`cme_seal_key` (0x7C3), which is M-mode only regardless of P2 relaxations
+`cme_seal_key` (0x7C3), which is M-mode only regardless of `S_EN`
 (Chapter 13 §13.3.9). There is no enable path for these instructions from
 lower privilege levels.
 
@@ -439,7 +428,7 @@ OS kernel and, optionally, for VMs under a type-1 hypervisor.
 ## 14.10 Where to go next
 
 **Chapter 13** is the normative CSR reference. It lists all CE Suite CSR
-addresses, bit-fields, and access control; Chapter 14 defines the P2
+addresses, bit-fields, and access control; Chapter 14 defines the privilege
 relaxations that extend some access to lower privilege levels.
 
 **Chapter 3** (CME instruction set) and **Chapter 7** (CPE instruction set)
@@ -447,7 +436,7 @@ are the normative instruction references. Each instruction's semantics apply
 at all permitted privilege levels; the authorization checks described here
 are a pre-condition, not a replacement for per-instruction error handling.
 
-**P3** (trap/exception table, not yet written) will enumerate every CE Suite
-exception cause code and specify which are delegatable to S-mode via `medeleg`.
+**Chapter 15** (trap/exception table) enumerates every CE Suite exception cause
+code and specifies which are delegatable to S-mode via `medeleg`.
 
 [Next: Chapter 15 — CE Suite Trap and Exception Table](ch15-trap-table.md)
