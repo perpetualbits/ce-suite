@@ -70,6 +70,7 @@ Categories:
 - [x] docs/reference/instruction-card.md
 - [x] docs/submission/motivation.md
 - [x] docs/submission/submission-brief.md
+- [x] docs/work-items.md
 
 ## CODE (BSD-3-Clause)
 
@@ -91,7 +92,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/work-items.md
 - [ ] docs/working_notes_for_authors.md
 - [ ] hw/README.md
 - [ ] scratchpads/README.md
