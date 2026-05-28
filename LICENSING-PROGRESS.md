@@ -48,6 +48,7 @@ Categories:
 - [x] docs/chapters/ch03-cme-instruction-set.md
 - [x] docs/chapters/ch04-hardware-microarch.md
 - [x] docs/chapters/ch05-linux-integration.md
+- [x] docs/chapters/ch06-cme-usage-examples.md
 
 ## CODE (BSD-3-Clause)
 
@@ -69,7 +70,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/chapters/ch06-cme-usage-examples.md
 - [ ] docs/chapters/ch07-cpe-instruction-set.md
 - [ ] docs/chapters/ch08-cpe-usage-examples.md
 - [ ] docs/chapters/ch09-mse-memory-scheduling.md
