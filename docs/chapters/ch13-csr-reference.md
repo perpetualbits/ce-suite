@@ -20,9 +20,9 @@ CSR address map:
 | 0xFC0–0xFCF | 1111 (M-mode RO) | Read-Only | 16 |
 | 0xFD1–0xFD2 | 1111 (M-mode RO) | Read-Only | 2 |
 
-**Note.** The 0xFC0–0xFCF range (16 entries) is fully assigned. The two CME
-virtualization CSRs added in E5 use provisional addresses 0xFD1–0xFD2 in the
-same M-mode RO encoding class. Address 0xFD0 is provisionally assigned to
+**Note.** The 0xFC0–0xFCF range (16 entries) is fully assigned. Two additional CME
+virtualization CSRs use provisional addresses 0xFD1–0xFD2 in the same M-mode
+RO encoding class. Address 0xFD0 is provisionally assigned to
 `ce_present` by Chapter 16 (discovery).
 
 **All addresses are provisional.** Real submission to RISC-V International
@@ -35,10 +35,10 @@ instance. No CE Suite CSR is shared across harts.
 
 ### 1.1 CE-disable CSR
 
-The charter (§3.7, §8.7) establishes that CE may be disabled by firmware and
-that CE CSRs read as 0 when CE is disabled. The naming, bit layout, and
-per-extension granularity of the CE-disable CSR are deferred open items
-(charter §8.7) and are not specified in this chapter.
+CE may be disabled by firmware; when disabled, CE CSRs read as 0 (see §2 —
+CE disabled convention). The naming, bit layout, and per-extension granularity
+of the CE-disable CSR are deferred to a future revision and are not specified
+in this chapter.
 
 ---
 
@@ -47,7 +47,7 @@ per-extension granularity of the CE-disable CSR are deferred open items
 **Minimum privilege.** Unless otherwise noted, all CE Suite CSRs require
 M-mode. Lower-privilege access causes an *illegal instruction* exception.
 Relaxations for S-mode (kernel) and HS-mode (hypervisor) are specified
-in Chapter 14 (P2 — privilege model integration).
+in Chapter 14.
 
 **Access types used in bit-field tables:**
 
@@ -65,7 +65,7 @@ WIRI (reads as 0, writes ignored).
 **Reset values.** `impl` means the value is implementation-defined, fixed per
 hart, and non-zero unless noted. `0` means the field reads as 0 out of reset.
 
-**CE disabled.** When CE is disabled (charter §3.7), all CE Suite CSRs read as
+**CE disabled.** When CE is disabled, all CE Suite CSRs read as
 0 and accept writes silently — no *illegal instruction* exception is raised.
 This allows a CE-unaware OS to probe for CE presence without taking unexpected
 traps.
@@ -87,10 +87,10 @@ ECID of the currently executing context on this hart.
 `ec.ob`. No instruction or CSR write may modify this field directly; it is
 maintained exclusively by CME hardware.
 
-**Privilege note.** Per charter §3.1.2, a process may not read its own ECID.
-Whether S-mode may read `current_ecid` is subject to P2. Implementations that
-expose a user-readable shadow must use a separate address in the user-accessible
-CSR range; no such shadow is defined in this version of the spec.
+**Privilege note.** A process may not read its own ECID. S-mode may read
+`current_ecid` when enabled per Chapter 14 §14.6. Implementations that expose
+a user-readable shadow must use a separate address in the user-accessible CSR
+range; no such shadow is defined in this version of the spec.
 
 ---
 
@@ -104,7 +104,7 @@ Base address of the `EC[e]` array for this hart.
 
 **Semantics.** Hardware computes `EC[e]` entry addresses as
 `BASE + e × stride`, where `stride` is implementation-defined and fixed per
-hart (charter §3.3). M-mode firmware sets `BASE` during CE initialization.
+hart. M-mode firmware sets `BASE` during CE initialization.
 
 **Legal range.** Any XLEN-wide physical address aligned to `stride`. Unaligned
 writes are rounded down to the nearest `stride`-aligned address. Writing 0
@@ -120,16 +120,15 @@ Delegation depth cap for this hart.
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
 | XLEN-1:2 | *reserved* | WIRI | 0 | — |
-| 1:0 | D | RO | impl | Maximum delegation depth, 0–3 (charter §5.1) |
+| 1:0 | D | RO | impl | Maximum delegation depth, 0–3 |
 
-**Semantics.** Exposes the implementation's delegation depth cap D, where D ≤ 3
-(charter §5.1). An ECID whose delegation level equals D may not create child
+**Semantics.** Exposes the implementation's delegation depth cap D, where D ≤ 3.
+An ECID whose delegation level equals D may not create child
 ECIDs. Software reads this CSR once at boot to determine the maximum hierarchy
 depth supported on this hart.
 
-**Note.** This CSR names the "read-only cap D via a CSR" referenced in Chapter 0
-§0.3, Chapter 1 §1.4, and charter §5.1, which did not previously assign a CSR
-name to this field.
+**Note.** This CSR provides the read-only delegation depth cap `D` referenced in
+Chapter 0 §0.3 and Chapter 1 §1.4.
 
 ---
 
@@ -178,7 +177,7 @@ Result code and status for the last CME operation on this hart.
 | 7:0 | CODE | RO | 0 | Last CME operation result code (0 = success) |
 
 **Semantics.** Hardware updates `CODE` in parallel with the `rd` write of
-every CME instruction (charter §6.6). The `rd` write is the primary error
+every CME instruction. The `rd` write is the primary error
 channel; `CODE` is diagnostic. Error code values are defined in Chapter 3.
 
 `VMT_RDY` is cleared to 0 at the start of an `ec.ob` that initiates a
@@ -237,14 +236,13 @@ encryption operation described in Chapter 3 §6. Implementations may make this
 field non-readable after a write (reads return 0 after programming) for security
 isolation; that is legal WARL behavior.
 
-**Access restriction.** This CSR is M-mode only regardless of any P2 privilege
-relaxations. S-mode or lower access always causes an *illegal instruction*
+**Access restriction.** This CSR is M-mode only; `S_EN` does not relax this
+restriction. S-mode or lower access always causes an *illegal instruction*
 exception.
 
 **Specification status.** The key derivation, attestation, and rotation
-semantics of the vault are currently shell-only (work item F7); they are deferred
-to a future revision (charter §8.6). This CSR is defined here for completeness;
-full key-management semantics will be added when charter §8.6 is resolved.
+semantics of the vault are deferred to a future revision. This CSR is defined
+here for completeness.
 
 ---
 
@@ -301,7 +299,7 @@ CPE capability flags for this hart.
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
 | XLEN-1:12 | *reserved* | WIRI | 0 | — |
-| 11 | DELEG | RO | impl | 1 = `cp.it`/`cp.ot` delegation supported (charter §4.3.6) |
+| 11 | DELEG | RO | impl | 1 = `cp.it`/`cp.ot` delegation supported |
 | 10 | L2P | RO | impl | 1 = L2-private cache partitioning supported |
 | 9 | L1D | RO | impl | 1 = L1D cache partitioning supported |
 | 8 | L1I | RO | impl | 1 = L1I cache partitioning supported |
@@ -652,12 +650,12 @@ Interrupt routing is implementation-defined.
 
 | Condition | Outcome |
 |-----------|---------|
-| Any CE Suite CSR access from privilege below M-mode | *illegal instruction* (subject to P2 S-mode relaxations) |
+| Any CE Suite CSR access from privilege below M-mode | *illegal instruction* (see Chapter 14 for S-mode relaxations) |
 | Write to any CE Suite RO CSR (0xFC0–0xFCF, 0xFD1–0xFD2) | *illegal instruction* (RISC-V privilege spec §4.1) |
 | Write to a reserved field in an RW CSR | Ignored (WIRI) |
 | Domain-scoped CSR access with invalid domain in `qos_domain_sel` | *illegal instruction* |
-| Access to `cme_seal_key` from S-mode or below | *illegal instruction* (M-mode-only restriction applies even after P2 relaxations) |
-| Any CE Suite CSR access when CE is disabled (charter §3.7) | Reads return 0; writes are silently ignored |
+| Access to `cme_seal_key` from S-mode or below | *illegal instruction* (`S_EN` does not relax this restriction) |
+| Any CE Suite CSR access when CE is disabled | Reads return 0; writes are silently ignored |
 
 ---
 
