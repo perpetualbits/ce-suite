@@ -222,8 +222,7 @@ the Markdown source and the adoc mirror. **F12 fully resolved.**
 ```
 docs/
 ├── charter/
-│   ├── project_instructions.md      # the charter (this is the comb)
-│   └── CHANGELOG.md
+│   └── project_instructions.md      # the charter (this is the comb)
 ├── chapters/                        # normative spec content
 │   ├── ch00-fundamental-structure.md
 │   ├── ch01-execution-context-model.md

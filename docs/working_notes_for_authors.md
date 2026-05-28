@@ -167,8 +167,7 @@ the same five minutes.
 ```
 1. Open a fresh chat.
 2. First message: "We're revising the charter to resolve open item §8.X.
-   Please read docs/charter/project_instructions.md and
-   docs/charter/CHANGELOG.md. Do not edit yet."
+   Please read docs/charter/project_instructions.md. Do not edit yet."
 3. The assistant responds with the open item's current state and the
    options for resolving it.
 4. You discuss; you decide.
