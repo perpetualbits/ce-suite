@@ -5,7 +5,7 @@
 This chapter describes how a CE-Suite-capable hart coexists with ratified RISC-V
 extensions and with extensions on the ratification track for the RVA23 and RVA23.1
 profiles. Nothing in this chapter introduces new CE Suite instructions, CSRs, or
-charter-level decisions. All statements about per-EC state residing in the bank CSR
+new architectural decisions. All statements about per-EC state residing in the bank CSR
 slot follow from the bank layout defined in ch00 §0.6 — this chapter identifies which
 extension-specific CSRs belong in that slot, not a new rule about how banks work.
 
@@ -28,7 +28,7 @@ per-EC bank CSR slot, and what cross-extension invariants software must maintain
 Each extension is fully defined by its own RISC-V specification; this chapter
 references only the CE-relevant subset.
 
-**CE remains opt-in.** Per charter §3.7, CE may be disabled by firmware, and any
+**CE remains opt-in.** CE may be disabled by firmware, and any
 privilege level may ignore CE even when the hardware is enabled. A hart that
 implements the RVA23S64 mandatory set and CE Suite but runs a non-CE kernel behaves
 as a standard RISC-V hart. Nothing in the RVA23 mandatory set requires CE to be
@@ -352,9 +352,8 @@ recommended software configuration is:
 **Open option (not decided in this version).** A future CE version could fold an
 `Ssqosid`-RCID field into the Contract descriptor so that `ms.ir` and `qs.ir`
 automatically populate `srmcfg.RCID` on resource assignment, eliminating the
-explicit software write on `ec.ob`. This option is parked in charter §8 for a
-later version if `Ssqosid` sees sufficient adoption; the current chapter does not
-propose it.
+explicit software write on `ec.ob`. This option is deferred to a future version
+if `Ssqosid` sees sufficient adoption; the current chapter does not propose it.
 
 ### 19.4.2 Ssctr and Sscsrind
 
@@ -419,11 +418,11 @@ a CE-managed context may address; CE governs how register state and resource con
 are assigned within that context. When Smmtt/Smsdid ratify, a new section in this
 chapter will specify the combined configuration rules.
 
-**Charter §8 open items overlapping with external extensions.** Charter §8 items 1
-(NUMA-aware Contract assignment) and 2 (multi-resource Contracts) may interact with
-future RISC-V memory partitioning and topology extensions. Those interactions will
-be specified when the relevant charter items are resolved and the external extensions
-have ratified. Cross-reference: charter §8.
+**Deferred items overlapping with external extensions.** Two items deferred in this
+specification — NUMA-aware Contract assignment and multi-resource Contracts
+(Chapter 9 §9.12) — may interact with future RISC-V memory partitioning and topology
+extensions. Those interactions will be specified when the relevant extensions have
+ratified.
 
 ---
 
@@ -441,7 +440,7 @@ column uses the following values:
 - **Bridges-to** — CE Suite concepts map to or interact with this extension's
   concepts; see the reference section for details.
 - **Deferred** — interoperability rules are deferred pending extension ratification
-  or charter resolution.
+  or a future specification update.
 
 | Extension | RVA23 status | CE interaction | Reference |
 |---|---|---|---|
