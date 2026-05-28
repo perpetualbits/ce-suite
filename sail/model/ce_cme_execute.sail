@@ -177,15 +177,73 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.im — Spill bank to ECS in RAM (ch03 §3.2) — STUB               */
+/* ec.im — Spill bank to ECS in RAM (ch03 §3.2)                      */
+/*                                                                     */
+/* ECS memory layout (implementation-defined, Sail v1):               */
+/*   ecs_ptr +   0 : GPRs x1..x31 (31 × 8 bytes = 248 bytes)         */
+/*   ecs_ptr + 248 : FPRs f0..f31 (32 × 8 bytes = 256 bytes)         */
+/*   ecs_ptr + 504 : PC  (8 bytes)                                    */
+/*   ecs_ptr + 512 : mask (8 bytes)                                   */
+/* The bank remains allocated after spill; ec.og releases it.         */
+/* ch17 §17.3.1: caller issues FENCE W,W after ec.im.                */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIM(rd, rs1, rs2)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S15: DMA bank→ECS transfer; involves memory writes (RVWMO store) */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let target_ecid : ecid_t   = truncate(X(rs1), 16);
+    let mask        : regmask_t = X(rs2);
+
+    match lookup_ec(target_ecid) {
+      None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+      Some(entry) => {
+        if ~entry.allocated then {
+          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
+          RETIRE_SUCCESS
+        } else {
+          match find_bank(target_ecid) {
+            None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK); RETIRE_SUCCESS },
+            Some(slot) => {
+              let bank    = bank_pool[unsigned(truncate(slot, 3))];
+              let ecs_ptr = entry.ecs_ptr;
+
+              if mask[0] == 0b1 then  /* GPR group (ch03 §3.7 bit 0) */
+                foreach (i from 1 to 31) {
+                  let _ : bool = write_ram(Write_plain,
+                    Physaddr(ecs_ptr + to_bits(64, (i - 1) * 8)),
+                    8, bank.gprs[i-1], default_meta);
+                  ()
+                };
+
+              if mask[1] == 0b1 then  /* FPR group (bit 1) */
+                foreach (i from 0 to 31) {
+                  let _ : bool = write_ram(Write_plain,
+                    Physaddr(ecs_ptr + to_bits(64, 248 + i * 8)),
+                    8, bank.fprs[i], default_meta);
+                  ()
+                };
+
+              /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO */
+
+              if mask[4] == 0b1 then {  /* PC group (bit 4) */
+                let _ : bool = write_ram(Write_plain,
+                  Physaddr(ecs_ptr + to_bits(64, 504)),
+                  8, bank.pc, default_meta);
+                ()
+              };
+
+              /* Write the effective mask so ec.om can restore the same groups */
+              let _ : bool = write_ram(Write_plain,
+                Physaddr(ecs_ptr + to_bits(64, 512)),
+                8, mask, default_meta);
+
+              X(rd) = cme_err_to_xlenbits(CME_OK);
+              RETIRE_SUCCESS
+            }
+          }
+        }
+      }
+    }
   }
 }
 

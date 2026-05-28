@@ -81,6 +81,26 @@ function wX(Regidx(r), v) = { if unsigned(r) != 0 then xregs[unsigned(r)] = v }
 
 overload X = {rX, wX}
 
+/* Physical memory — mirrors sail-riscv's phys_mem_interface.sail / mem.sail
+ * In standalone mode these are stubs: writes are no-ops, reads return zeros.
+ * In integrated mode the real sail-riscv implementations are used. */
+type max_mem_access : Int = 4096
+type physaddrbits = bits(64)            /* standalone: RV64 assumed */
+newtype physaddr = Physaddr : physaddrbits
+
+enum write_kind = { Write_plain }
+enum read_kind  = { Read_plain }
+type mem_meta = unit
+let default_meta : mem_meta = ()
+
+val write_ram : forall 'n, 0 < 'n <= max_mem_access .
+  (write_kind, physaddr, int('n), bits(8 * 'n), mem_meta) -> bool
+function write_ram(_, _, _, _, _) = true   /* standalone: no-op */
+
+val read_ram : forall 'n, 0 < 'n <= max_mem_access .
+  (read_kind, physaddr, int('n), bool) -> (bits(8 * 'n), mem_meta)
+function read_ram(_, _, _, _) = (zeros(), ())  /* standalone: returns zeros */
+
 /* FPR access — mirrors sail-riscv's fdext_regs.sail / freg_type.sail */
 newtype fregidx = Fregidx : bits(5)
 type flenbits = bits(64)            /* standalone: D-extension (64-bit FP) assumed */

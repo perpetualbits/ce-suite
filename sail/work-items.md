@@ -336,7 +336,11 @@ write function. The bank remains allocated after spill; `ec.og` releases it.
 
 **Depends on:** S4
 
-**Status:** ☐
+**Status:** ✓ Done — writes bank groups to ECS via write_ram (8 bytes/word).
+Defined ECS layout: GPRs at +0, FPRs at +248, PC at +504, mask at +512.
+Bank remains valid after spill; ec.og releases it. Standalone prelude
+adds physaddr, write_kind, read_kind, mem_meta, write_ram, read_ram stubs.
+Both checks pass.
 
 ---
 
