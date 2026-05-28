@@ -125,9 +125,21 @@ ECID is not allocated or has a generation mismatch;
 the caller is not an authorized ancestor;
 `CME_ERR_ALREADY_SEALED` (6) if the target bank is sealed —
 use `ec.ov` to unseal before restoring.
-** `rs1`: Target ECID number.
+** `rs1`: Target ECID and expected generation, packed in a single register:
+*** `rs1[15:0]` — ECID slot index (the target context).
+*** `rs1[23:16]` — Expected generation counter. Hardware compares this
+against `EC[target].generation`; a mismatch returns `CME_ERR_INVALID_ECID`
+without modifying any state. This detects stale references — slots freed
+and reallocated since the caller last obtained the ECID (ch00 §0.2).
+*** `rs1[63:24]` — Must be zero; non-zero returns `CME_ERR_ILLEGAL_FIELD`.
++
+*Obtaining the generation:* after `ec.ir` returns the new ECID in `rd`,
+the OS reads `EC[rd].generation` from the EC array in memory
+(at `cme_ec_table_base + rd × stride`, offset 8 from `ecs_ptr`).
+The OS stores the `(ecid, generation)` pair and passes the packed value
+in rs1 for all subsequent `ec.ob` calls targeting that context.
 ** `rs2`: Register mask — which register groups to restore (see §3.7).
-* *Side effects*: Restores registers from the bank owned by ECID `rs1`.
+* *Side effects*: Restores registers from the bank owned by ECID `rs1[15:0]`.
 Clears the dirty-group bitmap bits for every register group restored;
 the resumed context begins with a clean bitmap for those groups. If the
 PC bit is set in the mask, execution jumps to the restored program
@@ -136,9 +148,9 @@ counter on commit.
 
 ____
 *Typical switch sequence*: `ec.ib mask` (save current), then
-`ec.ob x0, next_ecid, mask` (restore next, discard result). The
-transition between `current_ecid` and `next_ecid` is complete
-when `ec.ob` commits.
+`ec.ob x0, next_ecid_gen, mask` (restore next, discard result), where
+`next_ecid_gen` holds `(generation << 16) | ecid`. The transition
+between `current_ecid` and the target ECID is complete when `ec.ob` commits.
 ____
 
 ===== Bank Exhaustion Recovery
@@ -601,7 +613,7 @@ CPE, MSE, and QoS instruction encoding tables are in chapters 7, 9, and
 |===
 |funct7 |Mnemonic |rd field |rs1 field |rs2 field
 |`0000000` |`ec.ib` |bank slot index |mask register |`00000`
-|`0000001` |`ec.ob` |result |target ECID |mask register
+|`0000001` |`ec.ob` |result |ECID + generation^1^ |mask register
 |`0000010` |`ec.im` |result |target ECID |mask register
 |`0000011` |`ec.om` |result |target ECID |mask register
 |`0000100` |`ec.ig` |result |target ECID |`00000`
@@ -616,6 +628,9 @@ CPE, MSE, and QoS instruction encoding tables are in chapters 7, 9, and
 
 funct7 values `0001100`–`1111111` (12–127) are reserved for future CME
 instructions.
+
+^1^ `ec.ob` rs1 packs `(generation[23:16] | ecid[15:0])`. Bits [63:24] must be zero.
+See §3.1 for details.
 
 ==== 3.10.4 Encoding examples
 
@@ -719,10 +734,12 @@ zombies cannot stall reclamation.
     current_ecid unchanged  (still A)
     rd = bank slot index (0-based in owning Group); x0 discards. Always succeeds or traps.
 
-  ─── Step 2: ec.ob x0, B, mask ──────────────────────────────────────
-    EC[B].bank_ref   ──→  Bank[B] located
-    Bank[B]          ──→  Active reg file  (state restored from SRAM)
-    current_ecid     ──→  B               (updated on commit)
+  ─── Step 2: ec.ob x0, B_ref, mask ─────────────────────────────────
+    B_ref = (gen_B << 16) | ecid_B   (packed register value)
+    EC[ecid_B].generation checked against gen_B  (stale → INVALID_ECID)
+    EC[ecid_B].bank_ref  ──→  Bank[B] located
+    Bank[B]              ──→  Active reg file  (state restored from SRAM)
+    current_ecid         ──→  ecid_B           (updated on commit)
     If PC bit set in mask: execution jumps to restored PC immediately.
 
   State after:

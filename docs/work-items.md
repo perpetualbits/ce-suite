@@ -283,7 +283,13 @@ and the packing is unambiguous.
 `(generation[23:16] | ecid[15:0])` encoding. Add a note to §3.10.3 encoding
 table. Update the §3.13.1 context-switch diagram to show the packed value.
 
-**Status:** Open — requires dedicated ch03 session.
+**Status:** ✓ ch03 fixed (§3.1 rs1 description, §3.10.3 table footnote, §3.13.1
+diagram). ch06 minimal propagation fix applied (one line). Two follow-up
+fixes deferred to dedicated sessions:
+- **ch05 §5.4**: code example uses `lhu a1, ECID_OFFSET(...)` (16-bit load)
+  and prose says "16-bit ECID number" — needs `lwu`/`ld` and prose update.
+- **ch14 §14.8**: vm_ecid/hs_ecid code examples need prose clarification
+  that registers hold the packed (generation, ecid) value.
 
 ---
 

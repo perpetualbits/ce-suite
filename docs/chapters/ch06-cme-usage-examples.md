@@ -53,8 +53,8 @@ ec.ob  x0, next_ecid, FULL_MASK
 
 ### Notes
 
-- `current_ecid` and `next_ecid` are ECID numbers held in registers, not
-  pointers.
+- `next_ecid` holds the packed `(generation << 16) | ecid` value (ch03 §3.1);
+  `current_ecid` is the implicit source, requiring no register operand.
 - `ec.ob` causes the hardware to set `current_ecid` to `next_ecid`. After the
   instruction completes, the hart is executing as `next_ecid`.
 - No ECS access occurs on this path; only the bank and `current_ecid` CSR are
