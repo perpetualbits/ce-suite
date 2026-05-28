@@ -7,19 +7,19 @@ every instruction in this chapter:
 
 1. **ECID-first operands.** Any instruction that targets a context other than the
    currently running one takes an **ECID number** as its primary operand — never a raw
-   pointer, never a bank ID. (Charter §6.2)
+   pointer, never a bank ID.
 2. **Implicit current ECID.** Instructions that operate on the currently running context
-   consult `current_ecid` implicitly and omit the ECID operand. (Charter §6.2)
+   consult `current_ecid` implicitly and omit the ECID operand.
 3. **Unified error reporting via `rd`.** Every instruction that can fail writes 0
    (success) or a non-zero error code in `rd`; pass `x0` to discard. Status CSRs
    (`cme_status` etc.) are updated for diagnostics but are not the primary channel.
    Two exceptions return success-path information in `rd` rather than an error code:
    `ec.ib` returns the bank slot index written; `ec.oe` returns the count of ECIDs
    freed. Both trap on the error path — `rd` is never an error code for these two.
-   Use `x0` to discard either. Silent ignore is prohibited. (Charter §6.6)
+   Use `x0` to discard either. Silent ignore is prohibited.
 
 All CME instructions are privileged unless noted otherwise. The mnemonic scheme is
-`ec.<dir><target>` (Charter §6.1), where `<dir>` ∈ `{i, o}` and `<target>` is
+`ec.<dir><target>`, where `<dir>` ∈ `{i, o}` and `<target>` is
 a letter naming the target or kind. CME uses the subset `{b, m, g, t, r, e, v}`:
 
   | Letter | Target / kind | Full name | Instructions |
@@ -34,9 +34,7 @@ a letter naming the target or kind. CME uses the subset `{b, m, g, t, r, e, v}`:
 
 The letter `s` (stream / staging bank) does not appear in CME software instructions —
 staging banks are entirely hardware-internal and have no direct software-visible
-instruction. `ec.or` does not exist as a current instruction: it was the original name
-for the forced-destroy operation, renamed first to `ec.od` (v0.7) and then to `ec.oe`
-(v0.8) for naming consistency. See §3.5 for details.
+instruction.
 
 ---
 
@@ -180,7 +178,7 @@ EC entry) — the instruction does not take a separate pointer operand.
 
 ## 3.3 Bank–Group Assignment
 
-Banks belong to Groups; GroupID equals the owning ECID number (charter §4.1). These
+Banks belong to Groups; GroupID equals the owning ECID number. These
 instructions assign or release banks from a given ECID's Group without touching the
 ECID itself. The Group maintains no explicit member list; ownership is encoded in each
 bank's up-pointer and checked at the bank (the reversal trick).
@@ -234,8 +232,7 @@ context is switched out.
 ## 3.4 Resource Delegation
 
 These instructions delegate Group resources (banks, contracts, child ECIDs) from a
-parent ECID to a child, or revoke them. The delegation tree is bounded by depth D ≤ 3
-(charter §5).
+parent ECID to a child, or revoke them. The delegation tree is bounded by depth D ≤ 3.
 
 ### `ec.it` — Delegate one bank to a child ECID
 
@@ -249,7 +246,7 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 * **Scope**: Banks only. `ec.it` transfers exactly **one** bank per call;
   the implementation selects which bank from `rs1`'s Group. To delegate N banks,
   call `ec.it` N times. Contract delegation is handled by per-extension instructions:
-  `ms.it` for MSE, `qs.it` for QoS (charter §4.3).
+  `ms.it` for MSE, `qs.it` for QoS.
 * **Side effects**: The selected bank's owner field is updated from `rs1` to `rs2`.
   Requires `rs1` to be a privileged ancestor of `rs2`. Requires `rs2` to have
   `L < D` if the child is to be able to re-delegate the bank further.
@@ -298,7 +295,7 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 * **Syntax**: `ec.oe rd, rs1`
   * `rd`: Total count of ECIDs freed, including the target itself; write `x0` to discard.
   * `rs1`: Target ECID to destroy.
-* **Semantics** (per charter §6.5):
+* **Semantics**:
   1. Revokes all Contracts held by `rs1` and every descendant in its subtree.
   2. Frees all Banks owned by `rs1` and descendants; returns them to the parent Group.
   3. Marks the radix-tree subtree rooted at `rs1` as free.
@@ -310,14 +307,6 @@ parent ECID to a child, or revoke them. The delegation tree is bounded by depth 
 * **Privileged**: Yes. The caller must be a parent or privileged ancestor of `rs1`.
 * **Cycles**: O(log N) average; proportional to subtree size.
 
-**Why there is no `ec.or`.** In the earliest drafts the forced-destroy instruction was
-named `ec.or` ("ECID out of resource"). It was renamed to `ec.od` at v0.7 to avoid
-visual ambiguity with bitwise OR, then renamed again to `ec.oe` at v0.8 to restore the
-convention that the trailing letter names the *target kind* rather than the operation
-(`e` = existence; the instruction takes an ECID *out of existence*). Charter §2.1
-lists both retired names. There is no current instruction named `ec.or`; the
-`r`-target is used only for the allocation direction (`ec.ir`).
-
 ---
 
 ## 3.6 Secure Vault Operations
@@ -325,7 +314,7 @@ lists both retired names. There is no current instruction named `ec.or`; the
 > **Status — instruction shells only.** `ec.iv` and `ec.ov` are defined as
 > instruction placeholders. The cryptographic semantics — key derivation, key
 > rotation, attestation, sealed-bank representation, and unsealing authentication
-> — are **not yet normative** (charter §8, open item 6). An implementer cannot
+> — are **not yet normative** and are deferred to a future revision. An implementer cannot
 > build a secure vault from this chapter alone. Do not rely on vault instruction
 > semantics for any security-critical design until they are fully specified.
 
@@ -401,7 +390,7 @@ illegal-operand trap. Silent ignore of reserved bits is prohibited.
 
 `EC[e]` entries are located via `cme_ec_table_base + e * stride`, where `stride` is
 implementation-defined but fixed per hart. The `ecs_ptr` field is at offset 0 within
-each entry (charter §3.2).
+each entry (§0 of this specification).
 
 ---
 
@@ -542,7 +531,7 @@ funct7 values `0001100`–`1111111` (12–127) are reserved for future CME instr
 Every CME instruction that can fail writes its result in `rd`: **0** = success,
 **non-zero** = error code. Callers who do not need the result write `rd = x0`.
 `cme_status` is updated in parallel for diagnostic use (e.g., exception handlers
-logging the cause) but is not the primary error channel (charter §6.6).
+logging the cause) but is not the primary error channel.
 
 Any instruction that encounters an invalid ECID (unallocated slot, generation
 mismatch, privilege violation, or Group ownership failure) must either:
@@ -550,7 +539,7 @@ mismatch, privilege violation, or Group ownership failure) must either:
 * Raise a defined trap to the OS or hypervisor, or
 * Return a documented error code in `rd`.
 
-Silent ignore is prohibited (charter §6.6).
+Silent ignore is prohibited.
 
 **Success-path `rd` for `ec.ib` and `ec.oe`:**
 
