@@ -16,7 +16,7 @@ MSE achieves this through two coordinated mechanisms:
    Contract holders without starving best-effort traffic.
 
 2. **Hierarchical Contract model.** Memory bandwidth and latency guarantees are
-   represented as Contracts (charter §4.3), owned by ECIDs, splittable to child ECIDs,
+   represented as Contracts, owned by ECIDs, splittable to child ECIDs,
    and enforced in O(1) hardware per arbitration cycle. Group caps bound the total
    guaranteed bandwidth any ECID subtree can claim.
 
@@ -87,7 +87,7 @@ bandwidth guarantees intact under interrupt load.
 Interrupt nesting extends the worst-case latency for CN slots. MSE defines a
 parameter **K** — the maximum hardware-tolerated interrupt nesting depth — exposed via
 the read-only CSR `mse_max_nesting`. The value K is independent of the ECID
-delegation depth cap D (charter §5.1); they are unrelated parameters.
+delegation depth cap D; they are unrelated parameters.
 
 Under worst-case nesting of depth K, CN slots are delayed but not skipped:
 
@@ -122,12 +122,12 @@ and is not permitted by MSE v1.
 
 ## 9.4 MSE Contracts
 
-MSE Contracts are instances of the general Contract model (charter §4.3). This section
+MSE Contracts are instances of the general Contract model (Chapter 0 §0.7). This section
 specifies the MSE-specific parameters each Contract carries.
 
 ### 9.4.1 Contract parameters
 
-Per charter §4.3.0 and ch00 §0.7.0, an MSE Contract is identified by
+Per Chapter 0 §0.7.0, an MSE Contract is identified by
 `(owning_ECID, MSE)` and consists of the parameters below stored in the bank's
 CP field plus admission-control state in implementation-defined per-controller SRAM.
 
@@ -165,18 +165,18 @@ resources.
 ### 9.4.3 Hierarchical splitting
 
 A privileged actor may split an MSE Contract into a parent Contract and one or more
-child Contracts (charter §4.3.2). Each child's `bw_class` must be ≤ the parent's
+child Contracts. Each child's `bw_class` must be ≤ the parent's
 `bw_class` minus what the parent retains. The sum of all children's `bw_class` values
 must never exceed the parent's `bw_class`.
 
 Splitting is performed via `ms.it` (§9.5) and is **atomic**: if the hardware
-admission check fails, no state is changed (charter §4.3.3).
+admission check fails, no state is changed.
 
 ### 9.4.4 Dissolution
 
 When an ECID's Contract is revoked (via `ms.or` or `ec.oe`), the Contract dissolves
 and its `bw_class` is returned to the parent ECID's cap headroom. If the ECID has
-child Contracts, those are revoked first, recursively (charter §4.3.4). This is
+child Contracts, those are revoked first, recursively. This is
 always O(log N) via the radix tree and always succeeds — even for zombie or hostile
 ECIDs.
 
@@ -185,7 +185,7 @@ ECIDs.
 ## 9.5 MSE Instructions
 
 All MSE instructions are privileged. They follow the naming scheme
-`ms.{i,o}{target}` (charter §6.1). MSE uses the subset `{r, t}`:
+`ms.{i,o}{target}`. MSE uses the subset `{r, t}`:
 
 | Letter | Target / kind |
 |---|---|
@@ -194,7 +194,7 @@ All MSE instructions are privileged. They follow the naming scheme
 
 **ECID-first operands.** Any MSE instruction targeting a context other than the
 current one takes an ECID number as its primary operand — never a pointer, never an
-opaque group ID (charter §6.2).
+opaque group ID.
 
 > **Memory ordering.** MSE Contract instructions operate on per-hart hardware
 > registers and SRAM; they carry no implicit memory fence. Cross-hart coordination
@@ -428,7 +428,7 @@ An EC with both a CPE cache partition and an MSE Contract has:
 | `MSE_ERR_PRIVILEGE` | 5 | Caller does not have permission to modify this ECID's Contract |
 
 All error codes are returned in `rd` or in `mse_status`. Silent failure is prohibited
-(charter §6.6).
+Silent failure is prohibited.
 
 ---
 
@@ -482,12 +482,12 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 
 - **NoC, DMA, and peripheral arbitration.** Covered by QoS (Chapter 11).
 - **NUMA-aware Contract assignment.** Multi-socket NUMA semantics for MSE Contracts
-  are an open item (charter §8.1).
+  are deferred to a future revision.
 - **Multi-resource Contracts.** Whether a single Contract can span memory and I/O
-  is open (charter §8.2).
+  is deferred to a future revision.
 - **Software-overflow Contracts.** When hardware Contract slots are exhausted, the
-  slow-path software fallback is not yet specified (charter §8.3).
-- **Cross-hart ECS sharing during migration.** Open item (charter §8.4).
+  slow-path software fallback is not yet specified.
+- **Cross-hart ECS sharing during migration.** Deferred to a future revision.
 
 ---
 
