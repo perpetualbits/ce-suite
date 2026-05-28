@@ -74,6 +74,7 @@ Categories:
 - [x] docs/working_notes_for_authors.md
 - [x] hw/README.md
 - [x] scratchpads/README.md
+- [x] scratchpads/general/big-concatenation.md
 
 ## CODE (BSD-3-Clause)
 
@@ -95,7 +96,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] scratchpads/general/big-concatenation.md
 - [ ] scratchpads/general/mermaid-sketch.md
 - [ ] scratchpads/mse/101-scratchpad.md
 - [ ] scratchpads/mse/102-scratchpad.md
