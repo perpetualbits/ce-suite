@@ -12,7 +12,7 @@ Categories:
 
 ## SPEC (CC BY 4.0)
 
-<!-- files moved here as they are licensed -->
+- [x] README.md
 
 ## CODE (BSD-3-Clause)
 
@@ -25,7 +25,6 @@ Categories:
 - [x] LICENSE
 
 ## UNCLASSIFIED
-- [ ] README.md
 - [ ] SETUP_INSTRUCTIONS
 - [ ] docs/adoc/chapters/appendix-a-ecid.adoc
 - [ ] docs/adoc/chapters/appendix-b-profiles.adoc
