@@ -3,8 +3,6 @@ Roland Nagtegaal <perpetualbits@gmail.com>
 :doctype: book
 :toc: left
 :toclevels: 4
-:sectnums:
-:sectnumlevels: 4
 :source-highlighter: rouge
 :rouge-style: github
 :icons: font
@@ -65,3 +63,7 @@ include::chapters/appendix-a-ecid.adoc[leveloffset=+0]
 
 [appendix]
 include::chapters/appendix-b-profiles.adoc[leveloffset=+0]
+
+include::reference/glossary.adoc[leveloffset=+0]
+
+include::reference/instruction-card.adoc[leveloffset=+0]
