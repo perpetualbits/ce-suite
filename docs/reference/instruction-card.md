@@ -36,7 +36,7 @@ to discard.
 - `ec.it` delegates **one bank** per call, implementation-chosen from the
   parent's group. To delegate N banks, call `ec.it` N times.
 - `ec.iv`/`ec.ov` are specified as instruction shells; full key-derivation
-  and sealing-format semantics await resolution of charter §8.6.
+  and sealing-format semantics are deferred to a future revision.
 
 ---
 
@@ -82,7 +82,7 @@ to discard.
 
 **Notes.**
 - `qs.or` and `qs.ot`: rs2 = domain_id; `0` = revoke all domains
-  simultaneously (charter §6.7). All four QoS instructions use all three
+  simultaneously. All four QoS instructions use all three
   register fields.
 - `qs.it` inline form (rs2 = delegation descriptor directly in a register)
   requires RV64 on many-field encodings; pointer form available for RV32.
