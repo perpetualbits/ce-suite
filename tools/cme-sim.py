@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com>
+
 # cme_sim.py
 
 import sys
