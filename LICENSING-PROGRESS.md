@@ -37,6 +37,7 @@ Categories:
 - [x] docs/adoc/chapters/ch19-interop-ratified-extensions.adoc
 - [x] docs/adoc/index.adoc
 - [x] docs/adoc/reference/glossary.adoc
+- [x] docs/adoc/reference/instruction-card.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -48,7 +49,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/reference/instruction-card.adoc
 - [ ] docs/adoc/submission/motivation.adoc
 - [ ] docs/adoc/submission/submission-brief.adoc
 - [ ] docs/archive/README.md
