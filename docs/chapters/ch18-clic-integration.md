@@ -359,7 +359,7 @@ interrupt is first requested (`request_irq`), and released when the interrupt is
 
 **Chapter 3 (CME Instruction Set Reference)** defines `ec.ib` (§3.1), `ec.ob` (§3.1),
 `ec.om` (§3.2), `ec.ir` (§3.5), and `ec.oe` (§3.6). The dirty-save mode for `ec.ib`
-is specified in §3.1 (E3). The Bank Exhaustion Recovery protocol referenced in §18.8
+is specified in §3.1. The Bank Exhaustion Recovery protocol referenced in §18.8
 is in §3.1 and §3.3.
 
 **Chapter 4 (Hardware Microarchitecture)** specifies the SRAM-vs-RAM residency model
