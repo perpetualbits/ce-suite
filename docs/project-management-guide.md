@@ -434,6 +434,75 @@ standards body, publishing):
 
 ---
 
+## Part 11 — Starting a new project with this methodology
+
+### 11.1 Using this guide as a prompt
+
+This document is designed to be handed directly to an AI assistant at the start
+of a new project. A minimal opening prompt:
+
+```
+We are starting a new [type] project. Before we do anything, read
+[path/to/project-management-guide.md]. It describes the methodology we
+will follow. Then help me adapt it: decide what plays the role of "the
+comb" in this project, create the document hierarchy, and establish the
+session discipline before we write any content.
+```
+
+Do this setup work before writing a single line of content. The methodology only
+protects you if the infrastructure is in place from the start. Retrofitting it
+onto an existing project is possible but significantly harder — you have to
+simultaneously write the comb, audit existing content for drift, and establish
+the habit.
+
+### 11.2 Adapting the methodology by project type
+
+The core rules transfer without modification. What varies is what plays each role:
+
+| CE Suite role | Spec / standards project | Software architecture | Protocol design |
+|---|---|---|---|
+| **The comb** | Axiom charter | ADR set + architecture principles doc | Normative requirements doc |
+| **Unit of work** | One chapter | One ADR / one module | One protocol section |
+| **Retired terms** | Superseded instruction names | Deprecated APIs / patterns | Obsolete message types |
+| **Chapters** | Spec chapters | Design docs, READMEs | Protocol specification sections |
+| **Generated artifacts** | PDF, HTML | API docs, diagrams | Protocol reference PDFs |
+
+For software projects, the "comb" is often a combination of: an architecture
+principles document (the immovable constraints) plus an ADR log (the decision
+history). The ADR log plays the same role as the charter changelog — it records
+what was decided, when, and why.
+
+### 11.3 The five things to create before the first content session
+
+1. **The comb** — even a one-page document with three decisions is enough to
+   start. You will grow it. What matters is that it exists, it is versioned,
+   and it is the place where decisions land.
+2. **The refamiliarize document** — a stub is fine. Put in the project summary,
+   a "what has been decided" section (initially empty), and "what's next" (your
+   first task). You will fill it in as work progresses.
+3. **The working notes** — copy the session patterns from Part 4 of this guide,
+   adapt the unit-of-work definition to your project, and add any
+   project-specific warnings you already know about.
+4. **The work items document** — one item: the first task. More will accumulate.
+5. **The AI bootstrap file** — three lines telling the assistant what to read
+   and what rules to follow. This is the enforcement mechanism; without it the
+   discipline decays as soon as you forget to mention it.
+
+### 11.4 The hiatus test
+
+The most reliable indicator that the methodology is working: could you hand the
+project to someone who has never seen it — or return to it yourself after six
+months away — and have them oriented and productive in under an hour?
+
+If the answer is yes, the document hierarchy is doing its job. If the answer is
+no, something is missing from the refamiliarize document or the comb is not
+capturing decisions as they are made.
+
+Run this test periodically, not just at the start. Projects drift; the documents
+that prevent drift need to be kept current.
+
+---
+
 ## Summary — the rules in order of importance
 
 1. **The comb wins.** One authoritative source of truth, versioned, with
