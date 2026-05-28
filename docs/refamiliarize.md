@@ -48,15 +48,15 @@ ownership layer that ties the other four together.
   layer that all four hang off. Not numbered as a sixth extension; it's the
   foundation defined in Chapter 0.
 
-### A.3 Chapter status (as of v0.15 of the charter; E1–E8 all done)
+### A.3 Chapter status (as of v0.16 of the charter; E1–E8 all done)
 
 > **Note:** See `docs/work-items.md` for all tracked inconsistencies and open design
 > decisions. The table below shows high-level state.
 
 | Chapter | State | Notes |
 |---|---|---|
-| **Charter** (Project Instructions) | v0.15 — current | D1–D5 locked; F1–F11, G1–G3 resolved; E8 chartered; D5: §4.3.0 Contract object model |
-| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.15; §0.7.0 Contract object model added; E3: §0.3 dirty-group tracking paragraph added |
+| **Charter** (Project Instructions) | v0.16 — current | D1–D5 locked; F1–F11, G1–G3 resolved; E8 chartered; D5: §4.3.0 Contract object model; §8.7: `ce_ctrl` (0x7D0) resolved |
+| **Chapter 0** (Fundamental Structure) | Done | Aligned to charter v0.16; §0.7.0 Contract object model added; E3: §0.3 dirty-group tracking paragraph added; `ce_ctrl` named in disable/ignore section |
 | **Chapter 1** (Execution Context Model) | Done | ECID-first throughout |
 | **Chapter 2** (Bank/Group/Delegation Semantics) | Done | D2 applied |
 | **Chapter 3** (CME Instruction Set Reference) | Done | D1/F3/F7/G1/G2 resolved; F8 encoding added; E8 propagated; E4 Bank Exhaustion Protocol added; E3: `ec.ib` dirty-save mode (rs1=x0) and `ec.ob` bitmap clearing added |
@@ -69,10 +69,10 @@ ownership layer that ties the other four together.
 | **Chapter 10** (MSE Usage Examples) | Done | — |
 | **Chapter 11** (QoS) | Done | qs.{ir,or,it,ot}; D4/F2/F8 resolved |
 | **Chapter 12** (QoS Usage Examples) | Done | qs.it inline requires RV64; pointer form noted |
-| **Chapter 13** (CSR Reference) | Done | P1 resolved; 31 CSRs (0x7C0–0x7CF, 0xFC0–0xFCF); E5: +2 CME RO CSRs at 0xFD1–0xFD2 (`current_ecid_level`, `current_ecid_parent`) |
+| **Chapter 13** (CSR Reference) | Done | P1 resolved; 32 CSRs (0x7C0–0x7CF, 0x7D0, 0xFC0–0xFCF, 0xFD1–0xFD2); §8.7: `ce_ctrl` (0x7D0) added |
 | **Chapter 14** (Privilege Model) | Done | P2 resolved; cme_priv_ctl (0x7CF), hcme_ctrl (0x6C0); E5: S/HS/VS read access for new CSRs added |
 | **Chapter 15** (Trap and Exception Table) | Done | P3 resolved; trap-vs-rd model; CE_EXC_BANK_FAULT (cause 16); CME error code table; E4: ec.ob CME_ERR_NO_BANK corrected + cross-ref |
-| **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos; E1: §3.1 + §7 cross-reference to Appendix B |
+| **Chapter 16** (Discovery Mechanism) | Done | P4 resolved; ce_present (0xFD0); ISA string names Xce/Xcecme/Xcecpe/Xcemse/Xceqos; E1: §3.1 + §7 cross-reference to Appendix B; CE-disabled note updated for `ce_ctrl` |
 | **Chapter 17** (Memory Ordering) | Done | P5 resolved; no implicit fences on ec.ib/ec.ob; FENCE W,W after ec.im; FENCE R,R before ec.om; normative migration sequence §17.5 |
 | **Chapter 18** (CLIC Interrupt Integration) | Done | E2: interrupt-EC pattern; boot allocation; M-mode prologue/epilogue; CPE partition isolation; nested interrupts; bank provisioning |
 | **Chapter 19** (Interoperability with Ratified Extensions) | Done | I1: RVA23S64 mandatory set + RVA23.1 optional; per-EC CSR slot obligations; Smstateen gate bit (provisional bit 58); Ssqosid bridges-to CE Contracts |
@@ -115,6 +115,10 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
     Parameters live in the Bank CP field; admission-control state in per-controller
     SRAM. Lifecycle: `*.ir`/`*.it` creates, `*.or`/`*.ot`/`ec.oe` destroys.
     Charter §4.3.0; ch00 §0.7.0. *(v0.15)*
+17. **`ce_ctrl` (0x7D0) is the CE-disable CSR.** M-mode RW, resets to 0 (all
+    disabled). Four independent per-extension bits: `CME_EN` (bit 0), `CPE_EN`
+    (bit 1), `MSE_EN` (bit 2), `QOS_EN` (bit 3). Hardware-absent extensions are
+    RO 0. Extensions may be enabled independently. *(v0.16)*
 
 ### A.5 What's *open*
 
@@ -127,8 +131,6 @@ If a chapter you're reading contradicts any of these, the chapter is wrong:
 5. UCS (Unified Context Structure) — kernel-side abstraction, not
    architectural; may become an optional appendix.
 6. Secure Vault key derivation, attestation, rotation.
-7. The CE-disable CSR name, bit layout, reset defaults, per-extension
-   granularity.
 
 **`docs/work-items.md` remaining open items** (specification-level):
 
