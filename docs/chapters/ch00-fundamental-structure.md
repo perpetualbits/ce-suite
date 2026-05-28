@@ -9,10 +9,8 @@ This chapter defines the core objects and relationships in the CE Suite. Its
 definitions are normative: all instruction semantics, delegation rules, and OS
 integration details in later chapters reference this chapter.
 
-The CE Suite charter (`docs/charter/project_instructions.md`) is the
-authoritative source for architectural decisions. When a detail here conflicts
-with the charter, the charter wins. When a later chapter conflicts with this
-chapter, this chapter wins.
+This chapter is normative. When a later chapter conflicts with this
+chapter, this chapter takes precedence.
 
 ---
 
@@ -108,9 +106,8 @@ running context. `ec.ib` clears the bitmap for every group it saves (whether in
 explicit-mask or dirty-save mode). `ec.ob` clears the bitmap for all groups in
 the restore mask; the restored context begins with a clean bitmap.
 
-The bitmap may be stored in the implementation-defined region of `EC[e]` (charter
-§3.2 allows implementation-defined fields in `EC_entry`) or as a per-hart
-hardware register that is flushed into `EC[e]` on context save. Either placement
+The bitmap may be stored in the implementation-defined region of `EC[e]` or as
+a per-hart hardware register that is flushed into `EC[e]` on context save. Either placement
 is conforming. This bitmap is the mechanism behind `ec.ib`'s dirty-save mode
 (Chapter 3 §3.1).
 
@@ -233,8 +230,6 @@ VMT banks are allocated and managed separately from non-VMT banks.
 
 ### §0.7.0 — Contract: object model
 
-Charter §4.3.0 is the normative statement; this section restates and concretizes it.
-
 **Definition.** A Contract is a privileged-actor-created binding of a slice of a
 global multiplexed resource to one owning ECID's Group, tracked by hardware for
 the duration of the binding.
@@ -342,8 +337,7 @@ every freed `EC[e]` slot. A destroyed EC cannot stall its own reclamation.
 
 All CME instructions follow the naming scheme `ec.{i,o}{target}` where `i` =
 into (save/create/assign) and `o` = out of (restore/destroy/revoke). Target
-letters name the target or kind and are drawn from `{b, m, s, g, t, v, e, r}`
-(charter §6.1).
+letters name the target or kind and are drawn from `{b, m, s, g, t, v, e, r}`.
 
 **Target letter definitions:**
 
@@ -367,9 +361,8 @@ ms.{i,o}{r,t}              — MSE (4 instructions)
 qs.{i,o}{r,t}              — QoS (4 instructions)
 ```
 
-Not every cross-product exists. Within CME: there is no `ec.or` (the name was
-retired; forced destroy is `ec.oe`). Within CPE, MSE, and QoS: all four
-combinations `{i,o}{r,t}` are valid. Full definitions are in Chapter 3 (CME),
+Not every cross-product exists. Within CME: there is no `ec.or`; forced destroy
+is `ec.oe`. Within CPE, MSE, and QoS: all four combinations `{i,o}{r,t}` are valid. Full definitions are in Chapter 3 (CME),
 Chapter 7 (CPE), Chapter 9 (MSE), and Chapter 11 (QoS).
 
 **ECID-first operands.** Any instruction that targets a context other than the
