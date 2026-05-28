@@ -13,7 +13,6 @@ Categories:
 ## SPEC (CC BY 4.0)
 
 - [x] README.md
-- [x] SETUP_INSTRUCTIONS
 - [x] docs/adoc/chapters/appendix-a-ecid.adoc
 - [x] docs/adoc/chapters/appendix-b-profiles.adoc
 - [x] docs/adoc/chapters/ch00-fundamental-structure.adoc
@@ -26,7 +25,6 @@ Categories:
 
 - [x] .gitignore
 - [x] CLAUDE.md
-- [x] LICENSE
 
 ## UNCLASSIFIED
 - [ ] docs/adoc/chapters/ch01-execution-context-model.adoc
