@@ -83,6 +83,7 @@ Categories:
 ## CODE (BSD-3-Clause)
 
 - [x] Makefile
+- [x] tools/ce-sizing-calculator.py
 
 ## SKIP (no header)
 
@@ -100,7 +101,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] tools/ce-sizing-calculator.py
 - [ ] tools/ce_sizing_baseline_percentages.csv
 - [ ] tools/ce_sizing_current_config.csv
 - [ ] tools/ce_sizing_node_sweep.csv

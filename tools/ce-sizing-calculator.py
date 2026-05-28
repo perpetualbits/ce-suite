@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com>
+
 # CE suite sizing & percentage calculator
 #
 # Adjust the parameters in the CONFIG section (near the top) to explore
