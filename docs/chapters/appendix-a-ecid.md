@@ -102,7 +102,7 @@ abstract over it.
 
 ECID allocation is always performed by the privileged actor that owns the containing
 prefix — the kernel (L0), a hypervisor (L1), or a nested hypervisor (L2). User mode
-may never allocate ECIDs. The maximum delegation depth is D ≤ 3 (charter §5.1).
+may never allocate ECIDs. The maximum delegation depth is D ≤ 3.
 
 Two operations cover the full allocation surface:
 
@@ -206,7 +206,7 @@ is maintained by hardware; software cannot forge or overwrite it directly.
 **Contracts** are split from the parent's Contract via the appropriate admission
 instruction (`ms.it` for MSE, `qs.it` for QoS, `cp.ir` for CPE). Each split requires
 chip-global arbitration and either succeeds atomically or fails with no state change
-(charter §4.3, atomic admission invariant). The parent's remaining Contract is reduced
+(atomic admission invariant). The parent's remaining Contract is reduced
 by the amount allocated to the child.
 
 ### A.4.2 Delegation invariants
@@ -230,7 +230,7 @@ After any delegation step, the following invariants must hold:
 
 ### A.5.1 Guarantee
 
-The instruction `ec.oe rd, rs1` (charter §6.5) destroys the ECID in `rs1` and its entire
+The instruction `ec.oe rd, rs1` destroys the ECID in `rs1` and its entire
 delegation subtree. It **always succeeds**. A zombie, blocked, or hostile EC cannot
 stall its own destruction. The kernel need not wait for the target to be cooperatively
 scheduled or to voluntarily release resources.
