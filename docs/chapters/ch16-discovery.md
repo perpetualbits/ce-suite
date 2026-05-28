@@ -2,7 +2,7 @@
 
 **Status:** Normative.
 
-This chapter (P4 work item) defines how software detects the presence of CE Suite
+This chapter defines how software detects the presence of CE Suite
 extensions and determines which sub-extensions are implemented. It introduces a
 single top-level capability CSR (`ce_present`, 0xFD0) and specifies the provisional
 ISA string names used to advertise CE Suite in firmware and tooling.
@@ -82,7 +82,7 @@ slot after the 16-CSR M-mode RO block defined in Chapter 13 (0xFC0–0xFCF).
 harts in a system will report the same bit pattern, but software must not assume
 this without reading the CSR on each hart.
 
-**CE-disabled behavior.** When CE is disabled by firmware (charter §3.7),
+**CE-disabled behavior.** When CE is disabled by firmware,
 `ce_present` reads as 0 — consistent with the rule that all CE CSRs read as 0
 when CE is disabled (Chapter 13 §2). This is intentional: `ce_present = 0` is
 the correct answer to "is CE available?" when CE is disabled. No software-visible
@@ -239,7 +239,7 @@ disagreement should log the inconsistency and fall back to the CSR value.
 |---------|------|-----------|--------|-------|
 | 0xFD0 | `ce_present` | CE substrate | RO (M-mode) | First available slot after ch13's 0xFC0–0xFCF block |
 
-This is the only new CSR introduced by P4. All per-extension capability CSRs are
+This is the only CSR introduced by this chapter. All per-extension capability CSRs are
 defined in Chapter 13.
 
 ---
