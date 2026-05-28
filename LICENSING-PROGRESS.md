@@ -22,9 +22,9 @@ Categories:
 
 - [x] .gitignore
 - [x] CLAUDE.md
+- [x] LICENSE
 
 ## UNCLASSIFIED
-- [ ] LICENSE
 - [ ] Makefile
 - [ ] README.md
 - [ ] SETUP_INSTRUCTIONS
