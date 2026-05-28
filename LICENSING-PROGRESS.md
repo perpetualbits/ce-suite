@@ -67,6 +67,7 @@ Categories:
 - [x] docs/future-directions.md
 - [x] docs/refamiliarize.md
 - [x] docs/reference/glossary.md
+- [x] docs/reference/instruction-card.md
 
 ## CODE (BSD-3-Clause)
 
@@ -88,7 +89,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] docs/reference/instruction-card.md
 - [ ] docs/submission/motivation.md
 - [ ] docs/submission/submission-brief.md
 - [ ] docs/work-items.md
