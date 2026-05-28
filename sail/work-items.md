@@ -353,7 +353,10 @@ contents into it, update `ec_array[rs1]` bank reference.
 
 **Depends on:** S12, S15
 
-**Status:** ☐
+**Status:** ✓ Done — reads register groups from ecs_ptr via read_ram using
+the S15 ECS layout (GPRs +0, FPRs +248, PC +504). Claims a free bank slot
+(like ec.ig), populates it from ECS, marks valid. CME_ERR_NO_BANK if pool
+exhausted. Both checks pass.
 
 ---
 

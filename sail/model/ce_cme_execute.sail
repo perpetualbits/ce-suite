@@ -248,15 +248,90 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.om — Fill bank from ECS in RAM (ch03 §3.2) — STUB              */
+/* ec.om — Fill bank from ECS in RAM (ch03 §3.2)                     */
+/*                                                                     */
+/* Reads register groups from EC[rs1].ecs_ptr using the same ECS     */
+/* layout defined for ec.im (S15). Claims a free bank slot.          */
+/* ch17 §17.3.2: caller issues FENCE R,R before ec.om on cross-hart. */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOM(rd, rs1, rs2)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S16: DMA ECS→bank transfer; involves memory reads (RVWMO load) */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let target_ecid : ecid_t   = truncate(X(rs1), 16);
+    let mask        : regmask_t = X(rs2);
+
+    match lookup_ec(target_ecid) {
+      None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+      Some(entry) => {
+        if ~entry.allocated then {
+          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
+          RETIRE_SUCCESS
+        } else {
+          let ecs_ptr = entry.ecs_ptr;
+
+          /* Claim a free bank slot (ec.om acts like ec.ig + fill) */
+          var found     : bool = false;
+          var free_slot : nat  = 0;
+          foreach (i from 0 to 7) {
+            if ~found & ~(bank_pool[i].valid) then {
+              found     = true;
+              free_slot = i
+            }
+          };
+
+          if ~found then {
+            X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
+            RETIRE_SUCCESS
+          } else {
+            /* Read register groups from ECS (mirrors ec.im layout) */
+            var new_gprs : vector(31, dec, bits(64)) = Bank_default.gprs;
+            if mask[0] == 0b1 then  /* GPR group */
+              foreach (i from 1 to 31) {
+                let (v, _) = read_ram(Read_plain,
+                  Physaddr(ecs_ptr + to_bits(64, (i - 1) * 8)),
+                  8, false);
+                new_gprs[i-1] = v
+              };
+
+            var new_fprs : vector(32, dec, bits(64)) = Bank_default.fprs;
+            if mask[1] == 0b1 then  /* FPR group */
+              foreach (i from 0 to 31) {
+                let (v, _) = read_ram(Read_plain,
+                  Physaddr(ecs_ptr + to_bits(64, 248 + i * 8)),
+                  8, false);
+                new_fprs[i] = v
+              };
+
+            /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO */
+
+            let new_pc : bits(64) =
+              if mask[4] == 0b1 then {  /* PC group */
+                let (v, _) = read_ram(Read_plain,
+                  Physaddr(ecs_ptr + to_bits(64, 504)),
+                  8, false);
+                v
+              } else Bank_default.pc;
+
+            /* Populate the free bank slot */
+            foreach (i from 0 to 7) {
+              if i == free_slot then
+                bank_pool[i] = { Bank_default with
+                  owner_ecid = target_ecid,
+                  valid      = true,
+                  gprs       = new_gprs,
+                  fprs       = new_fprs,
+                  pc         = new_pc,
+                  mask       = mask
+                }
+            };
+
+            X(rd) = cme_err_to_xlenbits(CME_OK);
+            RETIRE_SUCCESS
+          }
+        }
+      }
+    }
   }
 }
 
