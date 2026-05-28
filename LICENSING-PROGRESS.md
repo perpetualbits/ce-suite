@@ -20,11 +20,10 @@ Categories:
 
 ## SKIP (no header)
 
-<!-- files moved here as they are classified -->
+- [x] .gitignore
 
 ## UNCLASSIFIED
 
-- [ ] .gitignore
 - [ ] CLAUDE.md
 - [ ] LICENSE
 - [ ] Makefile
