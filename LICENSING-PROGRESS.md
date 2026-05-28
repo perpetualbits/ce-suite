@@ -89,6 +89,9 @@ Categories:
 
 - [x] .gitignore
 - [x] CLAUDE.md
+- [x] tools/ce_sizing_baseline_percentages.csv
+- [x] tools/ce_sizing_current_config.csv
+- [x] tools/ce_sizing_node_sweep.csv
 - [x] docs/archive/README.md
 - [x] docs/archive/ce-tree-of-truths.md
 - [x] docs/archive/chapter0-also-half-correct.md
@@ -101,9 +104,6 @@ Categories:
 - [x] docs/archive/working_with_chatgpt.md
 
 ## UNCLASSIFIED
-- [ ] tools/ce_sizing_baseline_percentages.csv
-- [ ] tools/ce_sizing_current_config.csv
-- [ ] tools/ce_sizing_node_sweep.csv
 - [ ] tools/cme-sim.py
 - [ ] tools/md2adoc.py
 - [ ] working_notes_for_authors.md
