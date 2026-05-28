@@ -16,6 +16,7 @@ Categories:
 - [x] docs/adoc/chapters/appendix-a-ecid.adoc
 - [x] docs/adoc/chapters/appendix-b-profiles.adoc
 - [x] docs/adoc/chapters/ch00-fundamental-structure.adoc
+- [x] docs/adoc/chapters/ch01-execution-context-model.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -27,7 +28,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/chapters/ch01-execution-context-model.adoc
 - [ ] docs/adoc/chapters/ch02-bank-group-delegation.adoc
 - [ ] docs/adoc/chapters/ch03-cme-instruction-set.adoc
 - [ ] docs/adoc/chapters/ch04-hardware-microarch.adoc
