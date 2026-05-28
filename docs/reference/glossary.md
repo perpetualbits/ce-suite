@@ -1,9 +1,8 @@
 # CE Suite Glossary
 
-A standalone copy of the normative glossary from charter §2, plus the
-list of retired terms, for quick lookup. **If this file disagrees with
-the charter, the charter wins.** If you notice a disagreement, fix this
-file.
+Normative glossary for the CE Suite. If a term defined here conflicts
+with its definition in the relevant chapter, the chapter definition takes
+precedence.
 
 ## Current terms
 
@@ -36,8 +35,6 @@ file.
 | **EECIDG** | ECID + `hart_id` + generation | Same. |
 | **CPE pool, CME pool** | Per-ECID explicit assignment | Pooling was rejected for per-hart resources. |
 | **Resource-attached flag** | Presence/absence of a Contract binding in `EC[e]` | Subsumed. |
-| **`ec.or`** | `ec.oe` | Renamed to `ec.od` (v0.7), then to `ec.oe` (v0.8). Both intermediate names are retired. |
-| **`ec.od`** | `ec.oe` | Renamed in v0.8: trailing `e`=existence restores the rule that the trailing letter names the target kind, not the operation. |
 | **6-bit Group ID** | GroupID = ECID number (16 bits) | Group IDs no longer have a separate namespace. |
 
 ## Instruction naming convention
@@ -52,6 +49,5 @@ file.
 - Target/kind: `b`=bank, `m`=memory, `g`=group, `t`=tenant, `v`=vault,
   `e`=existence, `r`=resource/region.
 - Each extension uses only the subset applicable to it; the full cross-product
-  is not valid. See charter §6.1 for the per-extension subset table.
-
-New letters or new extension prefixes require a charter change.
+  is not valid. See the Overview section of each extension's instruction chapter
+  for its subset.
