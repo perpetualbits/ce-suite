@@ -317,7 +317,10 @@ end-to-end: `ec.ig` returns `CME_ERR_NO_BANK` → caller issues `ec.im` +
 
 **Depends on:** S12, S13, S15 (ec.im needed for spill step)
 
-**Status:** ☐
+**Status:** ✓ Done — ce_cme_test_s14.sail. Fills all 8 slots, asserts
+CME_ERR_NO_BANK, calls ec.im (stub, CME_OK), calls ec.og (genuinely frees
+slot 7), retries ec.ig → succeeds with slot 7 assigned to ECID_E. Both
+checks pass. ec.im stub is sufficient — protocol structure is validated.
 
 ---
 
