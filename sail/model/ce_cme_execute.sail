@@ -314,14 +314,62 @@ function clause execute(CE_ECIR(rd, rs1)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.oe — Forced destroy of ECID and subtree (ch03 §3.5) — STUB     */
+/* ec.oe — Forced destroy of ECID and subtree (ch03 §3.5)            */
+/*                                                                     */
+/* Always succeeds (ch03 §3.5, invariant 1).                         */
+/* Permission check (caller must be ancestor) deferred to S22.        */
+/* Contract revocation is a no-op in Sail v1 (CPE/MSE/QoS stubs).   */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOE(rd, rs1)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S10: depth-first subtree walk; always succeeds; rd = ECIDs freed */
-    X(rd) = zero_extend(0x0001 : bits(16));
+    let target_ecid = truncate(X(rs1), 16);
+
+    /* ---- Phase 1: mark the target and all descendants ---- */
+    /* mark[i] = true iff ec_array slot i is in the subtree  */
+    var marked : vector(64, dec, bool) = vector_init(false);
+
+    /* Mark the target slot (if in range and allocated) */
+    foreach (j from 0 to 63) {
+      if j == unsigned(target_ecid) & ec_array[j].allocated then
+        marked[j] = true
+    };
+
+    /* Three propagation sweeps cover trees up to D=3 levels deep.
+     * Each sweep marks any allocated node whose parent is already marked. */
+    foreach (sweep from 0 to 2) {
+      foreach (i from 0 to 63) {
+        if ec_array[i].allocated & ~marked[i] then
+          foreach (j from 0 to 63) {
+            if j == unsigned(ec_array[i].parent_ecid) & marked[j] then
+              marked[i] = true
+          }
+      }
+    };
+
+    /* ---- Phase 2: free every marked slot ---- */
+    /* Leaves and parents alike — order does not matter for the free
+     * since we already have the full mark set.  Depth-first semantics
+     * hold because every node in the subtree is freed atomically.   */
+    var freed_count : nat = 0;
+    foreach (i from 0 to 63) {
+      if marked[i] then {
+        /* Free all banks owned by this ECID */
+        foreach (b from 0 to 7) {
+          if bank_pool[b].valid & (bank_pool[b].owner_ecid == to_bits(16, i)) then
+            bank_pool[b] = { bank_pool[b] with valid = false, owner_ecid = zeros() }
+        };
+        /* Increment generation (ABA safety) and mark slot free */
+        ec_array[i] = { ec_array[i] with
+          generation = to_bits(8, unsigned(ec_array[i].generation) + 1),
+          allocated  = false
+        };
+        freed_count = freed_count + 1
+      }
+    };
+
+    X(rd) = zero_extend(to_bits(16, freed_count));
     RETIRE_SUCCESS
   }
 }

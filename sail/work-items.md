@@ -247,7 +247,12 @@ ECIDs in `rd`. Must always succeed.
 
 **Depends on:** S9
 
-**Status:** ☐
+**Status:** ✓ Done — two-phase mark-then-free implementation. Phase 1:
+mark target slot, then 3 propagation sweeps to reach descendants up to
+D=3 levels deep (each sweep marks nodes whose parent is already marked).
+Phase 2: for each marked slot, free owned banks (valid=false,
+owner=zeros), increment generation counter, mark unallocated. rd = freed
+count. Always succeeds. Permission check deferred to S22. Both checks pass.
 
 ---
 
