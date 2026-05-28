@@ -185,7 +185,11 @@ expected.
 
 **Depends on:** S5, S6
 
-**Status:** ☐
+**Status:** ✓ Done — `ce_cme_test_s7.sail` added to CE_SOURCES. Sets up
+ECID_A (bank 0) and ECID_B (bank 1 with known sentinel values), executes
+`ec.ib x0, x1` then `ec.ob x0, x2, x1`, asserts current_ecid == B and
+B's sentinel (0xBBBB...0003) is live in x3. Both make check and
+make check-riscv exit 0.
 
 ---
 
