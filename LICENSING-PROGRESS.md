@@ -21,6 +21,7 @@ Categories:
 - [x] docs/adoc/chapters/ch03-cme-instruction-set.adoc
 - [x] docs/adoc/chapters/ch04-hardware-microarch.adoc
 - [x] docs/adoc/chapters/ch05-linux-integration.adoc
+- [x] docs/adoc/chapters/ch06-cme-usage-examples.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -32,7 +33,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/chapters/ch06-cme-usage-examples.adoc
 - [ ] docs/adoc/chapters/ch07-cpe-instruction-set.adoc
 - [ ] docs/adoc/chapters/ch08-cpe-usage-examples.adoc
 - [ ] docs/adoc/chapters/ch09-mse-memory-scheduling.adoc
