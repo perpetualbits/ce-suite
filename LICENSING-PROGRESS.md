@@ -25,6 +25,7 @@ Categories:
 - [x] docs/adoc/chapters/ch07-cpe-instruction-set.adoc
 - [x] docs/adoc/chapters/ch08-cpe-usage-examples.adoc
 - [x] docs/adoc/chapters/ch09-mse-memory-scheduling.adoc
+- [x] docs/adoc/chapters/ch10-mse-usage-examples.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -36,7 +37,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/chapters/ch10-mse-usage-examples.adoc
 - [ ] docs/adoc/chapters/ch11-qos-io-quality-of-service.adoc
 - [ ] docs/adoc/chapters/ch12-qos-usage-examples.adoc
 - [ ] docs/adoc/chapters/ch13-csr-reference.adoc
