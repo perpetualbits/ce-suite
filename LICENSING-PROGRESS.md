@@ -39,6 +39,7 @@ Categories:
 - [x] docs/adoc/reference/glossary.adoc
 - [x] docs/adoc/reference/instruction-card.adoc
 - [x] docs/adoc/submission/motivation.adoc
+- [x] docs/adoc/submission/submission-brief.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -50,7 +51,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/submission/submission-brief.adoc
 - [ ] docs/archive/README.md
 - [ ] docs/archive/ce-tree-of-truths.md
 - [ ] docs/archive/chapter0-also-half-correct.md
