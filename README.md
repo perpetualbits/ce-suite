@@ -26,12 +26,13 @@ hardware and software implementations.
 
 | If you are… | Start here |
 |---|---|
+| **A RISC-V International reviewer** | [`docs/submission/submission-brief.md`](docs/submission/submission-brief.md) for the allocation request, then [`docs/submission/motivation.md`](docs/submission/motivation.md) for the use cases |
 | **Coming back after any break** | [`docs/refamiliarize.md`](docs/refamiliarize.md) |
 | **Reviewing the design** | [`docs/charter/project_instructions.md`](docs/charter/project_instructions.md) then [`docs/chapters/ch00-fundamental-structure.md`](docs/chapters/ch00-fundamental-structure.md) |
 | **Editing the spec** | Read the charter first; then [`docs/working_notes_for_authors.md`](docs/working_notes_for_authors.md); then your target chapter |
 | **Looking for the original drafts** | [`docs/archive/`](docs/archive/) |
 | **Looking for working notes** | [`scratchpads/`](scratchpads/) |
-| **Building or simulating** | `hw/` and `sw/` (placeholders for now) |
+| **Building or simulating** | [`sail/`](sail/) (formal model), [`qemu/`](qemu/) (emulator), [`sw/`](sw/) (Linux patches) |
 
 ---
 
@@ -120,31 +121,33 @@ The documents in `docs/` are arranged by normative authority:
 
 | Component | State |
 |---|---|
-| Charter (project instructions) | **v0.15 — current** |
-| Chapter 0 (Fundamental Structure) | Done — aligned to charter v0.15 |
+| Charter (project instructions) | **v0.18 — current** |
+| Chapter 0 (Fundamental Structure) | Done |
 | Chapter 1 (Execution Context Model) | Done |
 | Chapter 2 (Bank/Group/Delegation Semantics) | Done |
 | Chapter 3 (CME Instruction Set Reference) | Done |
 | Chapter 4 (Hardware Microarchitecture) | Done |
 | Chapter 5 (Linux Kernel Integration) | Done |
 | Chapter 6 (CME Usage Examples) | Done |
-| Chapter 7 (CPE Instruction Set Reference) | Done — F1 redesign complete |
+| Chapter 7 (CPE Instruction Set Reference) | Done |
 | Chapter 8 (CPE Usage Examples) | Done |
-| Chapter 9 (MSE Memory Scheduling) | Done — ms.{ir,or,it,ot} |
+| Chapter 9 (MSE Memory Scheduling) | Done |
 | Chapter 10 (MSE Usage Examples) | Done |
-| Chapter 11 (QoS I/O Quality of Service) | Done — qs.{ir,or,it,ot} |
+| Chapter 11 (QoS I/O Quality of Service) | Done |
 | Chapter 12 (QoS Usage Examples) | Done |
-| Chapter 13 (CSR Reference) | Done — P1 resolved; 31 CSRs |
-| Chapter 14 (Privilege Model) | Done — P2 resolved |
-| Chapter 15 (Trap and Exception Table) | Done — P3 resolved |
-| Chapter 16 (Discovery) | Done — P4 resolved |
-| Chapter 17 (Memory Ordering) | Done — P5 resolved |
-| Chapter 18 (CLIC Interrupt Integration) | Done — E2 |
-| Chapter 19 (Interoperability with Ratified Extensions) | Done — I1 |
-| Appendix A (ECID) | Done — radix-tree algorithms and diagrams |
-| Appendix B (Capability Profiles) | Done — E1: four standard profiles |
-| `hw/` | empty; future work |
-| `sw/` | empty; future work |
+| Chapter 13 (CSR Reference) | Done — 32 CSRs |
+| Chapter 14 (Privilege Model) | Done |
+| Chapter 15 (Trap and Exception Table) | Done |
+| Chapter 16 (Discovery) | Done |
+| Chapter 17 (Memory Ordering) | Done |
+| Chapter 18 (CLIC Interrupt Integration) | Done |
+| Chapter 19 (Interoperability with Ratified Extensions) | Done |
+| Appendix A (ECID) | Done |
+| Appendix B (Capability Profiles) | Done |
+| `sail/` | Work plan complete; implementation not yet started |
+| `qemu/` | Work plan complete; implementation not yet started |
+| `sw/` | Work plan complete; implementation not yet started |
+| `hw/` | Future work |
 
 See `docs/refamiliarize.md` Part A.3 for the detailed chapter status table,
 and `docs/work-items.md` for all tracked inconsistencies and open design
@@ -154,4 +157,6 @@ decisions.
 
 ## License
 
-[TBD — your choice. See `LICENSE`.]
+Specification text (all `.md` and `.adoc` files under `docs/`) is licensed under
+[CC BY 4.0](LICENSE-CC-BY-4.0.txt). Code (everything under `sail/`, `qemu/`, `sw/`,
+`tools/`, `hw/`) is licensed under [BSD 3-Clause](LICENSE-BSD-3-Clause.txt).
