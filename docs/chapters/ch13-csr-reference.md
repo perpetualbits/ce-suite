@@ -262,9 +262,10 @@ isolation; that is legal WARL behavior.
 restriction. S-mode or lower access always causes an *illegal instruction*
 exception.
 
-**Specification status.** The key derivation, attestation, and rotation
-semantics of the vault are deferred to a future revision. This CSR is defined
-here for completeness.
+**Key management.** Key derivation, attestation, and rotation protocols are
+deferred to a future revision. Implementations must ensure the key loaded into
+this CSR is consistent between a sealing (`ec.iv`) call and its corresponding
+unsealing (`ec.ov`) call for a given bank.
 
 ---
 

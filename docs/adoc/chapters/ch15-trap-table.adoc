@@ -222,6 +222,9 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 |Caller is not an authorized ancestor of target |rd |3
 (`CME_ERR_PERMISSION`)
 
+|Target bank is sealed; use `ec.ov` to unseal first |rd |6
+(`CME_ERR_ALREADY_SEALED`)
+
 |Hardware bank SRAM error during restore |trap |16
 (`CE_EXC_BANK_FAULT`)
 |===
@@ -348,8 +351,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 |Always succeeds |rd |ECIDs freed count; never fails
 |===
 
-*`ec.iv`* (seal a bank — vault) _(instruction shell; cryptographic
-semantics deferred)_
+*`ec.iv`* (seal a bank — vault)
 
 [width="100%",cols="34%,33%,33%",options="header",]
 |===
@@ -362,8 +364,7 @@ semantics deferred)_
 |Bank is already sealed |rd |6 (`CME_ERR_ALREADY_SEALED`)
 |===
 
-*`ec.ov`* (unseal a bank — vault) _(instruction shell; cryptographic
-semantics deferred)_
+*`ec.ov`* (unseal a bank — vault)
 
 [width="100%",cols="34%,33%,33%",options="header",]
 |===

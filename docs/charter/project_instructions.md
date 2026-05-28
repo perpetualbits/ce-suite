@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.16
+**Version:** 0.17
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -679,14 +679,30 @@ the rest of the spec.
 5. **UCS (Unified Context Structure).** A kernel-side abstraction over
    ECS for unified scheduling. Currently kernel-design guidance only,
    not architectural. May be promoted to an optional appendix.
-6. **Secure Vault key management.** `ec.iv`/`ec.ov` semantics for sealed
-   banks are specified; key derivation, attestation, and rotation are not.
+6. **Secure Vault key management.** Instruction-level vault semantics are
+   normative in v1.0 (ch03 §3.6): sealed-bank state, `ec.iv`/`ec.ov`
+   behaviour, `ec.ob` refusal of sealed banks, and spill/fill of sealed
+   ciphertext. The encryption algorithm is implementation-defined. Key
+   derivation, attestation, rotation, and cross-hart portability of sealed
+   banks remain deferred to a future revision.
 
 ---
 
 ## Changelog
 
-- **v0.16 (this version).** §8.7 resolved: `ce_ctrl` CSR (0x7D0, M-mode RW)
+- **v0.17 (this version).** Option B vault resolution: `ec.iv`/`ec.ov`
+  instruction-level semantics are now normative. Defines sealed-bank state
+  (hardware tracks sealed/unsealed per bank), `ec.iv` encrypt-and-seal using
+  `cme_seal_key`, `ec.ov` decrypt-and-authenticate returning
+  `CME_ERR_NOT_SEALED` on failure, `ec.ob` refusal of sealed banks
+  (`CME_ERR_ALREADY_SEALED`), and spill/fill preservation of sealed ciphertext.
+  Encryption algorithm remains implementation-defined. Key derivation,
+  attestation, rotation, and cross-hart portability remain deferred (§8.6
+  updated). Propagated to: ch03 §3.6 (full normative vault section replaces
+  shell-only block); ch13 §3.9 (spec-status paragraph updated); ch15 §15.5.1
+  (shell qualifiers removed; ec.ob sealed-bank row added).
+
+- **v0.16.** §8.7 resolved: `ce_ctrl` CSR (0x7D0, M-mode RW)
   defined as the CE-disable mechanism. Four independent per-extension enable
   bits — `CME_EN` (bit 0), `CPE_EN` (bit 1), `MSE_EN` (bit 2), `QOS_EN`
   (bit 3) — reset to 0 (all disabled); firmware explicitly enables. If

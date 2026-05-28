@@ -122,7 +122,9 @@ ____
 ECID is not allocated or has a generation mismatch;
 `CME_ERR_NO_BANK` if the target ECID has no bank resident
 (see Bank Exhaustion Recovery below); `CME_ERR_PERMISSION` if
-the caller is not an authorized ancestor.
+the caller is not an authorized ancestor;
+`CME_ERR_ALREADY_SEALED` (6) if the target bank is sealed —
+use `ec.ov` to unseal before restoring.
 ** `rs1`: Target ECID number.
 ** `rs2`: Register mask — which register groups to restore (see §3.7).
 * *Side effects*: Restores registers from the bank owned by ECID `rs1`.
@@ -386,18 +388,31 @@ of `rs1`.
 
 === 3.6 Secure Vault Operations
 
-____
-*Status — instruction shells only.* `ec.iv` and `ec.ov` are defined as
-instruction placeholders. The cryptographic semantics — key derivation,
-key rotation, attestation, sealed-bank representation, and unsealing
-authentication — are *not yet normative* and are deferred to a future
-revision. An implementer cannot build a secure vault from this chapter
-alone. Do not rely on vault instruction semantics for any
-security-critical design until they are fully specified.
-____
+These operations seal and unseal banks under hardware-managed encryption
+using the key material in `cme_seal_key` (Chapter 13 §3.9). Both
+instructions are M-mode only.
 
-These operations seal and unseal banks under hardware-managed
-encryption.
+*What is normative here:* the instruction-level behaviour — what
+constitutes a sealed bank, how sealing interacts with other CME
+instructions, and the error conditions. *What is deferred to a future
+revision:* the encryption algorithm (implementation-defined in v1.0),
+key derivation, key rotation, attestation, and whether a sealed bank’s
+ciphertext is portable across harts or implementations.
+
+==== Sealed bank state
+
+A bank is either _unsealed_ (normal) or _sealed_ (encrypted). Hardware
+tracks this per-bank. The transitions are:
+
+* Any bank starts unsealed.
+* `ec.iv` transitions an unsealed bank to sealed.
+* `ec.ov` transitions a sealed bank back to unsealed on successful
+authentication.
+* `ec.ob` refuses to restore a sealed bank — returns
+`CME_ERR_ALREADY_SEALED` (6). Unseal with `ec.ov` before
+restoring.
+* `ec.im`/`ec.om` may spill and fill sealed banks as opaque ciphertext;
+sealed state is preserved across the spill/fill cycle.
 
 ==== `ec.iv` — Seal a bank (encrypt)
 
@@ -406,13 +421,17 @@ ____
 ____
 
 * *Syntax*: `ec.iv rd, rs1, rs2`
-** `rd`: 0 on success; error code if the bank is already sealed or ECID
-is invalid.
+** `rd`: 0 on success; error code on failure.
 ** `rs1`: Target ECID whose bank is to be sealed.
-** `rs2`: Register mask.
-* *Side effects*: The bank associated with ECID `rs1` is encrypted.
-Contents are inaccessible except in a secure mode that can present the
-appropriate key.
+** `rs2`: Register mask — which groups to seal (same encoding as
+`ec.ib`).
+* *Semantics*: Hardware encrypts the register groups in `rs2` in the
+bank owned by ECID `rs1` using the key material in
+`cme_seal_key`. The bank is marked sealed. The encryption
+algorithm is implementation-defined.
+* *Privilege*: M-mode only.
+* *Error conditions*: `CME_ERR_INVALID_ECID` (1),
+`CME_ERR_ALREADY_SEALED` (6). See Chapter 15 §15.5.1.
 
 ==== `ec.ov` — Unseal a bank (decrypt)
 
@@ -421,12 +440,20 @@ ____
 ____
 
 * *Syntax*: `ec.ov rd, rs1, rs2`
-** `rd`: 0 on success; error code if the bank is not sealed or
-authentication fails.
+** `rd`: 0 on success; `CME_ERR_NOT_SEALED` (7) on
+authentication failure.
 ** `rs1`: Target ECID whose bank is to be unsealed.
 ** `rs2`: Register mask.
-* *Side effects*: Decrypts and makes the bank’s contents accessible to a
-secure enclave executing as ECID `rs1`.
+* *Semantics*: Hardware decrypts the sealed bank for ECID `rs1` using
+the key material in `cme_seal_key`. On successful authentication
+the bank is marked unsealed and the groups in `rs2` become accessible.
+On failure (wrong key, tampered ciphertext, or bank not sealed) returns
+`CME_ERR_NOT_SEALED` without modifying the bank.
+* *Privilege*: M-mode only.
+* *Note*: Key derivation, attestation, and rotation are deferred to a
+future revision. Implementations must ensure `cme_seal_key`
+holds consistent material between the sealing and unsealing calls for a
+given bank.
 
 '''''
 

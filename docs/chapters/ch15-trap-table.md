@@ -161,6 +161,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 | Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
 | Target ECID has no bank resident (context is in ECS in RAM) | rd | 2 (`CME_ERR_NO_BANK`) |
 | Caller is not an authorized ancestor of target | rd | 3 (`CME_ERR_PERMISSION`) |
+| Target bank is sealed; use `ec.ov` to unseal first | rd | 6 (`CME_ERR_ALREADY_SEALED`) |
 | Hardware bank SRAM error during restore | trap | 16 (`CE_EXC_BANK_FAULT`) |
 
 **`ec.im`** (spill bank to ECS in RAM)
@@ -231,7 +232,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 |---|---|---|
 | Always succeeds | rd | ECIDs freed count; never fails |
 
-**`ec.iv`** (seal a bank — vault) *(instruction shell; cryptographic semantics deferred)*
+**`ec.iv`** (seal a bank — vault)
 
 | Condition | Outcome | Value |
 |---|---|---|
@@ -239,7 +240,7 @@ Memory-access faults (§15.2.2) are noted where they apply but listed as
 | Target ECID not allocated / generation mismatch | rd | 1 (`CME_ERR_INVALID_ECID`) |
 | Bank is already sealed | rd | 6 (`CME_ERR_ALREADY_SEALED`) |
 
-**`ec.ov`** (unseal a bank — vault) *(instruction shell; cryptographic semantics deferred)*
+**`ec.ov`** (unseal a bank — vault)
 
 | Condition | Outcome | Value |
 |---|---|---|
