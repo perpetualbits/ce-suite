@@ -105,5 +105,3 @@ Categories:
 - [x] docs/archive/ucs.md
 - [x] docs/archive/working_with_chatgpt.md
 
-## UNCLASSIFIED
-- [ ] working_notes_for_authors.md
