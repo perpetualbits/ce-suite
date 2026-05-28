@@ -488,8 +488,10 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
   are deferred to a future revision.
 - **Multi-resource Contracts.** Whether a single Contract can span memory and I/O
   is deferred to a future revision.
-- **Software-overflow Contracts.** When hardware Contract slots are exhausted, the
-  slow-path software fallback is not yet specified.
+- **Software-overflow Contracts.** When hardware MSE Contract slots are exhausted,
+  `ms.ir`/`ms.it` return `MSE_ERR_SYSTEM_FULL` (4). The slow-path response is
+  implementation-defined for v1.0: software may deny the request, queue the
+  Contract, or use another strategy. Richer slow-path semantics are deferred.
 - **Cross-hart ECS sharing during migration.** Deferred to a future revision.
 
 ---

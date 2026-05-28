@@ -35,7 +35,9 @@ both — QoS on the I/O side, MSE on the DRAM side. Neither subsumes the other.
 - DRAM arbitration — MSE (Chapter 9).
 - L1/L2 cache isolation — CPE (Chapter 7).
 - Multi-resource Contracts spanning memory and I/O — deferred to a future revision.
-- Software slow-path when hardware Contract slots are exhausted — deferred to a future revision.
+- Software-overflow Contracts — when hardware QoS Contract slots are exhausted,
+  `qs.ir`/`qs.it` return their system-full error code; the slow-path response is
+  implementation-defined for v1.0.
 
 ---
 
@@ -610,8 +612,11 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 - **L1/L2 cache isolation.** Covered by CPE (Chapter 7).
 - **Multi-resource Contracts.** Whether a single Contract can span multiple I/O domains
   or span I/O and memory is deferred to a future revision.
-- **Software-overflow Contracts.** When hardware Contract slots on a domain are
-  exhausted, the slow-path software fallback is not yet specified.
+- **Software-overflow Contracts.** When hardware QoS Contract slots on a domain
+  are exhausted, `qs.ir`/`qs.it` return their system-full error code. The
+  slow-path response is implementation-defined for v1.0: software may deny the
+  request, queue the Contract, or use another strategy. Richer slow-path
+  semantics are deferred.
 - **Multi-socket / NUMA I/O fabric.** By analogy with MSE's NUMA open item, QoS
   Contract semantics across multiple NoC domains in a multi-socket system are not
   yet specified.

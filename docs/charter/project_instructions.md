@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.17
+**Version:** 0.18
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -672,13 +672,20 @@ the rest of the spec.
 2. **Multi-resource Contracts.** Whether a single Contract can span
    multiple resource classes (e.g., memory + I/O) is open.
 3. **Software-overflow Contracts.** When hardware Contract slots are
-   exhausted, what the slow-path looks like.
+   exhausted, `ms.ir`/`ms.it`/`qs.ir`/`qs.it`/`cp.ir` return their
+   respective system-full error codes. The slow-path response (deny, queue,
+   or other strategy) is implementation-defined for v1.0 and not mandated
+   by this specification. Richer slow-path semantics are deferred to a later
+   version.
 4. **Cross-hart ECS sharing for migration.** Migration currently rebinds
    ECIDs (§3.1.4); whether ECS objects can be referenced by `EC[e]` on
    multiple harts simultaneously during the handover window is open.
-5. **UCS (Unified Context Structure).** A kernel-side abstraction over
-   ECS for unified scheduling. Currently kernel-design guidance only,
-   not architectural. May be promoted to an optional appendix.
+5. **UCS (Unified Context Structure).** Closed as out of architectural
+   scope for v1.0. UCS is a kernel implementation pattern — a software
+   abstraction over ECS for unified scheduling — not an architectural
+   mandate. The spec does not define it; implementers may define their own
+   kernel-side structures. A UCS appendix may be added in a future version
+   as informative guidance, but it is not required for ratification.
 6. **Secure Vault key management.** Instruction-level vault semantics are
    normative in v1.0 (ch03 §3.6): sealed-bank state, `ec.iv`/`ec.ov`
    behaviour, `ec.ob` refusal of sealed banks, and spill/fill of sealed
@@ -690,7 +697,14 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.17 (this version).** Option B vault resolution: `ec.iv`/`ec.ov`
+- **v0.18 (this version).** §8.3 and §8.5 addressed for v1.0. §8.3:
+  software-overflow Contract slow-path is implementation-defined; error
+  codes are already specified; richer semantics deferred. §8.5: UCS closed
+  as out of architectural scope for v1.0 — kernel implementation pattern,
+  not an architectural mandate. Propagated to: ch09 §9.12 and ch11 §11.13
+  (slow-path notes updated to reflect implementation-defined status).
+
+- **v0.17.** Option B vault resolution: `ec.iv`/`ec.ov`
   instruction-level semantics are now normative. Defines sealed-bank state
   (hardware tracks sealed/unsealed per bank), `ec.iv` encrypt-and-seal using
   `cme_seal_key`, `ec.ov` decrypt-and-authenticate returning
