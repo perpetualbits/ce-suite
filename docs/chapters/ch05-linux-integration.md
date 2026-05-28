@@ -47,7 +47,7 @@ requirement. Hardware never indexes into this struct directly. The CE hardware
 reaches it only through `EC[e].ecs_ptr`, which the kernel sets after calling
 `ec.ir` to allocate the ECID.
 
-> **Note on offset 0.** Charter §3.2 mandates that `ecs_ptr` sits at offset 0
+> **Note on offset 0.** The specification mandates that `ecs_ptr` sits at offset 0
 > of the `EC[e]` hardware entry, so that a single load from
 > `cme_ec_table_base + e * stride` yields the ECS pointer. That constraint
 > applies to the hardware `EC[e]` struct, not to the Linux `struct
@@ -89,7 +89,7 @@ context-switch sequence is:
     # Load incoming ECID from the task struct (Linux convention):
     lhu    a1, ECID_OFFSET(next_task)   # a1 = next_task->ecid
 
-    # ec.ob takes rd, then ECID, then mask (charter §6.6).
+    # ec.ob takes rd, then ECID, then mask.
     ec.ob  x0, a1, FULL_MASK    # restore next context from its bank
 ```
 
@@ -185,8 +185,8 @@ When Linux runs a guest VM, the hypervisor kernel:
 
 The guest OS is unaware of the host-level ECID numbers. From its perspective,
 it owns its own ECID namespace starting at the delegation level it was given.
-(Charter §4.1: "A child Group is delegated to a child ECID and appears to the
-child as that child's Group 0.")
+("A child Group is delegated to a child ECID and appears to the child as that
+child's Group 0.")
 
 ---
 
