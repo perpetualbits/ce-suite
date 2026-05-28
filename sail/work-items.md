@@ -228,7 +228,11 @@ on failure.
 
 **Depends on:** S4
 
-**Status:** ☐
+**Status:** ✓ Done — full implementation replaces stub. flag[63..1] != 0
+returns ILLEGAL_FIELD; delegating child checks parent_L >= D_val for
+CAP_DEPTH; leaf pins child_L = D; delegating sets child_L = parent_L+1.
+Free slot found via foreach 1..63; entry written with incremented
+generation counter. Both checks pass.
 
 ---
 

@@ -247,15 +247,69 @@ function clause execute(CE_ECOT(rd, rs1)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.ir — Allocate a child ECID (ch03 §3.5) — STUB                  */
+/* ec.ir — Allocate a child ECID (ch03 §3.5)                         */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIR(rd, rs1)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S9: allocate from radix tree; CME_ERR_CAP_DEPTH if L >= D */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let flag = X(rs1);
+
+    /* rs1 > 1: reserved bits set → ILLEGAL_FIELD (ch03 §3.5) */
+    if flag[63..1] != zeros() then {
+      X(rd) = cme_err_to_xlenbits(CME_ERR_ILLEGAL_FIELD);
+      RETIRE_SUCCESS
+    } else {
+      let is_leaf = (flag[0] == 0b0);  /* flag=0 → leaf, flag=1 → delegating */
+
+      /* Look up parent (current context) */
+      match lookup_ec(current_ecid) {
+        None() => { X(rd) = zeros(); RETIRE_SUCCESS },
+        Some(parent_entry) => {
+          let parent_L_val = unsigned(parent_entry.delegation_L);
+          let D_val        = unsigned(cme_del_cap_D);
+
+          /* Delegating child: parent must be below the depth cap */
+          if ~is_leaf & (parent_L_val >= D_val) then {
+            X(rd) = cme_err_to_xlenbits(CME_ERR_CAP_DEPTH);
+            RETIRE_SUCCESS
+          } else {
+            /* Child delegation level (ch00 §0.8) */
+            let child_L : del_level_t =
+              if is_leaf then cme_del_cap_D           /* leaf → pinned at D */
+              else to_bits(2, parent_L_val + 1);      /* delegating → L+1 */
+
+            /* Find the first free slot; skip slot 0 (root/null) */
+            var found      : bool = false;
+            var child_slot : nat  = 0;
+            foreach (i from 1 to 63) {
+              if ~found & ~(ec_array[i].allocated) then {
+                found      = true;
+                child_slot = i
+              }
+            };
+
+            if ~found then {
+              X(rd) = zeros();  /* no free slots */
+              RETIRE_SUCCESS
+            } else {
+              /* Write new entry; foreach satisfies the bounds checker */
+              foreach (i from 1 to 63) {
+                if i == child_slot then
+                  ec_array[i] = struct { EC_entry_default with
+                    generation   = to_bits(8, unsigned(ec_array[i].generation) + 1),
+                    delegation_L = child_L,
+                    parent_ecid  = current_ecid,
+                    allocated    = true
+                  }
+              };
+              X(rd) = zero_extend(to_bits(16, child_slot));
+              RETIRE_SUCCESS
+            }
+          }
+        }
+      }
+    }
   }
 }
 
