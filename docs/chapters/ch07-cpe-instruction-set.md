@@ -12,20 +12,20 @@ CPE v1 covers **per-hart private caches only** and does not manage shared
 caches (e.g., L3). L3 partitioning may be addressed by a future CPE-S
 extension.
 
-Three rules from the charter govern every CPE instruction:
+Three rules govern every CPE instruction:
 
 1. **ECID-first operands.** `rs1` holds the ECID number — a plain 16-bit
-   integer. Parameters go in `rs2`. (Charter §6.2)
+   integer. Parameters go in `rs2`.
 2. **`rd` is the primary error channel.** 0 = success; non-zero = error code.
-   Pass `x0` to discard. (Charter §6.6)
+   Pass `x0` to discard.
 3. **CPE Contracts are hierarchically delegatable.** `cp.it`/`cp.ot` follow
-   the same splitting semantics as MSE and QoS. (Charter §4.3, D3)
+   the same splitting semantics as MSE and QoS.
 
 ---
 
 ## 7.2 Instruction Naming
 
-CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
+CPE uses the subset `{r, t}` from the target-letter table:
 
 | Mnemonic | Name | Direction | Target |
 |---|---|---|---|
@@ -130,7 +130,7 @@ CPE uses the subset `{r, t}` from the target-letter table (charter §6.1):
 
 ## 7.4 Partition Descriptor (`rs2` for `cp.ir`)
 
-Per charter §4.3.0 and ch00 §0.7.0, this descriptor is the *creation parameters*
+Per Chapter 0 §0.7.0, this descriptor is the *creation parameters*
 for a CPE Contract identified by `(rs1, CPE)`. The Contract exists from the
 successful completion of `cp.ir` until its matching `cp.or` or `ec.oe`.
 
