@@ -59,13 +59,18 @@ val to_bits : forall 'l, 'l >= 0. (int('l), int) -> bits('l)
 function to_bits(l, n) = get_slice_int(l, n, 0)
 
 /* XLEN — RV64 assumed for standalone check */
-type xlenbits = bits(64)
+type xlen : Int = 64
+let xlen : int(64) = 64
+type xlenbits = bits(xlen)
 
 /* Register index — newtype matching sail-riscv's core/types.sail */
 newtype regidx = Regidx : bits(5)
 
 /* CSR address */
 type csreg = bits(12)
+
+/* regidx_bit_width — matches sail-riscv types.sail (non-E baseline = 5) */
+let regidx_bit_width : int(5) = 5
 
 /* encdec_reg — maps regidx <-> bits(5); same pattern as sail-riscv */
 mapping encdec_reg : regidx <-> bits(5) = { Regidx(b) <-> b }
@@ -99,11 +104,13 @@ function write_ram(_, _, _, _, _) = true   /* standalone: no-op */
 
 val read_ram : forall 'n, 0 < 'n <= max_mem_access .
   (read_kind, physaddr, int('n), bool) -> (bits(8 * 'n), mem_meta)
-function read_ram(_, _, _, _) = (zeros(), ())  /* standalone: returns zeros */
+function read_ram(_, _, n, _) = (sail_zeros(8 * n), ())  /* standalone: returns zeros */
 
 /* FPR access — mirrors sail-riscv's fdext_regs.sail / freg_type.sail */
 newtype fregidx = Fregidx : bits(5)
-type flenbits = bits(64)            /* standalone: D-extension (64-bit FP) assumed */
+type flen : Int = 64
+let flen : int(64) = 64
+type flenbits = bits(flen)          /* standalone: D-extension (64-bit FP) assumed */
 
 register fpr_file : vector(32, dec, flenbits) = vector_init(zeros())
 
@@ -116,6 +123,7 @@ function wF_bits(Fregidx(r), v) = { fpr_file[unsigned(r)] = v }
 overload F = {rF_bits, wF_bits}
 
 /* PC accessors — mirrors sail-riscv's pc_access.sail */
+register PC     : xlenbits = zeros()
 register nextPC : xlenbits = zeros()
 
 val get_arch_pc : unit -> xlenbits

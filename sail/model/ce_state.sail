@@ -88,3 +88,24 @@ function find_bank(e : ecid_t) -> option(bank_slot_t) = {
   };
   result
 }
+
+/* Check whether anc is a proper ancestor of desc in the delegation tree.
+ * Walks at most D+1=4 steps up from desc (ch00 §0.8, D ≤ 3). */
+function is_ancestor(anc : ecid_t, desc : ecid_t) -> bool = {
+  var found : bool   = false;
+  var cur   : ecid_t = desc;
+  foreach (step from 0 to 3) {
+    if ~(found) then {
+      match lookup_ec(cur) {
+        None() => (),
+        Some(entry) => {
+          if entry.allocated then {
+            cur = entry.parent_ecid;
+            if cur == anc then found = true
+          }
+        }
+      }
+    }
+  };
+  found
+}

@@ -26,28 +26,28 @@
 $[test]
 function test_migration_fence_sequence() -> unit = {
   let ECID_A : ecid_t = 0x0001;  /* source ECID (Hart 0) */
-  let ECS_ADDR : xlenbits = 0x0000000080010000;  /* ECS in RAM */
+  let ECS_ADDR : physaddrbits = zero_extend(0x80010000 : bits(32));  /* ECS in RAM */
   let GPR_MASK : xlenbits = zero_extend(0x01 : bits(8));  /* GPR only */
 
   ce_ctrl = CE_CTRL_CME_EN;
 
   /* --- Hart 0 setup: ECID_A with a bank and known register state --- */
-  ec_array[1] = struct { EC_entry_default with
+  ec_array[1] = { EC_entry_default with
     ecs_ptr   = ECS_ADDR,   /* kernel has set the ECS pointer */
     allocated = true
   };
   current_ecid = ECID_A;
 
-  bank_pool[0] = struct { Bank_default with owner_ecid = ECID_A, valid = true };
-  X(Regidx(0b00001)) = GPR_MASK;  /* x1 = mask */
+  bank_pool[0] = { Bank_default with owner_ecid = ECID_A, valid = true };
+  X(encdec_reg(0b00001)) = GPR_MASK;  /* x1 = mask */
 
   /* Hart 0, Step 2: ec.ib — save A's register state to bank */
-  let r_ib = execute(CE_ECIB(Regidx(0b00000), Regidx(0b00001)));
+  let r_ib = execute(CE_ECIB(encdec_reg(0b00000), encdec_reg(0b00001)));
   assert(r_ib == RETIRE_SUCCESS);
   assert(bank_pool[0].valid);  /* bank still assigned to A */
 
   /* Hart 0, Step 3: ec.im — spill bank to ECS in RAM */
-  let r_im = execute(CE_ECIM(Regidx(0b00000), Regidx(0b00001), Regidx(0b00001)));
+  let r_im = execute(CE_ECIM(encdec_reg(0b00000), encdec_reg(0b00001), encdec_reg(0b00001)));
   assert(r_im == RETIRE_SUCCESS);
   /* ec.im writes ECS via write_ram; bank remains valid (ec.og frees it) */
   assert(bank_pool[0].valid);
@@ -74,12 +74,12 @@ function test_migration_fence_sequence() -> unit = {
 
   /* Hart 1, Step 9: ec.ir — allocate a new ECID for the migrated EC */
   current_ecid = 0x0000;  /* Hart 1's root ECID (L=0) */
-  ec_array[0] = struct { EC_entry_default with allocated = true };
-  X(Regidx(0b00010)) = zeros();  /* x2 = flag=0 → leaf child */
+  ec_array[0] = { EC_entry_default with allocated = true };
+  X(encdec_reg(0b00010)) = zeros();  /* x2 = flag=0 → leaf child */
 
-  let r_ir = execute(CE_ECIR(Regidx(0b00011), Regidx(0b00010)));
+  let r_ir = execute(CE_ECIR(encdec_reg(0b00011), encdec_reg(0b00010)));
   assert(r_ir == RETIRE_SUCCESS);
-  let new_ecid_val = X(Regidx(0b00011));
+  let new_ecid_val = X(encdec_reg(0b00011));
   /* Allocation succeeded (rd != 0) */
   assert(new_ecid_val != zeros());
 
@@ -94,9 +94,9 @@ function test_migration_fence_sequence() -> unit = {
 
   /* Hart 1, Step 11: ec.om — fill new bank from ECS (after FENCE R,R) */
   current_ecid = new_ecid;
-  X(Regidx(0b00001)) = GPR_MASK;  /* x1 = mask (same as spill mask) */
+  X(encdec_reg(0b00001)) = GPR_MASK;  /* x1 = mask (same as spill mask) */
 
-  let r_om = execute(CE_ECOM(Regidx(0b00000), Regidx(0b00011), Regidx(0b00001)));
+  let r_om = execute(CE_ECOM(encdec_reg(0b00000), encdec_reg(0b00011), encdec_reg(0b00001)));
   assert(r_om == RETIRE_SUCCESS);
 
   /* ec.om postconditions:

@@ -5,8 +5,8 @@
  * Spec reference: ch03 §3.1–§3.6, ch15 §15.5.1
  *
  * Sail v1 scope:
- *   FULL:  ec.ib, ec.ob  (the fast-path core)
- *   STUB:  ec.im, ec.om, ec.ig, ec.og, ec.it, ec.ot, ec.ir, ec.oe
+ *   FULL:  ec.ib, ec.ob, ec.it  (fast-path core + bank delegation)
+ *   STUB:  ec.im, ec.om, ec.ig, ec.og, ec.ot, ec.ir, ec.oe
  *   DECODE-ONLY: ec.iv, ec.ov (execute semantics are implementation-defined
  *                for the encryption algorithm; key management deferred)
  *
@@ -49,7 +49,7 @@ function clause execute(CE_ECIB(rd, rs1)) = {
           var gs : vector(31, dec, bits(64)) = b.gprs;
           if mask[0] == 0b1 then  /* bit 0: GPR group (x1..x31) */
             foreach (i from 1 to 31) {
-              gs[i-1] = X(Regidx(to_bits(5, i)))
+              gs[i-1] = zero_extend(X(encdec_reg(to_bits(5, i))))
             };
 
           var fs : vector(32, dec, bits(64)) = b.fprs;
@@ -142,18 +142,18 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
 
                 if mask[0] == 0b1 then  /* bit 0: GPR group (x1..x31) */
                   foreach (i from 1 to 31) {
-                    X(Regidx(to_bits(5, i))) = b.gprs[i-1]
+                    X(encdec_reg(to_bits(5, i))) = truncate(b.gprs[i-1], xlen)
                   };
 
                 if mask[1] == 0b1 then  /* bit 1: FPR group (f0..f31) */
                   foreach (i from 0 to 31) {
-                    F(Fregidx(to_bits(5, i))) = b.fprs[i]
+                    F(Fregidx(to_bits(5, i))) = truncate(b.fprs[i], flen)
                   };
 
                 /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO in later Sail versions */
 
                 if mask[4] == 0b1 then  /* bit 4: PC — redirect execution on commit */
-                  set_next_pc(b.pc);
+                  set_next_pc(truncate(b.pc, xlen));
 
                 /* Update current_ecid atomically on commit */
                 current_ecid = target_ecid;
@@ -197,7 +197,7 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
     match lookup_ec(target_ecid) {
       None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
       Some(entry) => {
-        if ~entry.allocated then {
+        if ~(entry.allocated) then {
           X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
           RETIRE_SUCCESS
         } else {
@@ -210,7 +210,7 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
               if mask[0] == 0b1 then  /* GPR group (ch03 §3.7 bit 0) */
                 foreach (i from 1 to 31) {
                   let _ : bool = write_ram(Write_plain,
-                    Physaddr(ecs_ptr + to_bits(64, (i - 1) * 8)),
+                    Physaddr(ecs_ptr + zero_extend(to_bits(32, (i - 1) * 8))),
                     8, bank.gprs[i-1], default_meta);
                   ()
                 };
@@ -218,7 +218,7 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
               if mask[1] == 0b1 then  /* FPR group (bit 1) */
                 foreach (i from 0 to 31) {
                   let _ : bool = write_ram(Write_plain,
-                    Physaddr(ecs_ptr + to_bits(64, 248 + i * 8)),
+                    Physaddr(ecs_ptr + zero_extend(to_bits(32, 248 + i * 8))),
                     8, bank.fprs[i], default_meta);
                   ()
                 };
@@ -227,15 +227,15 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
 
               if mask[4] == 0b1 then {  /* PC group (bit 4) */
                 let _ : bool = write_ram(Write_plain,
-                  Physaddr(ecs_ptr + to_bits(64, 504)),
+                  Physaddr(ecs_ptr + zero_extend(to_bits(32, 504))),
                   8, bank.pc, default_meta);
                 ()
               };
 
               /* Write the effective mask so ec.om can restore the same groups */
               let _ : bool = write_ram(Write_plain,
-                Physaddr(ecs_ptr + to_bits(64, 512)),
-                8, mask, default_meta);
+                Physaddr(ecs_ptr + zero_extend(to_bits(32, 512))),
+                8, zero_extend(mask), default_meta);
 
               X(rd) = cme_err_to_xlenbits(CME_OK);
               RETIRE_SUCCESS
@@ -264,7 +264,7 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
     match lookup_ec(target_ecid) {
       None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
       Some(entry) => {
-        if ~entry.allocated then {
+        if ~(entry.allocated) then {
           X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
           RETIRE_SUCCESS
         } else {
@@ -274,13 +274,13 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
           var found     : bool = false;
           var free_slot : nat  = 0;
           foreach (i from 0 to 7) {
-            if ~found & ~(bank_pool[i].valid) then {
+            if ~(found) & ~(bank_pool[i].valid) then {
               found     = true;
               free_slot = i
             }
           };
 
-          if ~found then {
+          if ~(found) then {
             X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
             RETIRE_SUCCESS
           } else {
@@ -289,7 +289,7 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
             if mask[0] == 0b1 then  /* GPR group */
               foreach (i from 1 to 31) {
                 let (v, _) = read_ram(Read_plain,
-                  Physaddr(ecs_ptr + to_bits(64, (i - 1) * 8)),
+                  Physaddr(ecs_ptr + zero_extend(to_bits(32, (i - 1) * 8))),
                   8, false);
                 new_gprs[i-1] = v
               };
@@ -298,7 +298,7 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
             if mask[1] == 0b1 then  /* FPR group */
               foreach (i from 0 to 31) {
                 let (v, _) = read_ram(Read_plain,
-                  Physaddr(ecs_ptr + to_bits(64, 248 + i * 8)),
+                  Physaddr(ecs_ptr + zero_extend(to_bits(32, 248 + i * 8))),
                   8, false);
                 new_fprs[i] = v
               };
@@ -308,7 +308,7 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
             let new_pc : bits(64) =
               if mask[4] == 0b1 then {  /* PC group */
                 let (v, _) = read_ram(Read_plain,
-                  Physaddr(ecs_ptr + to_bits(64, 504)),
+                  Physaddr(ecs_ptr + zero_extend(to_bits(32, 504))),
                   8, false);
                 v
               } else Bank_default.pc;
@@ -345,28 +345,29 @@ function clause execute(CE_ECIG(rd, rs1)) = {
     let target_ecid : ecid_t = truncate(X(rs1), 16);
 
     /* Find the first free bank slot */
-    var found     : bool = false;
-    var free_slot : nat  = 0;
+    var found     : bool    = false;
+    var free_slot : bits(3) = zeros();
     foreach (i from 0 to 7) {
-      if ~found & ~(bank_pool[i].valid) then {
+      if ~(found) & ~(bank_pool[i].valid) then {
         found     = true;
-        free_slot = i
+        free_slot = to_bits(3, i)
       }
     };
 
-    if ~found then {
+    if ~(found) then {
       X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
       RETIRE_SUCCESS
     } else {
+      let free_idx = unsigned(free_slot);
       /* Claim the free slot for target_ecid */
       foreach (i from 0 to 7) {
-        if i == free_slot then
+        if i == free_idx then
           bank_pool[i] = { bank_pool[i] with
             owner_ecid = target_ecid,
             valid      = true
           }
       };
-      X(rd) = zero_extend(to_bits(8, free_slot));
+      X(rd) = zero_extend(free_slot);
       RETIRE_SUCCESS
     }
   }
@@ -398,14 +399,14 @@ function clause execute(CE_ECOG(rd, rs1)) = {
             }
         };
 
-        /* Count banks remaining in the Group after release */
-        var remaining : nat = 0;
+        /* Count banks remaining in the Group after release (0..7 fits in bits(4)) */
+        var remaining : bits(4) = zeros();
         foreach (i from 0 to 7) {
           if bank_pool[i].valid & (bank_pool[i].owner_ecid == target_ecid) then
-            remaining = remaining + 1
+            remaining = remaining + 0x1
         };
 
-        X(rd) = zero_extend(to_bits(8, remaining));
+        X(rd) = zero_extend(remaining);
         RETIRE_SUCCESS
       }
     }
@@ -413,15 +414,65 @@ function clause execute(CE_ECOG(rd, rs1)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.it — Delegate one bank to a child ECID (ch03 §3.4) — STUB      */
+/* ec.it — Delegate one bank to a child ECID (ch03 §3.4)             */
+/*                                                                     */
+/* Syntax: ec.it rd, rs1, rs2                                         */
+/*   rs1 = source (parent) ECID — Group that donates a bank           */
+/*   rs2 = destination (child) ECID — Group that receives the bank    */
+/*   rd  = 0 on success; error code on failure                        */
+/*                                                                     */
+/* Caller permission check (current_ecid must be ancestor of rs1)    */
+/* is deferred to S22 (ce_ctrl privilege model integration).          */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIT(rd, rs1, rs2)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S18: transfer bank ownership from rs1's Group to rs2's Group */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let parent_ecid : ecid_t = truncate(X(rs1), 16);
+    let child_ecid  : ecid_t = truncate(X(rs2), 16);
+
+    match lookup_ec(parent_ecid) {
+      None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+      Some(parent_entry) => {
+        if ~(parent_entry.allocated) then {
+          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
+          RETIRE_SUCCESS
+        } else {
+          match lookup_ec(child_ecid) {
+            None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+            Some(child_entry) => {
+              if ~(child_entry.allocated) then {
+                X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
+                RETIRE_SUCCESS
+              } else {
+                /* rs1 must be a proper ancestor of rs2 (ch03 §3.4) */
+                if ~(is_ancestor(parent_ecid, child_ecid)) then {
+                  X(rd) = cme_err_to_xlenbits(CME_ERR_PERMISSION);
+                  RETIRE_SUCCESS
+                } else {
+                  match find_bank(parent_ecid) {
+                    None() => {
+                      X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
+                      RETIRE_SUCCESS
+                    },
+                    Some(slot) => {
+                      let slot_idx = unsigned(truncate(slot, 3));
+                      /* Transfer ownership from parent to child */
+                      foreach (i from 0 to 7) {
+                        if i == slot_idx then
+                          bank_pool[i] = { bank_pool[i] with owner_ecid = child_ecid }
+                      };
+                      X(rd) = cme_err_to_xlenbits(CME_OK);
+                      RETIRE_SUCCESS
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -448,7 +499,7 @@ function clause execute(CE_ECIR(rd, rs1)) = {
     let flag = X(rs1);
 
     /* rs1 > 1: reserved bits set → ILLEGAL_FIELD (ch03 §3.5) */
-    if flag[63..1] != zeros() then {
+    if unsigned(flag) > 1 then {
       X(rd) = cme_err_to_xlenbits(CME_ERR_ILLEGAL_FIELD);
       RETIRE_SUCCESS
     } else {
@@ -462,7 +513,7 @@ function clause execute(CE_ECIR(rd, rs1)) = {
           let D_val        = unsigned(cme_del_cap_D);
 
           /* Delegating child: parent must be below the depth cap */
-          if ~is_leaf & (parent_L_val >= D_val) then {
+          if ~(is_leaf) & (parent_L_val >= D_val) then {
             X(rd) = cme_err_to_xlenbits(CME_ERR_CAP_DEPTH);
             RETIRE_SUCCESS
           } else {
@@ -472,30 +523,31 @@ function clause execute(CE_ECIR(rd, rs1)) = {
               else to_bits(2, parent_L_val + 1);      /* delegating → L+1 */
 
             /* Find the first free slot; skip slot 0 (root/null) */
-            var found      : bool = false;
-            var child_slot : nat  = 0;
+            var found      : bool    = false;
+            var child_slot : bits(6) = zeros();  /* 64 slots → 6 bits */
             foreach (i from 1 to 63) {
-              if ~found & ~(ec_array[i].allocated) then {
+              if ~(found) & ~(ec_array[i].allocated) then {
                 found      = true;
-                child_slot = i
+                child_slot = to_bits(6, i)
               }
             };
 
-            if ~found then {
+            if ~(found) then {
               X(rd) = zeros();  /* no free slots */
               RETIRE_SUCCESS
             } else {
+              let child_idx = unsigned(child_slot);
               /* Write new entry; foreach satisfies the bounds checker */
               foreach (i from 1 to 63) {
-                if i == child_slot then
-                  ec_array[i] = struct { EC_entry_default with
-                    generation   = to_bits(8, unsigned(ec_array[i].generation) + 1),
+                if i == child_idx then
+                  ec_array[i] = { EC_entry_default with
+                    generation   = ec_array[i].generation + 0x01,
                     delegation_L = child_L,
                     parent_ecid  = current_ecid,
                     allocated    = true
                   }
               };
-              X(rd) = zero_extend(to_bits(16, child_slot));
+              X(rd) = zero_extend(child_slot);
               RETIRE_SUCCESS
             }
           }
@@ -532,7 +584,7 @@ function clause execute(CE_ECOE(rd, rs1)) = {
      * Each sweep marks any allocated node whose parent is already marked. */
     foreach (sweep from 0 to 2) {
       foreach (i from 0 to 63) {
-        if ec_array[i].allocated & ~marked[i] then
+        if ec_array[i].allocated & ~(marked[i]) then
           foreach (j from 0 to 63) {
             if j == unsigned(ec_array[i].parent_ecid) & marked[j] then
               marked[i] = true
@@ -544,7 +596,7 @@ function clause execute(CE_ECOE(rd, rs1)) = {
     /* Leaves and parents alike — order does not matter for the free
      * since we already have the full mark set.  Depth-first semantics
      * hold because every node in the subtree is freed atomically.   */
-    var freed_count : nat = 0;
+    var freed_count : bits(7) = zeros();  /* 0..64 freed ECIDs, 7 bits sufficient */
     foreach (i from 0 to 63) {
       if marked[i] then {
         /* Free all banks owned by this ECID */
@@ -554,14 +606,14 @@ function clause execute(CE_ECOE(rd, rs1)) = {
         };
         /* Increment generation (ABA safety) and mark slot free */
         ec_array[i] = { ec_array[i] with
-          generation = to_bits(8, unsigned(ec_array[i].generation) + 1),
+          generation = ec_array[i].generation + 0x01,
           allocated  = false
         };
-        freed_count = freed_count + 1
+        freed_count = freed_count + to_bits(7, 1)
       }
     };
 
-    X(rd) = zero_extend(to_bits(16, freed_count));
+    X(rd) = zero_extend(freed_count);
     RETIRE_SUCCESS
   }
 }

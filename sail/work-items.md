@@ -393,7 +393,16 @@ checks pass. Full cross-hart ordering requires the memory model simulator.
 
 **Depends on:** S9, S12
 
-**Status:** ☐
+**Status:** ✓ Done — `is_ancestor` helper added to `ce_state.sail` (walks up
+to D+1=4 levels). `ec.it` validates both ECIDs, checks ancestry
+(→ `CME_ERR_PERMISSION`), finds a bank owned by parent, transfers
+`owner_ecid` to child. Three-scenario test (success, no-bank, permission
+violation) added as `ce_cme_test_s18.sail`. Both checks pass.
+Also fixed a batch of pre-existing sail-riscv compatibility issues surfaced
+by the sail-riscv update (2026-05-28): `~expr` → `~(expr)`, `struct { rec with }` →
+`{ rec with }`, XLEN/FLEN polymorphism (zero_extend/truncate), physaddrbits
+for ECS pointer, bits(N)-typed slot accumulators, `encdec_reg` for register
+index construction.
 
 ---
 

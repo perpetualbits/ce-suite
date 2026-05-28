@@ -11,7 +11,7 @@
 /* ------------------------------------------------------------------ */
 
 struct EC_entry = {
-  ecs_ptr      : xlenbits,      /* ECS pointer — always at offset 0 */
+  ecs_ptr      : physaddrbits,  /* ECS pointer — always at offset 0 */
   generation   : generation_t,  /* incremented on every slot reuse (ABA safety) */
   delegation_L : del_level_t,   /* delegation level, 0 ≤ L ≤ D */
   parent_ecid  : ecid_t,        /* parent in the delegation tree; 0 for root */

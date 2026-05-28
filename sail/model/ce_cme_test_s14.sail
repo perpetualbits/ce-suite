@@ -23,46 +23,46 @@ function test_bank_exhaustion_recovery() -> unit = {
   ce_ctrl      = CE_CTRL_CME_EN;
   current_ecid = ECID_E;
 
-  ec_array[5] = struct { EC_entry_default with allocated = true };
-  ec_array[6] = struct { EC_entry_default with allocated = true };
+  ec_array[5] = { EC_entry_default with allocated = true };
+  ec_array[6] = { EC_entry_default with allocated = true };
 
   /* Fill all 8 bank slots so ec.ig has nothing to allocate */
-  bank_pool[0] = struct { Bank_default with owner_ecid = 0x0001, valid = true };
-  bank_pool[1] = struct { Bank_default with owner_ecid = 0x0002, valid = true };
-  bank_pool[2] = struct { Bank_default with owner_ecid = 0x0003, valid = true };
-  bank_pool[3] = struct { Bank_default with owner_ecid = 0x0004, valid = true };
-  bank_pool[4] = struct { Bank_default with owner_ecid = ECID_E, valid = true };
-  bank_pool[5] = struct { Bank_default with owner_ecid = 0x0007, valid = true };
-  bank_pool[6] = struct { Bank_default with owner_ecid = 0x0008, valid = true };
-  bank_pool[7] = struct { Bank_default with owner_ecid = ECID_V, valid = true };
+  bank_pool[0] = { Bank_default with owner_ecid = 0x0001, valid = true };
+  bank_pool[1] = { Bank_default with owner_ecid = 0x0002, valid = true };
+  bank_pool[2] = { Bank_default with owner_ecid = 0x0003, valid = true };
+  bank_pool[3] = { Bank_default with owner_ecid = 0x0004, valid = true };
+  bank_pool[4] = { Bank_default with owner_ecid = ECID_E, valid = true };
+  bank_pool[5] = { Bank_default with owner_ecid = 0x0007, valid = true };
+  bank_pool[6] = { Bank_default with owner_ecid = 0x0008, valid = true };
+  bank_pool[7] = { Bank_default with owner_ecid = ECID_V, valid = true };
 
   /* x1 = ECID_E (target for ec.ig) */
-  X(Regidx(0b00001)) = zero_extend(ECID_E);
+  X(encdec_reg(0b00001)) = zero_extend(ECID_E);
   /* x2 = ECID_V (victim for ec.im / ec.og) */
-  X(Regidx(0b00010)) = zero_extend(ECID_V);
+  X(encdec_reg(0b00010)) = zero_extend(ECID_V);
   /* x3 = GPR mask */
-  X(Regidx(0b00011)) = zero_extend(0x01 : bits(8));
+  X(encdec_reg(0b00011)) = zero_extend(0x01 : bits(8));
 
   /* ---- Step 1: ec.ig x4, x1 — pool full, expect CME_ERR_NO_BANK ---- */
-  let r1 = execute(CE_ECIG(Regidx(0b00100), Regidx(0b00001)));
+  let r1 = execute(CE_ECIG(encdec_reg(0b00100), encdec_reg(0b00001)));
   assert(r1 == RETIRE_SUCCESS);
-  assert(X(Regidx(0b00100)) == cme_err_to_xlenbits(CME_ERR_NO_BANK));
+  assert(X(encdec_reg(0b00100)) == cme_err_to_xlenbits(CME_ERR_NO_BANK));
 
   /* ---- Step 2: ec.im x0, x2, x3 — spill victim to RAM (stub ok) ---- */
-  let r2 = execute(CE_ECIM(Regidx(0b00000), Regidx(0b00010), Regidx(0b00011)));
+  let r2 = execute(CE_ECIM(encdec_reg(0b00000), encdec_reg(0b00010), encdec_reg(0b00011)));
   assert(r2 == RETIRE_SUCCESS);
   /* Bank 7 still valid after spill — ec.og releases it */
   assert(bank_pool[7].valid);
 
   /* ---- Step 3: ec.og x0, x2 — release victim's bank ---- */
-  let r3 = execute(CE_ECOG(Regidx(0b00000), Regidx(0b00010)));
+  let r3 = execute(CE_ECOG(encdec_reg(0b00000), encdec_reg(0b00010)));
   assert(r3 == RETIRE_SUCCESS);
   assert(~(bank_pool[7].valid));  /* bank 7 now in free pool */
 
   /* ---- Step 4: ec.ig x4, x1 — retry; bank 7 is the only free slot ---- */
-  let r4 = execute(CE_ECIG(Regidx(0b00100), Regidx(0b00001)));
+  let r4 = execute(CE_ECIG(encdec_reg(0b00100), encdec_reg(0b00001)));
   assert(r4 == RETIRE_SUCCESS);
   assert(bank_pool[7].valid);
   assert(bank_pool[7].owner_ecid == ECID_E);
-  assert(X(Regidx(0b00100)) == zero_extend(0x07 : bits(8)))
+  assert(X(encdec_reg(0b00100)) == zero_extend(0x07 : bits(8)))
 }
