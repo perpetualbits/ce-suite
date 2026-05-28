@@ -1,0 +1,21 @@
+# Sail compiler outputs
+_build/
+*.cmo
+*.cmi
+*.cmx
+*.o
+*.a
+
+# Generated C emulator
+sail_gen/
+*.c
+*.h
+!model/*.h
+
+# Litmus / test outputs
+*.elf
+*.bin
+*.out
+
+# OCaml / dune
+.merlin
