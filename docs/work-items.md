@@ -251,6 +251,42 @@ ch09 and ch17 (and now canonical):
 
 ---
 
+### F13 · `ec.ob` generation counter encoding unspecified
+
+**Affects:** `ch03-cme-instruction-set.md` §3.1 (`ec.ob` description).
+
+**Found during:** S11 (Sail formal model — generation counter validation).
+
+The spec states that `ec.ob` returns `CME_ERR_INVALID_ECID` on "generation
+mismatch" but never specifies how the expected generation reaches the
+instruction. The rs1 description says only "Target ECID number." Without an
+explicit encoding, neither software nor hardware can implement the check.
+
+**Options:**
+
+**Option A — Pack into rs1 (recommended):** `X(rs1)[23:16]` = expected
+generation (8 bits); `X(rs1)[15:0]` = ECID slot index (16 bits); bits
+[63:24] = must be zero (ILLEGAL_FIELD if non-zero). This is the natural
+register-packing idiom for a `(ECID, generation)` pair. The Sail model
+(S11) already uses this convention as a placeholder.
+
+**Option B — Software convention only:** The generation check is a software
+responsibility; hardware only checks `allocated == true`. Simpler, but does
+not provide a hardware ABA guarantee — a reallocated slot (same ECID number,
+new generation) would pass the hardware check with stale software state.
+
+**Recommendation:** Option A. It matches the spec's claim that the hardware
+returns `CME_ERR_INVALID_ECID` on mismatch (Option B cannot satisfy this),
+and the packing is unambiguous.
+
+**Resolution:** Update ch03 §3.1 `ec.ob` rs1 description to specify the
+`(generation[23:16] | ecid[15:0])` encoding. Add a note to §3.10.3 encoding
+table. Update the §3.13.1 context-switch diagram to show the packed value.
+
+**Status:** Open — requires dedicated ch03 session.
+
+---
+
 ## Category G — Gaps requiring new content
 
 Items where the spec is silent and content needs to be created.
