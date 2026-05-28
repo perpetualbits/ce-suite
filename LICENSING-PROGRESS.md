@@ -19,6 +19,7 @@ Categories:
 - [x] docs/adoc/chapters/ch01-execution-context-model.adoc
 - [x] docs/adoc/chapters/ch02-bank-group-delegation.adoc
 - [x] docs/adoc/chapters/ch03-cme-instruction-set.adoc
+- [x] docs/adoc/chapters/ch04-hardware-microarch.adoc
 
 ## CODE (BSD-3-Clause)
 
@@ -30,7 +31,6 @@ Categories:
 - [x] CLAUDE.md
 
 ## UNCLASSIFIED
-- [ ] docs/adoc/chapters/ch04-hardware-microarch.adoc
 - [ ] docs/adoc/chapters/ch05-linux-integration.adoc
 - [ ] docs/adoc/chapters/ch06-cme-usage-examples.adoc
 - [ ] docs/adoc/chapters/ch07-cpe-instruction-set.adoc
