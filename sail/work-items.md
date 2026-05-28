@@ -203,7 +203,11 @@ the `rs1 == 0b00000` special case correctly and clears dirty bits on save.
 
 **Depends on:** S5
 
-**Status:** ☐
+**Status:** ✓ Done — `ce_cme_test_s8.sail` added. Two scenarios:
+(1) `ec.ib x0, x0` (rs1=x0) uses dirty_bitmap as mask, clears bits after;
+(2) `ec.ib x0, a1` with X(a1)=0 (rs1≠x0) uses explicit mask=0, saves
+nothing, leaves dirty_bitmap unchanged. Covers the spec distinction:
+encoding 00000, not value zero. Both checks pass.
 
 ---
 
