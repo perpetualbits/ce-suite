@@ -16,7 +16,7 @@ QoS achieves this through two coordinated mechanisms:
    best-effort traffic.
 
 2. **Hierarchical Contract model.** I/O bandwidth and latency guarantees are represented
-   as Contracts (charter §4.3), owned by ECIDs, splittable to child ECIDs, and enforced
+   as Contracts, owned by ECIDs, splittable to child ECIDs, and enforced
    in O(1) hardware per arbitration cycle.
 
 QoS is per-system (the I/O fabric is a shared resource), but all software interactions
@@ -31,8 +31,8 @@ both — QoS on the I/O side, MSE on the DRAM side. Neither subsumes the other.
 
 - DRAM arbitration — MSE (Chapter 9).
 - L1/L2 cache isolation — CPE (Chapter 7).
-- Multi-resource Contracts spanning memory and I/O — open item (charter §8.2).
-- Software slow-path when hardware Contract slots are exhausted — open item (charter §8.3).
+- Multi-resource Contracts spanning memory and I/O — deferred to a future revision.
+- Software slow-path when hardware Contract slots are exhausted — deferred to a future revision.
 
 ---
 
@@ -67,7 +67,7 @@ in the implementation is invalid; instructions that reference it return
 Admission control, CN budgets, scheduling windows, and violation tracking are all
 **per-domain**. Exhausting the CN budget on the NoC domain does not block assignment
 of a DMA Contract. This is a deliberate consequence of keeping Contracts single-domain
-(charter §8.2 multi-resource Contracts are out of scope).
+(multi-resource Contracts spanning I/O and memory are out of scope for v1).
 
 ---
 
@@ -166,12 +166,12 @@ and is not permitted by QoS v1.
 
 ## 11.5 QoS Contracts
 
-QoS Contracts are instances of the general Contract model (charter §4.3). This section
+QoS Contracts are instances of the general Contract model (Chapter 0 §0.7). This section
 specifies the QoS-specific parameters each Contract carries.
 
 ### 11.5.1 Contract parameters
 
-Per charter §4.3.0 and ch00 §0.7.0, a QoS Contract is identified by
+Per Chapter 0 §0.7.0, a QoS Contract is identified by
 `(owning_ECID, QoS, domain_id)`. An ECID may simultaneously own multiple QoS
 Contracts distinguished by `domain_id`.
 
@@ -212,7 +212,7 @@ A child cannot claim more guaranteed I/O bandwidth than the parent has delegated
 ### 11.5.3 Hierarchical splitting
 
 A privileged actor may split a QoS Contract into a parent Contract and one or more
-child Contracts (charter §4.3.2). Each child's `bw_class` must be ≤ the parent's
+child Contracts. Each child's `bw_class` must be ≤ the parent's
 `bw_class` minus what the parent retains. The sum of all children's `bw_class` values
 must never exceed the parent's. Splitting is performed via `qs.it` (§11.7) and is
 **atomic**: if the hardware admission check fails, no state is changed.
@@ -222,7 +222,7 @@ must never exceed the parent's. Splitting is performed via `qs.it` (§11.7) and 
 When an ECID's Contract is revoked (via `qs.or` or `ec.oe`), the Contract dissolves
 and its `bw_class` is returned to the parent ECID's cap headroom for that domain.
 If the ECID has child Contracts on the same domain, those are revoked first,
-recursively (charter §4.3.4). Dissolution always succeeds — even for zombie or hostile
+recursively. Dissolution always succeeds — even for zombie or hostile
 ECIDs — and is O(log N) via the radix tree.
 
 ### 11.5.5 DMA attribution
@@ -285,7 +285,7 @@ Software reads this array at boot to enumerate available I/O fabric domains.
 ## 11.7 QoS Instructions
 
 All QoS instructions are privileged. They follow the naming scheme
-`qs.{i,o}{target}` (charter §6.1). QoS uses the subset `{r, t}`:
+`qs.{i,o}{target}`. QoS uses the subset `{r, t}`:
 
 | Letter | Target / kind |
 |---|---|
@@ -294,7 +294,7 @@ All QoS instructions are privileged. They follow the naming scheme
 
 **ECID-first operands.** Any QoS instruction targeting a context other than the
 current one takes an ECID number as its primary operand — never a pointer, never an
-opaque domain handle (charter §6.2).
+opaque domain handle.
 
 > **Memory ordering.** QoS Contract instructions operate on per-hart hardware
 > registers and SRAM; they carry no implicit memory fence. Cross-hart coordination
@@ -350,7 +350,7 @@ struct QOS_Contract_Params {
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Target ECID.
   * `rs2`: Domain selector — `domain_id` of the Contract to revoke, or 0 to revoke
-    all domains simultaneously. (charter §6.7)
+    all domains simultaneously.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class[domain] = 0` and `EC[rs1].lat_class[domain] = 0` for the
      specified domain(s).
@@ -421,7 +421,7 @@ struct QOS_Delegation_Params {
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Child ECID whose Contract is being revoked.
   * `rs2`: Domain selector — `domain_id` of the Contract to revoke, or 0 to revoke
-    all domains simultaneously. (charter §6.7)
+    all domains simultaneously.
 * **Semantics**:
   1. Sets `EC[rs1].bw_class[domain] = 0` and `EC[rs1].lat_class[domain] = 0`.
   2. Returns the revoked `bw_class` to the parent's cap headroom for that domain.
@@ -549,8 +549,7 @@ latency_max(end-to-end) = (K + 1) × qos_slot_ns(DMA domain)   // I/O side
 | `QOS_ERR_ALREADY_BOUND` | 7 | ECID already holds a Contract on this domain; revoke it first |
 | `QOS_ERR_DOMAIN_BUSY` | 8 | DMA channel is already bound to another ECID |
 
-All error codes are returned in `rd` or in `qos_status`. Silent failure is prohibited
-(charter §6.6).
+All error codes are returned in `rd` or in `qos_status`. Silent failure is prohibited.
 
 ---
 
@@ -575,7 +574,7 @@ funct7 values `0000100`–`1111111` (4–127) are reserved for future QoS instru
 
 Unlike CPE and MSE, all four QoS instructions use all three register fields — there
 are no rs2=`00000` cases. `qs.or` and `qs.ot` carry a domain selector in rs2
-(0 = revoke all domains simultaneously) per charter §6.7.
+(0 = revoke all domains simultaneously).
 
 ### 11.12.2 Encoding examples
 
@@ -607,9 +606,9 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
 - **DRAM arbitration.** Covered by MSE (Chapter 9).
 - **L1/L2 cache isolation.** Covered by CPE (Chapter 7).
 - **Multi-resource Contracts.** Whether a single Contract can span multiple I/O domains
-  or span I/O and memory is open (charter §8.2).
+  or span I/O and memory is deferred to a future revision.
 - **Software-overflow Contracts.** When hardware Contract slots on a domain are
-  exhausted, the slow-path software fallback is not yet specified (charter §8.3).
+  exhausted, the slow-path software fallback is not yet specified.
 - **Multi-socket / NUMA I/O fabric.** By analogy with MSE's NUMA open item, QoS
   Contract semantics across multiple NoC domains in a multi-socket system are not
   yet specified.
