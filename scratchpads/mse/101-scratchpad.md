@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com> -->
+
 # 101-MSE-scratchpad.md
 
 This file is the working scratchpad for the Memory Scheduling Extension (MSE) as part of the CE suite project.
