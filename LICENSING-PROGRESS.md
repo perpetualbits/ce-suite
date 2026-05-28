@@ -16,7 +16,7 @@ Categories:
 
 ## CODE (BSD-3-Clause)
 
-<!-- files moved here as they are licensed -->
+- [x] Makefile
 
 ## SKIP (no header)
 
@@ -25,7 +25,6 @@ Categories:
 - [x] LICENSE
 
 ## UNCLASSIFIED
-- [ ] Makefile
 - [ ] README.md
 - [ ] SETUP_INSTRUCTIONS
 - [ ] docs/adoc/chapters/appendix-a-ecid.adoc

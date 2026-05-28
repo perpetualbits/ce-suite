@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Roland Nagtegaal <perpetualbits@gmail.com>
 # CE Suite AsciiDoc build
 #
 # Toolchain requirements:
