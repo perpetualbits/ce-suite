@@ -401,4 +401,146 @@ are time-consuming; skipping them is what produced the previous mess.
 
 ---
 
+## Part 7 — Vocabulary for the chat-and-code workflow
+
+This part names the participants, artifacts, and patterns used when web-Claude
+(in claude.ai) and code-Claude (Claude Code) work together to produce changes
+in this repo. The rules in Parts 1–6 still apply; Part 7 adds the vocabulary
+that makes those rules easier to discuss and harder to forget.
+
+### 7.1 The vocabulary
+
+| Term | Meaning |
+|---|---|
+| architect | Roland Nagtegaal. The decision-maker. |
+| web-Claude | Claude in claude.ai. Discusses, drafts, prepares code-prompts. |
+| code-Claude | Claude Code in the architect's terminal. Reads the repo, executes one file edit per session, commits. |
+| code-prompt | The document web-Claude produces for code-Claude. Contains the prompt and any supporting content. |
+| session-report | What code-Claude returns at session end. Records what was done, what was checked, and the commit hash. |
+| prompt-and-code | The chat-then-code workflow producing one commit. |
+| prompt-to-code-loop | A multi-session sequence after a charter-level decision, where each affected file is its own prompt-and-code. |
+
+Case-insensitive variants (web-claude, webclaude, code-claude, codeclaude,
+code-prompt, codeprompt, session-report, sessionreport) are all the same
+term. Hyphenation may vary; meaning does not.
+
+### 7.2 The deictic rule
+
+In any document either Claude produces — code-prompts, scratchpad entries,
+working-notes additions, drafts of any kind — use role names: architect,
+web-Claude, code-Claude. Never "I" / "you" / "me" / "we" / "us".
+
+In chat between architect and web-Claude, deictic words are fine; the
+context is unambiguous.
+
+The reason: documents are read in session-contexts different from the one
+that wrote them. A code-prompt drafted in a web-Claude session is read
+hours or days later by a code-Claude session. "I" then refers to no
+particular agent and "you" can mean either Claude depending on who is
+reading. Role names stay stable across the gap.
+
+The rule applies to every kind of document, not just code-prompts:
+scratchpad notes, working-notes additions, charter drafts, README text,
+session-report excerpts quoted elsewhere. Anywhere the document might be
+read outside its originating chat, role names are mandatory.
+
+### 7.3 The prompt-and-code shape
+
+A prompt-and-code is a single completed cycle producing one commit. Its
+phases:
+
+1. **Chat phase.** The architect and web-Claude discuss what needs to
+   change. Web-Claude proposes; the architect decides. No decision is
+   enacted automatically. The architect's explicit approval gates the
+   transition to phase 2.
+
+2. **Drafting phase.** Web-Claude produces a code-prompt: a document
+   containing the prompt for code-Claude plus any supporting content
+   (templates, content blocks to insert, propagation-check queries).
+   Every code-prompt must include:
+   - **Step 0: orient.** Code-Claude reads the orientation chain
+     (CLAUDE.md, charter, refamiliarize, working notes, plus any
+     relevant sub-project CLAUDE.md) before any other action.
+   - **The work.** Scoped to one file, per Rule 2 in Part 1.
+   - **A mandatory propagation check** before commit, per the standard
+     chapter-refactor session pattern in §2.1 step 7.
+   - **Hard rules.** What the session will NOT do, even if related work
+     seems convenient. This is the anti-sweep enforcement at the
+     session boundary.
+   - **A session-report instruction.** What code-Claude must report
+     before ending.
+
+3. **Execution phase.** The architect hands the code-prompt to a fresh
+   code-Claude session. Code-Claude executes, commits, ends the
+   session, and produces a session-report.
+
+4. **Closure phase.** The architect reads the session-report and decides
+   whether the prompt-and-code is complete. If propagation revealed
+   additional work in other files, those become future prompt-and-codes,
+   often in a prompt-to-code-loop.
+
+### 7.4 The prompt-to-code-loop
+
+When one charter-level decision affects many files, it requires many
+prompt-and-codes — not one big sweep. The series is a prompt-to-code-loop.
+
+Typical example: a charter change to a normative rule propagates as
+charter → CHANGELOG → ch00 → each affected chapter → CSR reference (ch13)
+→ Sail. Each propagation step is its own session. Each is its own commit.
+Each session-report either confirms that step is done or surfaces
+additional follow-ups.
+
+The loop is not a sweep. The architect runs each session in turn, reads
+each session-report, and decides whether to continue. A prompt-to-code-loop
+may pause indefinitely — there is no requirement to finish one before
+starting other work. Partial loops are normal.
+
+### 7.5 What web-Claude does and does not do
+
+Web-Claude:
+- Discusses, proposes, drafts.
+- Re-fetches the orientation chain at session start, and again when
+  context suggests the repo has moved (for example, after the architect
+  reports a recent commit from code-Claude).
+- Produces code-prompts only on the architect's explicit approval.
+- Asks for clarification rather than guessing on architectural calls.
+
+Web-Claude does not:
+- Enact decisions without explicit architect approval.
+- Resolve open items as a side effect of discussion.
+- Propose multi-file changes packaged as a single code-prompt; decomposition
+  into per-file code-prompts is mandatory.
+- Use deictic words in produced documents.
+
+### 7.6 What code-Claude does and does not do
+
+Code-Claude:
+- Reads the orientation chain before any other action, every session.
+- Executes the code-prompt for the scoped file or files (typically one).
+- Performs the mandatory propagation check before staging.
+- Commits and produces a session-report.
+
+Code-Claude does not:
+- Touch files outside the code-prompt's scope, even if the change seems
+  small or related.
+- Re-interpret the architect's intent silently — when uncertain, stop and
+  ask via the session-report.
+- Skip the orientation read because a prior session "already did it" —
+  every session starts fresh.
+
+### 7.7 What the session-report must contain
+
+The session-report is the architect's record of what happened. At minimum:
+- What was changed (file, scope, brief description).
+- What was checked (the propagation findings — full list, not just
+  highlights).
+- The commit hash, so the architect can verify and reference later.
+- Any flagged anomalies: structure mismatches, unexpected content,
+  cases where code-Claude stopped rather than guessing.
+
+Session-reports are not throwaway. They become the audit trail when the
+architect, weeks later, asks "what touched this file and why?"
+
+---
+
 *End of Working Notes for Authors.*
