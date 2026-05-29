@@ -497,7 +497,12 @@ verify GPR values match.
 
 **Depends on:** S5, S6, S9, S12
 
-**Status:** ☐
+**Status:** ✓ Done — ce_cme_test_s23.sail: allocates ECID_A and ECID_B via
+ec.ir, assigns banks via ec.ig, pre-loads B's bank with GPR_MASK + A's
+ec.ob reference + SENTINEL_B (so the return journey works without separate
+register setup), writes SENTINEL_A to x5 as ECID_A, saves via ec.ib,
+switches A→B→A, asserts x5 == SENTINEL_A on return. Also verifies x1
+(mask), x3 (ECID_A), x4 (ECID_B) round-trip. Both checks pass.
 
 ---
 
