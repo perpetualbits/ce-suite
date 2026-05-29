@@ -81,8 +81,11 @@ This is the actual lived experience that produced the hiatus.
   ECID operands; add ec.od; retire ec.or."
 - Charter bumps are their own commits: "charter: v0.7 — lock ecs_ptr at
   offset 0, ECID 16 bits, D≤3, add §3.7 disable/ignore."
-- Push to the remote regularly. A local-only repo doesn't survive a
-  laptop accident.
+- Push to the remote **immediately after every commit, in the same
+  turn**. Web-based AI sessions read the project from GitHub; a
+  local-only commit means the next session sees stale content and
+  may duplicate or conflict with work just done.
+- A local-only repo also doesn't survive a laptop accident.
 
 **When something goes wrong**, `git reset --hard HEAD` and you've lost
 at most the current session's work. Without git, that same situation
@@ -390,6 +393,8 @@ Before you start any CE work session, run through this list mentally:
 - [ ] Has the propagation check been run (§2.1 step 7) — has the
       assistant searched for cross-chapter effects and reported them
       explicitly?
+- [ ] Did I push after the last commit? (`git push` must follow every
+      `git commit` in the same turn — web Claude reads from GitHub.)
 
 If any answer is no, fix that before continuing. None of these checks
 are time-consuming; skipping them is what produced the previous mess.
