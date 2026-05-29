@@ -24,7 +24,8 @@ CE_SOURCES = \
   model/ce_cme_test_s17.sail \
   model/ce_cme_test_s18.sail \
   model/ce_cme_test_s19.sail \
-  model/ce_cme_test_s20.sail
+  model/ce_cme_test_s20.sail \
+  model/ce_cme_test_s21.sail
 
 # Standalone check: prepend the prelude that stubs sail-riscv types
 CE_STANDALONE_SOURCES = \

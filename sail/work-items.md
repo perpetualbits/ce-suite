@@ -452,7 +452,13 @@ for this.
 
 **Depends on:** Phase 2–6 complete
 
-**Status:** ☐
+**Status:** ✓ Done — added `cme_ret_err(rd, code)` and `cme_ret_ok(rd, data)`
+helpers that write both rd and cme_status[7:0] atomically. Replaced all
+scattered `X(rd) = ...; RETIRE_SUCCESS` sites throughout ec.ob, ec.im,
+ec.om, ec.ig, ec.og, ec.it, ec.ot, ec.ir, ec.oe with these helpers.
+After the refactor, the only X(rd) writes in the file are inside the two
+helpers. ce_cme_test_s21.sail confirms success and error cme_status values
+for all affected instructions. Both checks pass.
 
 ---
 

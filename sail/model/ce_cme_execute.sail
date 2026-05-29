@@ -7,6 +7,7 @@
  * Sail v1 scope:
  *   FULL:  ec.ib, ec.ob, ec.it, ec.ot  (fast-path core + bank delegation)
  *   STUB:  ec.im, ec.om, ec.ig, ec.og, ec.ir, ec.oe
+ *   ALL instructions now update cme_status[7:0] via cme_ret_err/cme_ret_ok (S21)
  *   DECODE-ONLY: ec.iv, ec.ov (execute semantics are implementation-defined
  *                for the encryption algorithm; key management deferred)
  *
@@ -14,6 +15,26 @@
  * in the full implementation. For Sail v1 it returns Illegal_Instruction()
  * as a stub; proper trap wiring is deferred to S5/S6.
  */
+
+/* ------------------------------------------------------------------ */
+/* cme_status + rd write helpers (ch03 §3.12, ch13 §3.6)             */
+/*                                                                     */
+/* Every CME instruction updates cme_status[7:0] in parallel with rd. */
+/* Use cme_ret_err for error/success codes, cme_ret_ok for success    */
+/* paths that return data (bank slot index, ECID number, count).      */
+/* ------------------------------------------------------------------ */
+
+function cme_ret_err(rd : regidx, code : cme_error_t) -> ExecutionResult = {
+  cme_status[7..0] = code;
+  X(rd) = cme_err_to_xlenbits(code);
+  RETIRE_SUCCESS
+}
+
+function cme_ret_ok(rd : regidx, data : xlenbits) -> ExecutionResult = {
+  cme_status[7..0] = CME_OK;
+  X(rd) = data;
+  RETIRE_SUCCESS
+}
 
 /* ------------------------------------------------------------------ */
 /* ec.ib — Save current context into bank (ch03 §3.1)                */
@@ -76,13 +97,9 @@ function clause execute(CE_ECIB(rd, rs1)) = {
           /* Clear dirty bits for saved groups */
           dirty_bitmap = dirty_bitmap & ~(truncate(mask, 8));
 
-          /* Update cme_reg_mask and cme_status */
           cme_reg_mask = mask;
-          cme_status[7..0] = CME_OK;
-
           /* rd = bank slot index (0-based within owning Group) */
-          X(rd) = zero_extend(slot);
-          RETIRE_SUCCESS
+          cme_ret_ok(rd, zero_extend(slot))
         }
       }
     }
@@ -113,30 +130,22 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
 
     /* Look up EC[target_ecid] */
     match lookup_ec(target_ecid) {
-      None() => {
-        X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-        RETIRE_SUCCESS
-      },
+      None() => cme_ret_err(rd, CME_ERR_INVALID_ECID),
       Some(entry) => {
         /* Fail if unallocated or generation mismatch (stale reference) */
-        if ~(entry.allocated) | (entry.generation != expected_gen) then {
-          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-          RETIRE_SUCCESS
-        } else {
+        if ~(entry.allocated) | (entry.generation != expected_gen) then
+          cme_ret_err(rd, CME_ERR_INVALID_ECID)
+        else {
           /* Find the bank owned by target_ecid */
           match find_bank(target_ecid) {
-            None() => {
-              X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
-              RETIRE_SUCCESS
-            },
+            None() => cme_ret_err(rd, CME_ERR_NO_BANK),
             Some(slot) => {
               let idx = unsigned(truncate(slot, 3));
 
               /* Refuse sealed banks (ch03 §3.6, ec.ob sealed-bank rule) */
-              if bank_pool[idx].sealed then {
-                X(rd) = cme_err_to_xlenbits(CME_ERR_ALREADY_SEALED);
-                RETIRE_SUCCESS
-              } else {
+              if bank_pool[idx].sealed then
+                cme_ret_err(rd, CME_ERR_ALREADY_SEALED)
+              else {
                 /* Restore register groups indicated by mask (ch03 §3.7) */
                 let b = bank_pool[idx];
 
@@ -161,12 +170,8 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
                 /* Clear dirty bitmap for restored groups (ch00 §0.3) */
                 dirty_bitmap = dirty_bitmap & ~(truncate(mask, 8));
 
-                /* Update status registers */
                 cme_reg_mask = mask;
-                cme_status[7..0] = CME_OK;
-
-                X(rd) = cme_err_to_xlenbits(CME_OK);
-                RETIRE_SUCCESS
+                cme_ret_err(rd, CME_OK)
               }
             }
           }
@@ -195,14 +200,13 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
     let mask        : regmask_t = X(rs2);
 
     match lookup_ec(target_ecid) {
-      None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+      None() => cme_ret_err(rd, CME_ERR_INVALID_ECID),
       Some(entry) => {
-        if ~(entry.allocated) then {
-          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-          RETIRE_SUCCESS
-        } else {
+        if ~(entry.allocated) then
+          cme_ret_err(rd, CME_ERR_INVALID_ECID)
+        else {
           match find_bank(target_ecid) {
-            None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK); RETIRE_SUCCESS },
+            None() => cme_ret_err(rd, CME_ERR_NO_BANK),
             Some(slot) => {
               let bank    = bank_pool[unsigned(truncate(slot, 3))];
               let ecs_ptr = entry.ecs_ptr;
@@ -237,8 +241,7 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
                 Physaddr(ecs_ptr + zero_extend(to_bits(32, 512))),
                 8, zero_extend(mask), default_meta);
 
-              X(rd) = cme_err_to_xlenbits(CME_OK);
-              RETIRE_SUCCESS
+              cme_ret_err(rd, CME_OK)
             }
           }
         }
@@ -262,12 +265,11 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
     let mask        : regmask_t = X(rs2);
 
     match lookup_ec(target_ecid) {
-      None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+      None() => cme_ret_err(rd, CME_ERR_INVALID_ECID),
       Some(entry) => {
-        if ~(entry.allocated) then {
-          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-          RETIRE_SUCCESS
-        } else {
+        if ~(entry.allocated) then
+          cme_ret_err(rd, CME_ERR_INVALID_ECID)
+        else {
           let ecs_ptr = entry.ecs_ptr;
 
           /* Claim a free bank slot (ec.om acts like ec.ig + fill) */
@@ -280,10 +282,9 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
             }
           };
 
-          if ~(found) then {
-            X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
-            RETIRE_SUCCESS
-          } else {
+          if ~(found) then
+            cme_ret_err(rd, CME_ERR_NO_BANK)
+          else {
             /* Read register groups from ECS (mirrors ec.im layout) */
             var new_gprs : vector(31, dec, bits(64)) = Bank_default.gprs;
             if mask[0] == 0b1 then  /* GPR group */
@@ -326,8 +327,7 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
                 }
             };
 
-            X(rd) = cme_err_to_xlenbits(CME_OK);
-            RETIRE_SUCCESS
+            cme_ret_err(rd, CME_OK)
           }
         }
       }
@@ -354,10 +354,9 @@ function clause execute(CE_ECIG(rd, rs1)) = {
       }
     };
 
-    if ~(found) then {
-      X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
-      RETIRE_SUCCESS
-    } else {
+    if ~(found) then
+      cme_ret_err(rd, CME_ERR_NO_BANK)
+    else {
       let free_idx = unsigned(free_slot);
       /* Claim the free slot for target_ecid */
       foreach (i from 0 to 7) {
@@ -367,8 +366,7 @@ function clause execute(CE_ECIG(rd, rs1)) = {
             valid      = true
           }
       };
-      X(rd) = zero_extend(free_slot);
-      RETIRE_SUCCESS
+      cme_ret_ok(rd, zero_extend(free_slot))
     }
   }
 }
@@ -383,10 +381,7 @@ function clause execute(CE_ECOG(rd, rs1)) = {
     let target_ecid : ecid_t = truncate(X(rs1), 16);
 
     match find_bank(target_ecid) {
-      None() => {
-        X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
-        RETIRE_SUCCESS
-      },
+      None() => cme_ret_err(rd, CME_ERR_NO_BANK),
       Some(slot) => {
         let slot_idx = unsigned(truncate(slot, 3));
 
@@ -406,8 +401,7 @@ function clause execute(CE_ECOG(rd, rs1)) = {
             remaining = remaining + 0x1
         };
 
-        X(rd) = zero_extend(remaining);
-        RETIRE_SUCCESS
+        cme_ret_ok(rd, zero_extend(remaining))
       }
     }
   }
@@ -432,29 +426,23 @@ function clause execute(CE_ECIT(rd, rs1, rs2)) = {
     let child_ecid  : ecid_t = truncate(X(rs2), 16);
 
     match lookup_ec(parent_ecid) {
-      None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+      None() => cme_ret_err(rd, CME_ERR_INVALID_ECID),
       Some(parent_entry) => {
-        if ~(parent_entry.allocated) then {
-          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-          RETIRE_SUCCESS
-        } else {
+        if ~(parent_entry.allocated) then
+          cme_ret_err(rd, CME_ERR_INVALID_ECID)
+        else {
           match lookup_ec(child_ecid) {
-            None() => { X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID); RETIRE_SUCCESS },
+            None() => cme_ret_err(rd, CME_ERR_INVALID_ECID),
             Some(child_entry) => {
-              if ~(child_entry.allocated) then {
-                X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-                RETIRE_SUCCESS
-              } else {
+              if ~(child_entry.allocated) then
+                cme_ret_err(rd, CME_ERR_INVALID_ECID)
+              else {
                 /* rs1 must be a proper ancestor of rs2 (ch03 §3.4) */
-                if ~(is_ancestor(parent_ecid, child_ecid)) then {
-                  X(rd) = cme_err_to_xlenbits(CME_ERR_PERMISSION);
-                  RETIRE_SUCCESS
-                } else {
+                if ~(is_ancestor(parent_ecid, child_ecid)) then
+                  cme_ret_err(rd, CME_ERR_PERMISSION)
+                else {
                   match find_bank(parent_ecid) {
-                    None() => {
-                      X(rd) = cme_err_to_xlenbits(CME_ERR_NO_BANK);
-                      RETIRE_SUCCESS
-                    },
+                    None() => cme_ret_err(rd, CME_ERR_NO_BANK),
                     Some(slot) => {
                       let slot_idx = unsigned(truncate(slot, 3));
                       /* Transfer ownership from parent to child */
@@ -462,8 +450,7 @@ function clause execute(CE_ECIT(rd, rs1, rs2)) = {
                         if i == slot_idx then
                           bank_pool[i] = { bank_pool[i] with owner_ecid = child_ecid }
                       };
-                      X(rd) = cme_err_to_xlenbits(CME_OK);
-                      RETIRE_SUCCESS
+                      cme_ret_err(rd, CME_OK)
                     }
                   }
                 }
@@ -496,23 +483,18 @@ function clause execute(CE_ECOT(rd, rs1)) = {
     let target_ecid : ecid_t = truncate(X(rs1), 16);
 
     match lookup_ec(target_ecid) {
-      None() => {
-        X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-        RETIRE_SUCCESS
-      },
+      None() => cme_ret_err(rd, CME_ERR_INVALID_ECID),
       Some(entry) => {
-        if ~(entry.allocated) then {
-          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
-          RETIRE_SUCCESS
-        } else {
+        if ~(entry.allocated) then
+          cme_ret_err(rd, CME_ERR_INVALID_ECID)
+        else {
           let parent_ecid = entry.parent_ecid;
           /* Transfer all banks owned by target_ecid to its parent Group */
           foreach (i from 0 to 7) {
             if bank_pool[i].valid & (bank_pool[i].owner_ecid == target_ecid) then
               bank_pool[i] = { bank_pool[i] with owner_ecid = parent_ecid }
           };
-          X(rd) = cme_err_to_xlenbits(CME_OK);
-          RETIRE_SUCCESS
+          cme_ret_err(rd, CME_OK)
         }
       }
     }
@@ -529,24 +511,22 @@ function clause execute(CE_ECIR(rd, rs1)) = {
     let flag = X(rs1);
 
     /* rs1 > 1: reserved bits set → ILLEGAL_FIELD (ch03 §3.5) */
-    if unsigned(flag) > 1 then {
-      X(rd) = cme_err_to_xlenbits(CME_ERR_ILLEGAL_FIELD);
-      RETIRE_SUCCESS
-    } else {
+    if unsigned(flag) > 1 then
+      cme_ret_err(rd, CME_ERR_ILLEGAL_FIELD)
+    else {
       let is_leaf = (flag[0] == 0b0);  /* flag=0 → leaf, flag=1 → delegating */
 
       /* Look up parent (current context) */
       match lookup_ec(current_ecid) {
-        None() => { X(rd) = zeros(); RETIRE_SUCCESS },
+        None() => cme_ret_ok(rd, zeros()),  /* internal error: current_ecid invalid */
         Some(parent_entry) => {
           let parent_L_val = unsigned(parent_entry.delegation_L);
           let D_val        = unsigned(cme_del_cap_D);
 
           /* Delegating child: parent must be below the depth cap */
-          if ~(is_leaf) & (parent_L_val >= D_val) then {
-            X(rd) = cme_err_to_xlenbits(CME_ERR_CAP_DEPTH);
-            RETIRE_SUCCESS
-          } else {
+          if ~(is_leaf) & (parent_L_val >= D_val) then
+            cme_ret_err(rd, CME_ERR_CAP_DEPTH)
+          else {
             /* Child delegation level (ch00 §0.8) */
             let child_L : del_level_t =
               if is_leaf then cme_del_cap_D           /* leaf → pinned at D */
@@ -562,10 +542,9 @@ function clause execute(CE_ECIR(rd, rs1)) = {
               }
             };
 
-            if ~(found) then {
-              X(rd) = zeros();  /* no free slots */
-              RETIRE_SUCCESS
-            } else {
+            if ~(found) then
+              cme_ret_ok(rd, zeros())  /* no free slots: rd = 0, cme_status = OK */
+            else {
               let child_idx = unsigned(child_slot);
               /* Write new entry; foreach satisfies the bounds checker */
               foreach (i from 1 to 63) {
@@ -577,8 +556,7 @@ function clause execute(CE_ECIR(rd, rs1)) = {
                     allocated    = true
                   }
               };
-              X(rd) = zero_extend(child_slot);
-              RETIRE_SUCCESS
+              cme_ret_ok(rd, zero_extend(child_slot))
             }
           }
         }
@@ -643,8 +621,7 @@ function clause execute(CE_ECOE(rd, rs1)) = {
       }
     };
 
-    X(rd) = zero_extend(freed_count);
-    RETIRE_SUCCESS
+    cme_ret_ok(rd, zero_extend(freed_count))
   }
 }
 
