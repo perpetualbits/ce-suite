@@ -147,10 +147,13 @@ corresponding architectural register group into the bank struct.
 
 **Depends on:** S4
 
-**Status:** ✓ Done — GPR (bit 0), FPR (bit 1), and PC (bit 4) saves implemented.
-VEC/MAT/CSR/SATP (bits 2,3,5,6) remain TODO stubs. Added `fregidx` newtype,
-`F` overload, and `get_arch_pc` to `ce_standalone_prelude.sail` to mirror
-sail-riscv's `fdext_regs.sail` / `pc_access.sail`. Both `make check` and
+**Status:** ✓ Done — GPR (bit 0), FPR (bit 1), PC (bit 4), and SATP (bit 6)
+saves implemented. VEC/MAT/CSR (bits 2,3,5) remain TODO stubs. Added
+`fregidx` newtype, `F` overload, and `get_arch_pc` to
+`ce_standalone_prelude.sail` to mirror sail-riscv's `fdext_regs.sail` /
+`pc_access.sail`. SATP save added (v0.19 D6 propagation): `satp_val` field
+added to `Bank` struct; `ce_standalone_prelude.sail` gains `satp` register
+stub, `asidbits` type, and `flush_TLB` stub. Both `make check` and
 `make check-riscv` exit 0.
 
 ---
@@ -167,10 +170,14 @@ sail-riscv this is typically done by setting `nextPC`.
 
 **Depends on:** S4, S5
 
-**Status:** ✓ Done — GPR (bit 0), FPR (bit 1), and PC (bit 4) restores
-implemented. PC case uses `set_next_pc(b.pc)` to redirect execution on commit
-(sail-riscv pattern). VEC/MAT/CSR/SATP remain TODO stubs. Added `nextPC`
-register and `set_next_pc` to `ce_standalone_prelude.sail`. Both checks pass.
+**Status:** ✓ Done — GPR (bit 0), FPR (bit 1), PC (bit 4), and SATP (bit 6)
+restores implemented. PC case uses `set_next_pc(b.pc)` to redirect execution
+on commit (sail-riscv pattern). VEC/MAT/CSR (bits 2,3,5) remain TODO stubs.
+SATP restore added (v0.19 D6 propagation, charter §6.8): reads old SATP,
+writes `b.satp_val` to `satp`, calls `flush_TLB(None(), None())` if the
+values differ (full-flush scope; D6.1 unresolved). Skip when unchanged
+expresses the permitted optimization. API: `flush_TLB` from
+`sail-riscv/model/sys/vmem_tlb.sail`. Both checks pass.
 
 ---
 

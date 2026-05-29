@@ -41,11 +41,12 @@ struct Bank = {
   sealed     : bool,      /* true iff bank is encrypted (ec.iv) */
   /* Saved register state — abstracted as bitvectors per group.
    * Real widths are XLEN-dependent; modelled at 64 bits for RV64. */
-  gprs  : vector(31, dec, bits(64)),  /* x1..x31 (x0 slot holds Group ID) */
-  fprs  : vector(32, dec, bits(64)),  /* f0..f31 */
-  pc    : bits(64),
-  /* CSR and SATP state omitted in Sail v1 — add when needed */
-  mask  : regmask_t  /* which groups were saved */
+  gprs     : vector(31, dec, bits(64)),  /* x1..x31 (x0 slot holds Group ID) */
+  fprs     : vector(32, dec, bits(64)),  /* f0..f31 */
+  pc       : bits(64),
+  satp_val : xlenbits,  /* SATP register state (mask bit 6) */
+  /* CSR state (bit 5) omitted in Sail v1 */
+  mask     : regmask_t  /* which groups were saved */
 }
 
 /* ------------------------------------------------------------------ */
@@ -60,6 +61,7 @@ let Bank_default : Bank = struct {
   gprs       = vector_init(zeros()),
   fprs       = vector_init(zeros()),
   pc         = zeros(),
+  satp_val   = zeros(),
   mask       = zeros()
 }
 

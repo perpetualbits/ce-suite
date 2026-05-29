@@ -136,6 +136,16 @@ function get_arch_pc() = PC
 val set_next_pc : xlenbits -> unit
 function set_next_pc(pc) = { nextPC = pc }
 
+/* SATP register — mirrors sail-riscv's sys/vmem.sail */
+register satp : xlenbits = zeros()
+
+/* ASID bits — mirrors sail-riscv's core/xlen.sail (RV64: 16-bit ASIDs) */
+type asidbits = bits(16)
+
+/* TLB flush — mirrors sail-riscv's sys/vmem_tlb.sail */
+val flush_TLB : (option(asidbits), option(xlenbits)) -> unit
+function flush_TLB(_, _) = ()  /* standalone: no-op */
+
 /* Execution result — mirrors sail-riscv's ExecutionResult */
 union ExecutionResult = {
   Retire_Success      : unit,

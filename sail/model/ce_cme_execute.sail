@@ -79,11 +79,15 @@ function clause execute(CE_ECIB(rd, rs1)) = {
               fs[i] = zero_extend(F(Fregidx(to_bits(5, i))))
             };
 
-          /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO in later Sail versions */
+          /* bits 2 (VEC), 3 (MAT), 5 (CSR): TODO in later Sail versions */
 
           let new_pc : bits(64) =
             if mask[4] == 0b1 then zero_extend(get_arch_pc())  /* bit 4: PC */
             else b.pc;
+
+          let new_satp : xlenbits =
+            if mask[6] == 0b1 then satp   /* bit 6: SATP */
+            else b.satp_val;
 
           bank_pool[idx] = { b with
             owner_ecid = current_ecid,
@@ -91,7 +95,8 @@ function clause execute(CE_ECIB(rd, rs1)) = {
             mask       = mask,
             gprs       = gs,
             fprs       = fs,
-            pc         = new_pc
+            pc         = new_pc,
+            satp_val   = new_satp
           };
 
           /* Clear dirty bits for saved groups */
@@ -159,7 +164,19 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
                     F(Fregidx(to_bits(5, i))) = truncate(b.fprs[i], flen)
                   };
 
-                /* bits 2 (VEC), 3 (MAT), 5 (CSR), 6 (SATP): TODO in later Sail versions */
+                /* bits 2 (VEC), 3 (MAT), 5 (CSR): TODO in later Sail versions */
+
+                /* D6 resolution (charter §6.8, v0.19): SATP restore via ec.ob
+                   with bit 6 set performs TLB invalidation if SATP differs;
+                   skipped if unchanged (permitted optimization).
+                   Scope: full flush (D6.1 unresolved; refinement is mechanical). */
+                if mask[6] == 0b1 then {  /* bit 6: SATP */
+                  let old_satp = satp;
+                  let new_satp = b.satp_val;
+                  satp = new_satp;
+                  if old_satp != new_satp then
+                    flush_TLB(None(), None())
+                };
 
                 if mask[4] == 0b1 then  /* bit 4: PC — redirect execution on commit */
                   set_next_pc(truncate(b.pc, xlen));
