@@ -124,13 +124,37 @@ register-field encoding `00000` (x0), not the value zero. An instruction
 * **Side effects**: Restores registers from the bank owned by ECID `rs1[15:0]`. Clears the
   dirty-group bitmap bits for every register group restored; the resumed context
   begins with a clean bitmap for those groups. If the PC bit is set in the mask,
-  execution jumps to the restored program counter on commit.
+  execution jumps to the restored program counter on commit. If mask bit 6 (SATP)
+  is set and the restored SATP differs from the current SATP, hardware performs a
+  TLB invalidation atomically with the restore (see TLB Invalidation on SATP
+  Restore below).
 * **Guaranteed cycles**: 1–3.
 
 > **Typical switch sequence**: `ec.ib mask` (save current), then
 > `ec.ob x0, next_ecid_gen, mask` (restore next, discard result), where
 > `next_ecid_gen` holds `(generation << 16) | ecid`. The transition between
 > `current_ecid` and the target ECID is complete when `ec.ob` commits.
+
+#### TLB Invalidation on SATP Restore
+
+When the restore mask includes bit 6 (SATP) and the restored SATP value differs
+from the SATP value in effect immediately before `ec.ob`, the hardware performs a
+TLB invalidation atomically with the restore, before any subsequent instruction
+observes the new translation. Until the exact invalidation scope is settled (an
+open item in the CE Suite Project Instructions §8, items D6.1–D6.3), implementations
+satisfy this rule by using any scope that is correct for the standard `csrw satp`
+followed by `sfence.vma x0, x0` pattern in the same situation.
+
+Implementations may skip the invalidation when the restored SATP equals the SATP
+value in effect immediately before `ec.ob` — detected via direct comparison, ASID
+tagging, or other equivalent means. A conformant implementation that always
+invalidates is correct; one that uses an optimization to skip the invalidation when
+safe is also correct.
+
+The normative statement of this rule is in the CE Suite Project Instructions §6.8.
+Sub-decisions on the exact invalidation scope (D6.1) and H-extension analogues for
+`vsatp` and `hgatp` (D6.2) remain open items. For cross-address-space memory
+ordering, see also Chapter 17.
 
 #### Bank Exhaustion Recovery
 
