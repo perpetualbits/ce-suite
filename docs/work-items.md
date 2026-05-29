@@ -14,20 +14,19 @@ detailed design work that follows from locked architectural decisions.
 
 ---
 
-## ⚑ Current priority — Salvage clusters, D6, and PUB5
+## ⚑ Current priority — Salvage clusters and PUB5
 
 The ChatGPT-era CE Suite design sessions are being reviewed for ideas
 worth salvaging into the current spec. Discussion proceeds cluster by
 cluster; accepted items land here as new work items. Cluster G is
-complete (yielded D6 below; two items archived). Clusters A, B, C, D,
+complete (yielded D6, now ✓ resolved; two items archived). Clusters A, B, C, D,
 E, F, H remain to be discussed. PUB5 (pre-submission gap audit) is
 queued to follow cluster completion.
 
 **Sail work (Phase 9 onward, S26+) is now lower priority** than salvage
 cluster decisions and the items they produce. The CPE, MSE, and QoS
 execute functions being drafted in Sail may require rework if cluster D,
-E, or F results in architectural changes. D6 specifically blocks the
-SATP mask-bit work in Sail S5/S6 stubs.
+E, or F results in architectural changes.
 
 Sail S26+ work may continue in parallel because (a) any rework will be
 smaller than re-starting Sail cold, and (b) the toolchain familiarity
@@ -124,76 +123,33 @@ refamiliarize.md §A.3 updated.
 
 ---
 
-### D6 · TLB behavior of `ec.ob` when bit 6 (SATP) is set in the mask
+### D6 · TLB behavior of `ec.ob` when bit 6 (SATP) is set in the mask ✓ RESOLVED (v0.19)
 
-**Problem:** The spec defines that `ec.ob` may restore SATP (ch00 §0.10
-bit 6, ch03 §3.7) but does not specify what happens to TLB entries from
-the prior SATP value. Without a normative rule, conformant
-implementations may differ on whether stale translations remain visible
-after a context switch that changes address spaces. This is both a
-correctness gap (software relying on either behavior is non-portable)
-and an internal inconsistency with the charter §1 claim of "1–2 cycle
-context switches": if software must issue `sfence.vma` after every
-cross-address-space `ec.ob`, the effective switch latency is much
-larger than 1–2 cycles for those switches.
+**Decision:** Charter §6.8 (v0.19) established: when `ec.ob` restores a context with
+mask bit 6 (SATP) set and the restored SATP value differs from the SATP value in effect
+immediately before the `ec.ob`, hardware performs a TLB invalidation atomically with the
+SATP restore, using any scope that satisfies the standard `csrw satp` followed by
+`sfence.vma x0, x0` pattern. Implementations are *permitted* to skip the invalidation
+when the restored SATP equals the current SATP (the unchanged-SATP optimization) but are
+not *required* to detect this case; a conformant implementation that always invalidates is
+also correct. Three sub-decisions parked as charter §8 open items:
+- **D6.1** — Exact scope of the auto-invalidation (full flush vs. ASID-targeted vs.
+  implementation-defined minimum). Relevant empirical scratchpad:
+  `scratchpads/general/2026-05-asid-vmid-empirical.md`.
+- **D6.2** — H-extension analogues for `vsatp` (via `hfence.vvma`) and `hgatp`
+  (via `hfence.gvma`); resolution depends on D6.1 and ch19 §19.2.1 language.
+- **D6.3** — Charter §1 "1–2 cycle" claim qualification for cross-address-space
+  switches; see parked RT-subset insight in
+  `scratchpads/general/2026-05-rt-subset-determinism.md`.
 
-**Affected files:**
-- `docs/chapters/ch03-cme-instruction-set.md` — `ec.ob` semantics
-  (§3.1 or §3.7 area)
-- `docs/chapters/ch00-fundamental-structure.md` — §0.10 mask bit 6
-  note
-- `docs/chapters/ch17-memory-ordering.md` — likely a new §17.2.4 or
-  note distinguishing memory ordering (RVWMO) from TLB invalidation
-- `docs/chapters/ch19-interop-ratified-extensions.md` — verify
-  interaction with Svnapot, Svinval, Sv48/Sv57, H-extension
-  (hgatp/vsatp two-stage translation)
-- Sail model: `sail/model/ce_cme_execute.sail` and prelude — SATP
-  mask bit is currently a TODO stub in S5/S6; this resolves before
-  Sail SATP work begins
-- `docs/charter/project_instructions.md` — likely a new normative
-  paragraph in §3 (CME normative rules), charter version bump, and
-  CHANGELOG entry
+**Propagated to:** charter §6.8 (v0.19) and §8 items D6.1–D6.3; ch03 §3.1
+"TLB Invalidation on SATP Restore" subsection (commit e6de533); ch00 §0.10
+forward-reference note on mask bit 6 (commit f4e53a5); ch17 §17.2.1 note
+distinguishing TLB invalidation from RVWMO fence obligations (commit 3e8e1f7);
+Sail `ce_cme_execute.sail` `ec.ob` SATP handling with conditional
+`flush_TLB(None(), None())` and supporting prelude additions (commit 2b9e9da).
 
-**Options under consideration:**
-- **Option A** — `ec.ob` with bit 6 set automatically performs an
-  `sfence.vma`-equivalent. ASID-style optimization permitted (skip if
-  SATP unchanged).
-- **Option B** — Software is responsible for issuing `sfence.vma`
-  after `ec.ob` if SATP changed. Matches the standard pattern for
-  normal `csrw satp`.
-- **Option C** — Conditional automatic flush: hardware compares the
-  restored SATP against current SATP and flushes if and only if they
-  differ (mandates the comparison rather than permitting it).
-
-**Cross-references:** Affects how `ec.ob` interacts with Svnapot,
-Svinval, ASIDs (Sv39/Sv48/Sv57 with ASID), and the H-extension's
-two-stage translation (vsatp + hgatp). Each is in ch19; a decision
-here must propagate.
-
-**Resolution:** Dedicated design-decision session per
-project-management-guide §4.2. After resolution: charter bump, ch03
-update, ch00 §0.10 footnote, ch17 cross-reference, ch19 verification,
-Sail spec for the SATP mask bit.
-
-**Unblocks:** Sail S5/S6 work on the SATP mask bit (currently TODO);
-any future ec.ob/SATP interaction work; resolves an inconsistency a
-RISC-V International reviewer would flag.
-
-**Priority:** Medium. Does not block current cluster discussions or
-non-SATP Sail work, but should be resolved before the routing-stage
-reply lands or before the Sail SATP stubs are tackled, whichever
-comes first.
-
-**Source:** Surfaced during Cluster G of the salvage discussion
-(2026-05-29). The salvage triggered verification; the gap exists in
-the spec independently.
-
-**Related scratchpad:** `scratchpads/general/2026-05-rt-subset-determinism.md`
-— parked insight that the "1–2 cycle" claim is defensible only for a
-defined RT-subset of ECs (same-SATP, CPE-reserved, MSE/QoS-contracted,
-permanently-resident bank). The D6 resolution should reference this note
-and decide whether to develop the RT-subset framing as a follow-on work
-item or absorb it into the D6 propagation.
+**Deferred:** ch19 `vsatp`/`hgatp` TLB invalidation analogue, pending D6.2 resolution.
 
 ---
 
@@ -433,21 +389,22 @@ an illegal-instruction trap); silent ignore prohibited.
 3. ~~**D3** (CPE delegation)~~ — **DONE** (v0.11).
 4. ~~**D4** (`qs.or` domain selector)~~ — **DONE** (v0.12).
 5. ~~**D5** (Contract object model)~~ — **DONE** (v0.15).
-6. ~~**F5** (charter §6.1 CME subset)~~ — **DONE**.
-7. ~~**F3** (`ec.ir` clarification)~~ — **DONE**.
-8. ~~**F1** (CPE redesign)~~ — **DONE**.
-9. ~~**F2** (`qs.or`/`qs.ot` fix)~~ — **DONE** (with D4).
-10. ~~**F4** (`ms.it` encoding)~~ — **DONE**.
-11. ~~**F6** (`ec.is`/`ec.os`)~~ — **DONE** (option 2: `s` removed).
-12. ~~**F7** (`ec.iv`/`ec.ov` incompleteness flag)~~ — **DONE**.
-13. ~~**F9** (CPE QUERY)~~ — **DONE** (resolved in F1).
-14. ~~**F10** (working notes stale note)~~ — **DONE**.
-15. ~~**G2** (reserved-bit policy)~~ — **DONE**.
-16. ~~**G1** (diagrams)~~ — **DONE**.
-17. ~~**F8** (binary encoding)~~ — **DONE**.
-18. ~~**G3** (RV32 width audit)~~ — **DONE**.
-19. ~~**F11** (ch08 `0.` line-wrap artifact from P7 adoc verification)~~ — **DONE**.
-20. ~~**F12** (§4.3.N drift in ch11 §11.5.3/§11.5.4, ch13 §4.1, ch02 §3.4)~~ — **DONE**.
+6. ~~**D6** (TLB behavior on SATP restore)~~ — **DONE** (v0.19).
+7. ~~**F5** (charter §6.1 CME subset)~~ — **DONE**.
+8. ~~**F3** (`ec.ir` clarification)~~ — **DONE**.
+9. ~~**F1** (CPE redesign)~~ — **DONE**.
+10. ~~**F2** (`qs.or`/`qs.ot` fix)~~ — **DONE** (with D4).
+11. ~~**F4** (`ms.it` encoding)~~ — **DONE**.
+12. ~~**F6** (`ec.is`/`ec.os`)~~ — **DONE** (option 2: `s` removed).
+13. ~~**F7** (`ec.iv`/`ec.ov` incompleteness flag)~~ — **DONE**.
+14. ~~**F9** (CPE QUERY)~~ — **DONE** (resolved in F1).
+15. ~~**F10** (working notes stale note)~~ — **DONE**.
+16. ~~**G2** (reserved-bit policy)~~ — **DONE**.
+17. ~~**G1** (diagrams)~~ — **DONE**.
+18. ~~**F8** (binary encoding)~~ — **DONE**.
+19. ~~**G3** (RV32 width audit)~~ — **DONE**.
+20. ~~**F11** (ch08 `0.` line-wrap artifact from P7 adoc verification)~~ — **DONE**.
+21. ~~**F12** (§4.3.N drift in ch11 §11.5.3/§11.5.4, ch13 §4.1, ch02 §3.4)~~ — **DONE**.
 
 ---
 
