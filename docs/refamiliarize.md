@@ -486,6 +486,14 @@ systems.
 
 These are not technical decisions. They are habits.
 
+Throughout Part C, terms like *web-Claude*, *code-Claude*,
+*code-prompt*, *session-report*, *prompt-and-code*,
+*prompt-to-code-loop*, *session*, and *turn* have specific
+meanings defined in the Vocabulary section of
+`docs/working_notes_for_authors.md`. Anyone reading this part as
+an entry point should consult that section first; the operational
+guidance here assumes those definitions.
+
 ### C.1 The comb is the comb
 
 When in doubt, the Project Instructions win. If you find yourself reading
@@ -530,6 +538,74 @@ and reset with a new chat or session." Same applies to me. If you find
 yourself doubting the conversation, end the session and start a fresh
 one with this document, the charter, and Chapter 0 as the opening
 context. You won't lose progress; you'll regain clarity.
+
+### C.7 What to do at session start versus between turns
+
+A **session** is one complete conversation (one claude.ai chat, or one
+code-Claude invocation). A **turn** is one exchange within a session —
+the architect's message plus the Claude reply. The orientation cost
+at these two boundaries is asymmetric, and the discipline differs
+accordingly.
+
+**At session start, orientation is mandatory and complete.**
+
+When web-Claude opens a fresh chat or code-Claude begins a new
+invocation, the orientation chain must be re-read in full:
+
+  1. `CLAUDE.md` at the repo root (plus any relevant sub-project
+     `CLAUDE.md` if working in `sail/`, `qemu/`, or `sw/`)
+  2. `docs/charter/project_instructions.md` (the comb)
+  3. `docs/refamiliarize.md` (this file)
+  4. `docs/working_notes_for_authors.md`
+
+This is non-negotiable. Whatever either Claude remembered from a prior
+session, whatever the claude.ai Project Files mirror shows, whatever
+the architect summarized in their opening message — none of it
+substitutes for re-reading the canonical files in the repo. The repo
+may have moved since the last contact, and the most common workflow
+failures trace back to acting on stale state. The cost of re-reading
+is small; the cost of being wrong is large.
+
+Code-Claude's code-prompts encode this as Step 0 of every session.
+Web-Claude's discipline is the same, even when no code-prompt structure
+is visible — at session start, before any non-trivial claim about
+repo state, re-fetch.
+
+**Within a session, between turns, orientation is conditional.**
+
+Once a session has begun and the orientation chain has been read,
+re-reading it every turn would be wasteful. The repo normally does not
+move between turns within the same chat. However, web-Claude must
+re-fetch in two specific circumstances:
+
+1. **When the architect signals a commit has happened.** Any message
+   like "code-Claude just committed X" or "I pushed Y" means the repo
+   has moved; the in-context view of repo state is now stale. The
+   relevant file or files must be re-fetched before any reasoning
+   that depends on them. Within-session memory of "what the file
+   looked like" is no longer trustworthy.
+
+2. **When about to make a non-trivial factual claim about repo state.**
+   The current version of the charter, the resolution status of a
+   work-item, the contents of a specific chapter section, the current
+   value of a CSR — any claim where being wrong has consequences. The
+   canonical answer is in the repo; if it has not been re-fetched
+   recently in this session, fetch it now.
+
+Code-Claude's analogue is simpler: each file is read immediately
+before being edited, and the propagation check at the end of each
+prompt-and-code re-greps the repo. The mechanism is built into the
+prompt-and-code shape.
+
+**The architect's role across the asymmetry.**
+
+The architect is the only participant whose context spans multiple
+sessions reliably. Their continuity bridges what neither Claude can
+remember. The orientation discipline exists so that neither Claude
+has to — and so that the architect does not have to either, when they
+might prefer to focus on the architectural problem at hand. A
+well-disciplined session frees the architect to think about CME or
+CPE rather than about whether the file they are reading is current.
 
 ---
 
