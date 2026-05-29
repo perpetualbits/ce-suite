@@ -14,11 +14,30 @@ detailed design work that follows from locked architectural decisions.
 
 ---
 
-## ⚑ Current priority — Sail pre-work
+## ⚑ Current priority — Salvage clusters, D6, and PUB5
 
-PUB cleanup is complete. P6 (opcode allocation) and P8 (Sail) remain. The
-immediate pre-Sail items are tracked in P6 and P8 below. No further authoring
-sessions are required before Sail work can begin.
+The ChatGPT-era CE Suite design sessions are being reviewed for ideas
+worth salvaging into the current spec. Discussion proceeds cluster by
+cluster; accepted items land here as new work items. Cluster G is
+complete (yielded D6 below; two items archived). Clusters A, B, C, D,
+E, F, H remain to be discussed. PUB5 (pre-submission gap audit) is
+queued to follow cluster completion.
+
+**Sail work (Phase 9 onward, S26+) is now lower priority** than salvage
+cluster decisions and the items they produce. The CPE, MSE, and QoS
+execute functions being drafted in Sail may require rework if cluster D,
+E, or F results in architectural changes. D6 specifically blocks the
+SATP mask-bit work in Sail S5/S6 stubs.
+
+Sail S26+ work may continue in parallel because (a) any rework will be
+smaller than re-starting Sail cold, and (b) the toolchain familiarity
+gained is durable. But Sail work should not be defended on its own
+schedule: if a cluster decision arrives that requires rework, the rework
+takes priority over additional Sail progress.
+
+P6 (opcode allocation) and P8 (Sail completion) both remain open.
+The submission email to `help@riscv.org` is in flight; a routing reply
+is expected on a weeks-to-month timescale.
 
 ---
 
@@ -102,6 +121,72 @@ instruction semantics.
 concrete example); ch07 §7.4 single-sentence cross-reference; ch09 §9.4.1
 single-sentence cross-reference; ch11 §11.5.1 single-sentence cross-reference;
 refamiliarize.md §A.3 updated.
+
+---
+
+### D6 · TLB behavior of `ec.ob` when bit 6 (SATP) is set in the mask
+
+**Problem:** The spec defines that `ec.ob` may restore SATP (ch00 §0.10
+bit 6, ch03 §3.7) but does not specify what happens to TLB entries from
+the prior SATP value. Without a normative rule, conformant
+implementations may differ on whether stale translations remain visible
+after a context switch that changes address spaces. This is both a
+correctness gap (software relying on either behavior is non-portable)
+and an internal inconsistency with the charter §1 claim of "1–2 cycle
+context switches": if software must issue `sfence.vma` after every
+cross-address-space `ec.ob`, the effective switch latency is much
+larger than 1–2 cycles for those switches.
+
+**Affected files:**
+- `docs/chapters/ch03-cme-instruction-set.md` — `ec.ob` semantics
+  (§3.1 or §3.7 area)
+- `docs/chapters/ch00-fundamental-structure.md` — §0.10 mask bit 6
+  note
+- `docs/chapters/ch17-memory-ordering.md` — likely a new §17.2.4 or
+  note distinguishing memory ordering (RVWMO) from TLB invalidation
+- `docs/chapters/ch19-interop-ratified-extensions.md` — verify
+  interaction with Svnapot, Svinval, Sv48/Sv57, H-extension
+  (hgatp/vsatp two-stage translation)
+- Sail model: `sail/model/ce_cme_execute.sail` and prelude — SATP
+  mask bit is currently a TODO stub in S5/S6; this resolves before
+  Sail SATP work begins
+- `docs/charter/project_instructions.md` — likely a new normative
+  paragraph in §3 (CME normative rules), charter version bump, and
+  CHANGELOG entry
+
+**Options under consideration:**
+- **Option A** — `ec.ob` with bit 6 set automatically performs an
+  `sfence.vma`-equivalent. ASID-style optimization permitted (skip if
+  SATP unchanged).
+- **Option B** — Software is responsible for issuing `sfence.vma`
+  after `ec.ob` if SATP changed. Matches the standard pattern for
+  normal `csrw satp`.
+- **Option C** — Conditional automatic flush: hardware compares the
+  restored SATP against current SATP and flushes if and only if they
+  differ (mandates the comparison rather than permitting it).
+
+**Cross-references:** Affects how `ec.ob` interacts with Svnapot,
+Svinval, ASIDs (Sv39/Sv48/Sv57 with ASID), and the H-extension's
+two-stage translation (vsatp + hgatp). Each is in ch19; a decision
+here must propagate.
+
+**Resolution:** Dedicated design-decision session per
+project-management-guide §4.2. After resolution: charter bump, ch03
+update, ch00 §0.10 footnote, ch17 cross-reference, ch19 verification,
+Sail spec for the SATP mask bit.
+
+**Unblocks:** Sail S5/S6 work on the SATP mask bit (currently TODO);
+any future ec.ob/SATP interaction work; resolves an inconsistency a
+RISC-V International reviewer would flag.
+
+**Priority:** Medium. Does not block current cluster discussions or
+non-SATP Sail work, but should be resolved before the routing-stage
+reply lands or before the Sail SATP stubs are tackled, whichever
+comes first.
+
+**Source:** Surfaced during Cluster G of the salvage discussion
+(2026-05-29). The salvage triggered verification; the gap exists in
+the spec independently.
 
 ---
 
@@ -862,9 +947,9 @@ addresses and CSR addresses throughout the spec.
 
 ---
 
-## Category PUB — Publication readiness ✓ COMPLETE
+## Category PUB — Publication readiness
 
-All four PUB items are resolved. Internal editorial scaffolding has been removed
+PUB1–PUB4 are resolved. Internal editorial scaffolding has been removed
 from all publishable spec files. The adoc mirrors were regenerated via
 `md2adoc.py` (updated to auto-emit SPDX headers) and the PDF/HTML builds cleanly.
 
@@ -971,6 +1056,74 @@ References to internal file paths, the charter as an external document, and
   glossary from charter §2, plus the list of retired terms, for quick lookup.
   **If this file disagrees with the charter, the charter wins.**" Rewrite without
   the "copy of charter §2" framing.
+
+---
+
+### PUB5 · Pre-submission gap audit
+
+**Problem:** The spec is complete at the chapter level (ch00–ch19,
+appendices A/B) but has not been systematically audited against its own
+load-bearing claims for gaps in mechanism specification. The discovery
+of D6 — a gap that materially affects the charter §1 "1–2 cycle
+context switches" claim — indicates that other claim-to-mechanism gaps
+likely exist. A RISC-V International reviewer will perform this
+walk-through during routing or TG-formation review; doing it first lets
+the project address findings on its own timeline rather than under
+review pressure, and prevents the proposal from being characterized as
+"promising but incomplete" on first inspection.
+
+**Method:** A dedicated session walks through four axes:
+
+1. **Charter §1 claims against chapter mechanisms.** For each
+   load-bearing claim in the introduction — 1–2 cycle context switches,
+   opt-in at every privilege level, certifiability for ASIL D /
+   DO-178C / FDA Class III, 5–15% transistor overhead — identify the
+   chapter(s) where the mechanism is specified, and verify the
+   mechanism is fully specified rather than merely named.
+
+2. **Global-state-mutating instructions.** For every CE instruction
+   that mutates hart-global state (SATP via mask bit 6, mstatus,
+   interrupt enables, fence state, ASID, contexts visible to other
+   harts), verify the spec says what happens to dependent hardware
+   structures — TLB entries, cache state, in-flight memory operations,
+   interrupt latches — on that mutation. D6 is one example of this
+   class.
+
+3. **Implementation-defined surfaces.** For every "implementation-
+   defined" or "implementation may" phrase, verify it does not hide a
+   portability hole — i.e., that two conformant implementations cannot
+   legally diverge in a way that breaks user-visible behavior.
+
+4. **Cross-chapter references.** For every "§X.Y" or "Chapter N"
+   cross-reference, verify the reference still points to the section
+   claimed, and that the target section still says what the reference
+   claims.
+
+**Output:** Each finding becomes its own entry in `docs/work-items.md`
+under the appropriate category (D / F / Gap / PUB / E). The audit
+itself produces no spec changes — only new work items.
+
+**Affected files:** None directly. Findings will identify affected
+files for each follow-up item.
+
+**Depends on:** No blocking dependencies. Recommended sequence is to
+run after the salvage cluster work concludes (so the audit doesn't
+compete with cluster decisions for attention) but before significant
+new Sail work on mechanisms the audit might find gaps in.
+
+**Unblocks:** Reduces the volume and severity of changes that will be
+requested by RISC-V International reviewers post-submission. Improves
+the signal of the proposal's completeness on first contact.
+
+**Priority:** Medium-high. The salvage cluster work is currently in
+progress; PUB5 should follow its completion.
+
+**Estimated effort:** One focused session for the audit itself
+(single-digit hours). Variable follow-on effort depending on findings.
+
+**Source:** Surfaced from the discussion that produced D6
+(2026-05-29). The recognition that one gap was found suggests
+systematic search for others is warranted.
 
 ---
 
