@@ -472,7 +472,16 @@ instructions should raise illegal instruction before any other check. When
 
 **Depends on:** S4, `ce_ctrl.sail` complete
 
-**Status:** ☐
+**Status:** ✓ Done — added `Privilege` enum + `cur_privilege` register to
+standalone prelude (matches sail-riscv). Added `cme_priv_ctl` (0x7CF,
+S_EN) and `hcme_ctrl` (0x6C0, VS_EN) registers with CSR read/write
+clauses. Added `cme_priv_allowed()` (M → true, S/HS → S_EN, VS →
+S_EN & VS_EN, U/VU → false) and `cme_authorized() = cme_enabled() &
+cme_priv_allowed()` in ce_ctrl.sail. Replaced `~(cme_enabled())` with
+`~(cme_authorized())` in all 10 CME execute clauses (one replace_all).
+ce_cme_test_s22.sail covers 7 scenarios: M+CME_EN=1 allowed; M+CME_EN=0
+traps; S+S_EN=0 traps; S+S_EN=1 allowed; U traps; VS+VS_EN=1 allowed;
+VS+VS_EN=0 traps. Both checks pass.
 
 ---
 

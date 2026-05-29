@@ -45,7 +45,7 @@ function cme_ret_ok(rd : regidx, data : xlenbits) -> ExecutionResult = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIB(rd, rs1)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     /* Determine effective mask: dirty-save mode when rs1 == x0 */
     let mask : regmask_t =
@@ -116,7 +116,7 @@ function clause execute(CE_ECIB(rd, rs1)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOB(rd, rs1, rs2)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     /* rs1 packs (expected_generation | target_ecid):
      *   bits 15:0  = ECID slot index  (ecid_t)
@@ -194,7 +194,7 @@ function clause execute(CE_ECOB(rd, rs1, rs2)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIM(rd, rs1, rs2)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let target_ecid : ecid_t   = truncate(X(rs1), 16);
     let mask        : regmask_t = X(rs2);
@@ -259,7 +259,7 @@ function clause execute(CE_ECIM(rd, rs1, rs2)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOM(rd, rs1, rs2)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let target_ecid : ecid_t   = truncate(X(rs1), 16);
     let mask        : regmask_t = X(rs2);
@@ -340,7 +340,7 @@ function clause execute(CE_ECOM(rd, rs1, rs2)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIG(rd, rs1)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let target_ecid : ecid_t = truncate(X(rs1), 16);
 
@@ -376,7 +376,7 @@ function clause execute(CE_ECIG(rd, rs1)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOG(rd, rs1)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let target_ecid : ecid_t = truncate(X(rs1), 16);
 
@@ -420,7 +420,7 @@ function clause execute(CE_ECOG(rd, rs1)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIT(rd, rs1, rs2)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let parent_ecid : ecid_t = truncate(X(rs1), 16);
     let child_ecid  : ecid_t = truncate(X(rs2), 16);
@@ -478,7 +478,7 @@ function clause execute(CE_ECIT(rd, rs1, rs2)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOT(rd, rs1)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let target_ecid : ecid_t = truncate(X(rs1), 16);
 
@@ -506,7 +506,7 @@ function clause execute(CE_ECOT(rd, rs1)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECIR(rd, rs1)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let flag = X(rs1);
 
@@ -574,7 +574,7 @@ function clause execute(CE_ECIR(rd, rs1)) = {
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOE(rd, rs1)) = {
-  if ~(cme_enabled()) then Illegal_Instruction()
+  if ~(cme_authorized()) then Illegal_Instruction()
   else {
     let target_ecid = truncate(X(rs1), 16);
 

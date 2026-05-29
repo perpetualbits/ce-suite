@@ -122,6 +122,10 @@ function wF_bits(Fregidx(r), v) = { fpr_file[unsigned(r)] = v }
 
 overload F = {rF_bits, wF_bits}
 
+/* Privilege levels — mirrors sail-riscv's core/types.sail */
+enum Privilege = { User, VirtualUser, Supervisor, VirtualSupervisor, Machine }
+register cur_privilege : Privilege = Machine
+
 /* PC accessors — mirrors sail-riscv's pc_access.sail */
 register PC     : xlenbits = zeros()
 register nextPC : xlenbits = zeros()

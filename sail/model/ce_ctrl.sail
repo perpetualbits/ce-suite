@@ -23,12 +23,58 @@ function cpe_enabled() -> bool = (ce_ctrl & CE_CTRL_CPE_EN) != 0b0000
 function mse_enabled() -> bool = (ce_ctrl & CE_CTRL_MSE_EN) != 0b0000
 function qos_enabled() -> bool = (ce_ctrl & CE_CTRL_QOS_EN) != 0b0000
 
-/* CSR read: zero-extend to XLEN */
-function clause read_CSR(0x7D0) = zero_extend(ce_ctrl)
+/* ------------------------------------------------------------------ */
+/* cme_priv_ctl — M-mode privilege control (0x7CF)                    */
+/* ch14 §14.4.1: bit 0 = S_EN, rest WPRI                             */
+/* ------------------------------------------------------------------ */
 
-/* CSR write: only bits 3:0 writable; implementation-absent bits treated as RO 0.
- * Sail v1 assumes all four extensions are present. */
+register cme_priv_ctl : bits(1) = 0b0  /* S_EN: reset = 0 (S-mode disabled) */
+
+/* ------------------------------------------------------------------ */
+/* hcme_ctrl — HS-mode privilege control (0x6C0, H extension)        */
+/* ch14 §14.4.2: bit 0 = VS_EN, rest WPRI                            */
+/* ------------------------------------------------------------------ */
+
+register hcme_ctrl : bits(1) = 0b0     /* VS_EN: reset = 0 (VS-mode disabled) */
+
+/* ------------------------------------------------------------------ */
+/* Privilege-level gate (ch14 §14.4.3)                                */
+/*                                                                     */
+/* M-mode: always allowed                                             */
+/* S/HS-mode: allowed when S_EN = 1                                   */
+/* VS-mode: allowed when S_EN = 1 AND VS_EN = 1                      */
+/* U/VU-mode: never allowed                                           */
+/* ------------------------------------------------------------------ */
+
+function cme_priv_allowed() -> bool =
+  match cur_privilege {
+    Machine           => true,
+    Supervisor        => cme_priv_ctl[0] == 0b1,
+    VirtualSupervisor => (cme_priv_ctl[0] == 0b1) & (hcme_ctrl[0] == 0b1),
+    User              => false,
+    VirtualUser       => false
+  }
+
+/* Combined gate: CME extension enabled AND caller privilege allowed */
+function cme_authorized() -> bool = cme_enabled() & cme_priv_allowed()
+
+/* CSR read/write for ce_ctrl (0x7D0) */
+function clause read_CSR(0x7D0) = zero_extend(ce_ctrl)
 function clause write_CSR(0x7D0, value) = {
   ce_ctrl = value[3..0];
   Ok(zero_extend(ce_ctrl))
+}
+
+/* CSR read/write for cme_priv_ctl (0x7CF, M-mode RW) */
+function clause read_CSR(0x7CF) = zero_extend(cme_priv_ctl)
+function clause write_CSR(0x7CF, value) = {
+  cme_priv_ctl = value[0..0];
+  Ok(zero_extend(cme_priv_ctl))
+}
+
+/* CSR read/write for hcme_ctrl (0x6C0, M-mode and HS-mode RW) */
+function clause read_CSR(0x6C0) = zero_extend(hcme_ctrl)
+function clause write_CSR(0x6C0, value) = {
+  hcme_ctrl = value[0..0];
+  Ok(zero_extend(hcme_ctrl))
 }
