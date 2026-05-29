@@ -535,7 +535,11 @@ any state.
 
 **Depends on:** S6
 
-**Status:** ☐
+**Status:** ✓ Done — ce_cme_test_s25.sail. Scenario 1: bank.sealed=true,
+ec.ob → CME_ERR_ALREADY_SEALED in rd and cme_status; current_ecid
+unchanged, bank.sealed still true, bank.gprs[2] (sentinel) intact.
+Scenario 2: bank.sealed=false, same ec.ob → CME_OK, current_ecid
+switches to target, x3 carries sentinel. Both checks pass.
 
 ---
 
