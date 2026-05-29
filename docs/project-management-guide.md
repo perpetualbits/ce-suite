@@ -147,6 +147,15 @@ per session, no sweeps, no charter edits as a side effect.
 This file is loaded automatically at the start of every session. It is the
 enforcement mechanism for session discipline when working with AI.
 
+In CE Suite, this pattern is instantiated by `CLAUDE.md` at the
+repo root, which in turn points readers at the Vocabulary section
+of `docs/working_notes_for_authors.md` for the specific terms used
+in CE Suite's chat-and-code workflow (architect, web-Claude,
+code-Claude, code-prompt, session-report, prompt-and-code,
+prompt-to-code-loop, session, turn). Other projects reusing this
+methodology will define their own vocabulary; the Vocabulary
+section is the model.
+
 ---
 
 ## Part 3 — Tracking work
@@ -385,6 +394,12 @@ Every AI session must start with the assistant reading:
 This is not optional. An assistant that has not read the comb will produce text
 that contradicts it. An assistant that has not read the refamiliarize document
 will not know what has already been decided.
+
+The operational counterpart of this discipline (what to re-fetch
+at session start versus what may be cached within a session) is
+covered in `docs/refamiliarize.md` §C.7. The Vocabulary section
+of `docs/working_notes_for_authors.md` (§V.8) provides the
+definitions of session and turn that §C.7 builds on.
 
 ### 9.3 Watch for these patterns
 
