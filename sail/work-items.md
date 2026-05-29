@@ -415,7 +415,10 @@ index construction.
 
 **Depends on:** S18
 
-**Status:** ☐
+**Status:** ✓ Done — validates target ECID, reads parent_ecid from EC[e],
+transfers all banks owned by rs1 to parent in a single foreach sweep.
+rs1 stays allocated. Contract and recursive child ECID handling are Sail
+v1 no-ops. Two-scenario test (success + invalid ECID). Both checks pass.
 
 ---
 

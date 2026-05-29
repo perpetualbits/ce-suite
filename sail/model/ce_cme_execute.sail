@@ -5,8 +5,8 @@
  * Spec reference: ch03 §3.1–§3.6, ch15 §15.5.1
  *
  * Sail v1 scope:
- *   FULL:  ec.ib, ec.ob, ec.it  (fast-path core + bank delegation)
- *   STUB:  ec.im, ec.om, ec.ig, ec.og, ec.ot, ec.ir, ec.oe
+ *   FULL:  ec.ib, ec.ob, ec.it, ec.ot  (fast-path core + bank delegation)
+ *   STUB:  ec.im, ec.om, ec.ig, ec.og, ec.ir, ec.oe
  *   DECODE-ONLY: ec.iv, ec.ov (execute semantics are implementation-defined
  *                for the encryption algorithm; key management deferred)
  *
@@ -477,15 +477,45 @@ function clause execute(CE_ECIT(rd, rs1, rs2)) = {
 }
 
 /* ------------------------------------------------------------------ */
-/* ec.ot — Revoke resources from a child ECID (ch03 §3.4) — STUB     */
+/* ec.ot — Revoke resources from a child ECID (ch03 §3.4)            */
+/*                                                                     */
+/* Syntax: ec.ot rd, rs1                                              */
+/*   rs1 = child ECID whose banks are reclaimed                       */
+/*   rd  = 0 on success; error code on invalid ECID                   */
+/*                                                                     */
+/* All banks owned by rs1's Group are returned to rs1's parent Group. */
+/* rs1 itself remains allocated but holds no resources.               */
+/* Contract revocation and recursive child ECID handling are out of   */
+/* Sail v1 scope (axiomatised as no-op).                              */
+/* Caller permission check deferred to S22.                           */
 /* ------------------------------------------------------------------ */
 
 function clause execute(CE_ECOT(rd, rs1)) = {
   if ~(cme_enabled()) then Illegal_Instruction()
   else {
-    /* TODO S19: recursive resource revocation */
-    X(rd) = cme_err_to_xlenbits(CME_OK);
-    RETIRE_SUCCESS
+    let target_ecid : ecid_t = truncate(X(rs1), 16);
+
+    match lookup_ec(target_ecid) {
+      None() => {
+        X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
+        RETIRE_SUCCESS
+      },
+      Some(entry) => {
+        if ~(entry.allocated) then {
+          X(rd) = cme_err_to_xlenbits(CME_ERR_INVALID_ECID);
+          RETIRE_SUCCESS
+        } else {
+          let parent_ecid = entry.parent_ecid;
+          /* Transfer all banks owned by target_ecid to its parent Group */
+          foreach (i from 0 to 7) {
+            if bank_pool[i].valid & (bank_pool[i].owner_ecid == target_ecid) then
+              bank_pool[i] = { bank_pool[i] with owner_ecid = parent_ecid }
+          };
+          X(rd) = cme_err_to_xlenbits(CME_OK);
+          RETIRE_SUCCESS
+        }
+      }
+    }
   }
 }
 
