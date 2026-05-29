@@ -47,6 +47,10 @@ Cross-cutting notes and overviews.
 - `2026-05-salvage-overview.md` — Summary of all 27 ChatGPT
   design-discussion chats (Jul 2025 – May 2026). Reference for all
   clusters; identifies which chats have the deepest hardware content.
+- `2026-05-rt-subset-determinism.md` — Parked insight from D6
+  discussion: the charter's "1–2 cycle" claim is defensible only for
+  a defined RT-subset of ECs; five open questions before it can become
+  a work item.
 
 ### `cme/`
 
