@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.18
+**Version:** 0.19
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -599,6 +599,37 @@ qs.ot rd, rs1, rs2   # rs2 = domain_id (0 = revoke all domains)
 hardware. Any encoding that reads from `rd` is architecturally illegal and
 must not appear in the spec.
 
+### 6.8 TLB behavior on context restore
+
+When `ec.ob` restores a context whose mask includes bit 6 (SATP),
+and the restored SATP value differs from the SATP value in effect
+immediately before the `ec.ob`, the hardware shall behave as if an
+appropriate `sfence.vma` had been executed atomically with the SATP
+restore, before any subsequent instruction observes the new
+translation. The exact scope of the implied `sfence.vma` (all
+ASIDs, the new ASID only, or other) is an open item under §8;
+until it is settled, implementations satisfy this rule by using
+any scope that is correct for the standard `csrw satp` followed by
+`sfence.vma x0, x0` pattern in the same situation.
+
+Implementations are *permitted* to skip the invalidation when the
+restored SATP value equals the SATP value in effect immediately
+before the `ec.ob` — including but not limited to detection via
+direct comparison, ASID tagging, or other equivalent means — but
+are not *required* to detect this case. A conformant implementation
+that always invalidates is correct; a conformant implementation
+that uses any valid optimization to skip invalidation when safe is
+also correct.
+
+The H-extension analogues for `vsatp` (via `hfence.vvma`) and
+`hgatp` (via `hfence.gvma`) are an open item under §8 and are
+specified in ch19 (interop with ratified extensions) once
+resolved.
+
+This rule resolves D6 in `docs/work-items.md`. The full
+specification of `ec.ob`'s TLB behavior, including any cycle-cost
+qualifications, is in ch03 once propagated.
+
 ---
 
 ## 7. Document alignment rules
@@ -692,12 +723,75 @@ the rest of the spec.
    ciphertext. The encryption algorithm is implementation-defined. Key
    derivation, attestation, rotation, and cross-hart portability of sealed
    banks remain deferred to a future revision.
+7. **D6.1 — Exact scope of the auto-invalidation on `ec.ob`.** Per §6.8
+   (TLB behavior on context restore), `ec.ob` with bit 6 (SATP) set
+   automatically performs a TLB invalidation when the restored SATP differs.
+   The exact scope of that invalidation is not yet specified. Candidates:
+
+   - **Scope 1.** As if `sfence.vma x0, x0` — invalidate all ASIDs,
+     all virtual addresses. Always correct; pessimistic when ASIDs
+     are in use.
+   - **Scope 2.** As if `sfence.vma x0, ASID(new_SATP)` — invalidate
+     all virtual addresses for the new ASID. Correct when ASIDs are
+     used; degrades to Scope 1 when ASIDs are not used.
+   - **Scope 3.** Implementation-defined, with the minimum guarantee
+     that no stale translation from the previous address space is
+     observable.
+
+   This decision requires implementer-level review and is deferred to
+   TG-stage refinement. The §6.8 wording ("as if an appropriate
+   sfence.vma had been executed") is loose enough that resolving
+   D6.1 does not require another charter revision unless the rule
+   itself changes.
+8. **D6.2 — H-extension analogues of the SATP/TLB rule.** `ec.ob` may
+   also restore `vsatp` and `hgatp` (via the bit 6 aggregate, or via
+   dedicated mask bits in a future extension of §0.10). When this happens,
+   the analogous TLB invalidation rule applies, using `hfence.vvma` for
+   `vsatp` and `hfence.gvma` for `hgatp`. The exact mapping — including
+   whether the bit-6 aggregate covers all three or whether
+   `vsatp`/`hgatp` require separate treatment — is an open item.
+   Resolution depends on D6.1 (base scope decision), the §0.10 mask
+   granularity, and the H-extension interaction language in ch19 §19.2.1.
+9. **D6.3 — Charter §1 "1–2 cycle" claim qualification.** The charter §1
+   introduction characterizes CE Suite as providing 1–2 cycle context
+   switches. Under §6.8, cross-address-space `ec.ob` incurs an
+   auto-invalidation whose cost is not 1–2 cycles; the TLB refill cost on
+   first access to the new address space adds further latency. The general
+   claim is therefore true for `ec.ob`'s instruction-commit latency but
+   workload-dependent for end-to-end switching cost. Three resolution
+   candidates:
+
+   - Leave §1 alone (risk: a casual reader is misled).
+   - Add a parenthetical qualification to §1 (honest, slightly verbose).
+   - Move the precise claim from §1 into ch04 (microarchitecture) and
+     replace §1's claim with a more abstract characterization.
+
+   A related parked insight in
+   `scratchpads/general/2026-05-rt-subset-determinism.md` proposes that
+   the strong "1–2 cycle" claim is defensible for a defined RT-subset of
+   ECs (same-SATP, CPE-reserved, MSE/QoS-contracted, permanently-resident
+   bank). The eventual D6.3 resolution should decide whether to absorb
+   that framing into the §1 qualification, develop it as its own work
+   item, or defer further.
 
 ---
 
 ## Changelog
 
-- **v0.18 (this version).** §8.3 and §8.5 addressed for v1.0. §8.3:
+- **v0.19 (this version).** Resolved D6 (TLB behavior on context restore). §6.8
+  added: `ec.ob` with bit 6 (SATP) set in the mask now has normative TLB
+  semantics — when the restored SATP differs from the current SATP, hardware
+  performs an `sfence.vma`-equivalent invalidation atomically with the restore;
+  the optimization of skipping the invalidation when SATP is unchanged is
+  permitted but not required. Three sub-decisions deliberately parked as new §8
+  open items: D6.1 (exact scope), D6.2 (H-extension analogues for
+  `vsatp`/`hgatp`), D6.3 (§1 wording on cross-address-space cost, with
+  reference to the parked RT-subset insight in
+  `scratchpads/general/2026-05-rt-subset-determinism.md`). Propagation to ch03,
+  ch00 §0.10, ch17, ch19, and the Sail S5/S6 SATP stubs is pending separate
+  sessions per project-management-guide §4.2.
+
+- **v0.18.** §8.3 and §8.5 addressed for v1.0. §8.3:
   software-overflow Contract slow-path is implementation-defined; error
   codes are already specified; richer semantics deferred. §8.5: UCS closed
   as out of architectural scope for v1.0 — kernel implementation pattern,
