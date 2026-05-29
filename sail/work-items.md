@@ -434,7 +434,11 @@ v1 no-ops. Two-scenario test (success + invalid ECID). Both checks pass.
 
 **Depends on:** S6
 
-**Status:** ☐
+**Status:** ✓ Done — CSR functions at 0xFD1/0xFD2 already do live
+lookup_ec(current_ecid) reads, so they automatically track the ECID that
+ec.ob switched to. No code change needed. ce_cme_test_s20.sail verifies:
+before ec.ob → CSRs reflect ECID_A (level 1, parent = root); after
+ec.ob → CSRs reflect ECID_B (level 2, parent = ECID_A). Both checks pass.
 
 ---
 
