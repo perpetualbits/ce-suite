@@ -2,7 +2,7 @@
 
 Sail formal model for the CE Suite RISC-V ISA extensions (CME, CPE, MSE, QoS).
 
-## Current status (through S23)
+## Current status (through S25 — Phase 8 complete)
 
 ### CME — Context Management Extension
 
@@ -53,12 +53,15 @@ is complete.
 | `ce_cme_test_s21.sail` | cme_status updated by all CME instructions |
 | `ce_cme_test_s22.sail` | Privilege gating: M/S/VS/U-mode × CME_EN/S_EN/VS_EN |
 | `ce_cme_test_s23.sail` | Round-trip register preservation (ec.ir → ec.ig → ec.ib → ec.ob × 2) |
+| `ce_cme_test_s24.sail` | Delegation depth cap: ec.ir rs1=1 from L=D → CME_ERR_CAP_DEPTH |
+| `ce_cme_test_s25.sail` | Sealed bank: ec.ob refusal, state unchanged; unseal → success |
 
 ### What's next
 
-- **S24** — Delegation depth cap enforcement
-- **S25** — Sealed bank: ec.ob refusal
-- **S26–S38** — CPE, MSE, QoS execute functions and submission prep
+- **S26–S28** — CPE execute functions (cp.ir, cp.or, cp.it, cp.ot)
+- **S29–S31** — MSE execute functions
+- **S32–S34** — QoS execute functions
+- **S35–S38** — Integration, litmus tests, submission prep
 
 ---
 
@@ -110,7 +113,9 @@ sail/
 │   ├── ce_cme_test_s20.sail       # Test: CSR 0xFD1/0xFD2 correctness
 │   ├── ce_cme_test_s21.sail       # Test: cme_status audit
 │   ├── ce_cme_test_s22.sail       # Test: privilege gating
-│   └── ce_cme_test_s23.sail       # Test: round-trip register preservation
+│   ├── ce_cme_test_s23.sail       # Test: round-trip register preservation
+│   ├── ce_cme_test_s24.sail       # Test: delegation depth cap enforcement
+│   └── ce_cme_test_s25.sail       # Test: sealed bank ec.ob refusal
 ├── scripts/
 │   └── inject_ce_files.py         # Injects CE files into sail-riscv file list
 ├── work-items.md                  # Detailed work item tracking (S1–S38)
