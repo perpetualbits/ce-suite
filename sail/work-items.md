@@ -516,7 +516,12 @@ same ECID succeeds.
 
 **Depends on:** S9
 
-**Status:** ☐
+**Status:** ✓ Done — ce_cme_test_s24.sail builds the full delegation chain
+L=0→L=1→L=2→L=3=D via three ec.ir rs1=1 calls (each switching
+current_ecid before the next). From ECID_L3 (L=D): ec.ir rs1=1 →
+CME_ERR_CAP_DEPTH confirmed in both rd and cme_status; ec.ir rs1=0 →
+success, leaf ECID allocated with delegation_L == D confirmed. Both
+checks pass.
 
 ---
 
