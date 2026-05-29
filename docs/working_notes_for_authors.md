@@ -401,14 +401,14 @@ are time-consuming; skipping them is what produced the previous mess.
 
 ---
 
-## Part 7 — Vocabulary for the chat-and-code workflow
+## Vocabulary for the chat-and-code workflow
 
-This part names the participants, artifacts, and patterns used when web-Claude
+This section names the participants, artifacts, and patterns used when web-Claude
 (in claude.ai) and code-Claude (Claude Code) work together to produce changes
-in this repo. The rules in Parts 1–6 still apply; Part 7 adds the vocabulary
+in this repo. The rules in Parts 1–6 still apply; this section adds the vocabulary
 that makes those rules easier to discuss and harder to forget.
 
-### 7.1 The vocabulary
+### V.1 The vocabulary
 
 | Term | Meaning |
 |---|---|
@@ -424,7 +424,7 @@ Case-insensitive variants (web-claude, webclaude, code-claude, codeclaude,
 code-prompt, codeprompt, session-report, sessionreport) are all the same
 term. Hyphenation may vary; meaning does not.
 
-### 7.2 The deictic rule
+### V.2 The deictic rule
 
 In any document either Claude produces — code-prompts, scratchpad entries,
 working-notes additions, drafts of any kind — use role names: architect,
@@ -444,7 +444,7 @@ scratchpad notes, working-notes additions, charter drafts, README text,
 session-report excerpts quoted elsewhere. Anywhere the document might be
 read outside its originating chat, role names are mandatory.
 
-### 7.3 The prompt-and-code shape
+### V.3 The prompt-and-code shape
 
 A prompt-and-code is a single completed cycle producing one commit. Its
 phases:
@@ -479,7 +479,7 @@ phases:
    additional work in other files, those become future prompt-and-codes,
    often in a prompt-to-code-loop.
 
-### 7.4 The prompt-to-code-loop
+### V.4 The prompt-to-code-loop
 
 When one charter-level decision affects many files, it requires many
 prompt-and-codes — not one big sweep. The series is a prompt-to-code-loop.
@@ -495,7 +495,7 @@ each session-report, and decides whether to continue. A prompt-to-code-loop
 may pause indefinitely — there is no requirement to finish one before
 starting other work. Partial loops are normal.
 
-### 7.5 What web-Claude does and does not do
+### V.5 What web-Claude does and does not do
 
 Web-Claude:
 - Discusses, proposes, drafts.
@@ -512,7 +512,7 @@ Web-Claude does not:
   into per-file code-prompts is mandatory.
 - Use deictic words in produced documents.
 
-### 7.6 What code-Claude does and does not do
+### V.6 What code-Claude does and does not do
 
 Code-Claude:
 - Reads the orientation chain before any other action, every session.
@@ -528,7 +528,7 @@ Code-Claude does not:
 - Skip the orientation read because a prior session "already did it" —
   every session starts fresh.
 
-### 7.7 What the session-report must contain
+### V.7 What the session-report must contain
 
 The session-report is the architect's record of what happened. At minimum:
 - What was changed (file, scope, brief description).
@@ -540,6 +540,52 @@ The session-report is the architect's record of what happened. At minimum:
 
 Session-reports are not throwaway. They become the audit trail when the
 architect, weeks later, asks "what touched this file and why?"
+
+### V.8 Sessions and turns
+
+A **session** is one complete conversation: from when the architect
+opens a claude.ai chat (or invokes code-Claude in the terminal) until
+that conversation closes. Each session has its own context, fresh at
+the start.
+
+A **turn** is one exchange within a session: a message from the architect
+followed by web-Claude's or code-Claude's reply. A reply may include
+many parts — text, tool calls, generated files — but it is one turn.
+The next architect message begins the next turn.
+
+The distinction matters for orientation cost.
+
+**At session start**, web-Claude and code-Claude must re-read the
+orientation chain in full. The repo may have moved since the last
+session. Anything cached in chat history or earlier session memory
+about repo state is stale by default. This is non-negotiable.
+
+**Within a session**, between turns, the repo normally does not move on
+its own. Re-reading the full orientation chain every turn would be
+wasteful. However, web-Claude must re-fetch in two circumstances:
+
+1. When the architect explicitly signals a commit has happened (e.g.
+   "code-Claude just committed the rename"). The repo has moved; the
+   in-context view is stale.
+
+2. When web-Claude is about to make a non-trivial factual claim about
+   repo state — a chapter's current content, a work-item's resolution
+   status, the current charter version. Within-session memory is not
+   trustworthy for this; the canonical answer is in the repo.
+
+Code-Claude sessions are typically much shorter than web-Claude
+sessions — usually one prompt-and-code's worth of work, sometimes a
+small loop. The orientation read happens once at session start (Step 0
+of every code-prompt). Within the session, code-Claude reads each
+file it edits immediately before editing, which serves the same role
+as web-Claude's re-fetch.
+
+The architect's session is the longest of the three: it spans many
+turns with web-Claude, interleaved with handoffs to and from code-Claude
+sessions. The architect's "context" is partly in their head, partly
+in the chat, partly in the repo. The architect is the only participant
+who reliably bridges across sessions; the orientation discipline exists
+specifically so neither Claude has to.
 
 ---
 
