@@ -188,6 +188,13 @@ comes first.
 (2026-05-29). The salvage triggered verification; the gap exists in
 the spec independently.
 
+**Related scratchpad:** `scratchpads/general/2026-05-rt-subset-determinism.md`
+— parked insight that the "1–2 cycle" claim is defensible only for a
+defined RT-subset of ECs (same-SATP, CPE-reserved, MSE/QoS-contracted,
+permanently-resident bank). The D6 resolution should reference this note
+and decide whether to develop the RT-subset framing as a follow-on work
+item or absorb it into the D6 propagation.
+
 ---
 
 ## Category F — Specification fixes
