@@ -82,8 +82,12 @@ ce-suite/
 │   ├── diagrams/                     # SVG / mermaid figures
 │   └── archive/                      # superseded drafts, kept for provenance
 ├── scratchpads/                      # working notes; not normative
+│   ├── general/                      # cross-cutting notes and overviews
+│   ├── cme/                          # CME design sketches and salvage material
+│   ├── cpe/                          # CPE design sketches and salvage material
 │   ├── mse/                          # MSE design material
-│   └── general/
+│   ├── qos/                          # QoS design sketches and salvage material
+│   └── futures/                      # long-horizon ideas (FPGA, hypercube, etc.)
 ├── tools/                            # simulators, sizing calculators
 ├── hw/                               # FPGA / RTL work (future)
 │   ├── rtl/
