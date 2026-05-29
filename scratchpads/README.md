@@ -3,9 +3,14 @@
 
 # Scratchpads
 
+**Status:** Explicitly NOT normative. The playground.
+
 This folder is the **playground**. Files here are explicitly **not normative**.
 They are working notes, brain dumps, half-thought-through ideas, and
-exploratory designs.
+exploratory designs. Nothing here has authority over chapter content,
+the charter, or any other normative document. If a chapter and a
+scratchpad disagree, the chapter wins. If the charter and a scratchpad
+disagree, the charter wins.
 
 ## Rules for scratchpads
 
@@ -25,21 +30,12 @@ exploratory designs.
 
 ## What's here
 
-### `mse/`
-
-The Memory Scheduling Extension is the most-developed scratchpad
-material. These files contain mature design thinking (alternating
-BE/contract slots, interrupt-nesting depth D bounding worst-case
-latency, hierarchical bandwidth caps with O(1) admission control,
-mapping to prior art like WFQ/DRR/HTB/Intel-RDT). When you sit down
-to write the MSE chapter, **start here**.
-
-- `101-scratchpad.md` — Main MSE scratchpad with axioms, scenarios,
-  and the cycle-by-cycle group enforcement walk-through.
-- `102-scratchpad.md` — BE/contract slot alternation, interrupt
-  nesting, real-time latency guarantees.
+Organized by topic, matching the spec's extension structure plus a
+`general/` catch-all and a `futures/` long-horizon bin.
 
 ### `general/`
+
+Cross-cutting notes and overviews.
 
 - `big-concatenation.md` — A concatenation of Chapters 1–6 plus the
   ECID appendix from a previous attempt at a unified document.
@@ -48,11 +44,92 @@ to write the MSE chapter, **start here**.
   edit the canonical chapters instead.**
 - `mermaid-sketch.md` — A stub mermaid.js example. Probably becomes
   the seed of diagram work in `docs/diagrams/`.
+- `2026-05-salvage-overview.md` — Summary of all 27 ChatGPT
+  design-discussion chats (Jul 2025 – May 2026). Reference for all
+  clusters; identifies which chats have the deepest hardware content.
 
-## When a scratchpad becomes a chapter
+### `cme/`
 
-When MSE (or QoS, or anything else) gets a real chapter in
-`docs/chapters/`, the scratchpad stays where it is. It becomes the
-audit trail: "this is how we thought through MSE before writing
-Chapter 8." Do not delete it. Do not move it. Just add a note to the
-top of the scratchpad pointing at the canonical chapter.
+CME design sketches and salvage material.
+
+- `2026-05-salvage-cme.md` — Six register-bank hardware ideas
+  (SRAM+one-hot, S/R staging, bitline pass-gate, pointer swap,
+  distributed banks, VULM/IULM), two detailed write-ups, and
+  area/transistor numbers at 16/12 nm.
+
+### `cpe/`
+
+CPE design sketches and salvage material.
+
+- `2026-05-salvage-cpe.md` — Five-phase CPE development history;
+  instruction encoding design (COUPLE_L1L2, WAY_MASK, PERCENT,
+  INLINE, LOCK_EN); hardware viability against Intel CAT and ARM MPAM;
+  TLB-invalidation-on-SATP-change insight.
+
+### `mse/`
+
+MSE design material. The canonical MSE chapter is
+`docs/chapters/ch09-mse-memory-scheduling.md`; these files are the
+audit trail of how the design was developed.
+
+- `101-scratchpad.md` — Main MSE scratchpad with axioms, scenarios,
+  and the cycle-by-cycle group enforcement walk-through.
+- `102-scratchpad.md` — BE/contract slot alternation, interrupt
+  nesting, real-time latency guarantees.
+- `2026-05-salvage-mse.md` — Stream-of-slots model, telescoping /
+  bit-shaving mechanism, pool-in-pool data structures, and the
+  groups-only re-expression for the current charter model.
+
+### `qos/`
+
+QoS design sketches and salvage material.
+
+- `2026-05-salvage-qos.md` — QoS/MSE isomorphism analysis; what was
+  and was not developed in the ChatGPT era; hardware viability
+  assessment; the qs.* structural-mirror argument.
+
+### `futures/`
+
+Long-horizon ideas that are explicitly not part of v1 and may never be.
+
+- `2026-05-salvage-fpga-and-vision.md` — Artix-7 board specs and LUT/BRAM
+  feasibility numbers; five-step FPGA roadmap; learning tier stack;
+  hypercube chiplet vision.
+
+## Disposition policy — how items leave the scratchpad
+
+A scratchpad item is not meant to live there forever. Each item
+has exactly one of three exits:
+
+1. **Promoted to a work item.** The idea is worth pursuing. The
+   relevant content becomes an entry in `docs/work-items.md`
+   under the appropriate category (D / F / Gap / PUB / E). The
+   scratchpad section that produced the work item is annotated
+   with a back-pointer ("→ promoted to D5") and may be kept for
+   provenance or deleted, at the discretion of the session
+   resolving it.
+
+2. **Archived for future use.** The idea has merit but is
+   deliberately out of scope for the current version. It moves
+   to `docs/future-directions.md` (non-normative future notes)
+   with a brief rationale. The scratchpad source can then be
+   deleted.
+
+3. **Rejected.** The idea has been considered and explicitly
+   set aside. A one-line note records the rejection rationale
+   in the scratchpad file ("→ rejected 2026-MM-DD: <reason>")
+   and the section is left in place for provenance, or the
+   whole file is moved to `docs/archive/` if the entire file
+   is rejected.
+
+The scratchpad is not the archive. `docs/archive/` holds
+superseded normative material kept for provenance. Scratchpads
+hold work-in-progress thinking that hasn't been decided yet.
+
+## Discipline reminder
+
+Scratchpads are explicitly non-normative — but the project's
+workflow discipline still applies. Edits to scratchpads should
+happen in their own sessions or as clearly-scoped supporting
+work for another session. Resist the urge to "fix this related
+scratchpad while we're at it" during chapter or charter sessions.
