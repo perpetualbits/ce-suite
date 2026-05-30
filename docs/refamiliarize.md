@@ -120,7 +120,7 @@ architecture.
 
 ### Self-Preservation Invariant (critical pending architectural work)
 
-**Status: deferred, but required before RISC-V International submission.**
+**Status: framing decisions settled (2026-05-30); charter session and spec propagation pending before RISC-V International submission.**
 
 The principle: *A non-leaf EC must retain enough resources for itself to remain
 operational. No EC may delegate all of any resource type to children.* This applies
@@ -155,45 +155,128 @@ it allocates to L=2 VMs. A hypervisor that delegated all banks/Contracts to its
 children would be unable to context-switch its own kernel code to make further
 allocation decisions — this applies at every non-leaf level.
 
-**Required scope of the spec work.** This is a charter-touching architectural
-addition. Expected propagation chain when undertaken:
+**Framing decisions (settled, 2026-05-30).**
 
-- **Charter:** add the Self-Preservation Invariant as a normative principle alongside
-  the existing delegation rules in §5.
-- **ch02 §2.6:** add as an eighth invariant; each `*.it` / `*.ot` instruction's spec
-  gains a precondition check.
-- **ch03 §3.4** (`ec.it`/`ec.ot` semantics): add the precondition check; specify the
-  error code returned when the operation would leave the parent with zero banks.
-- **ch07, ch09, ch11:** same shape for `cp.it`/`cp.ot`, `ms.it`/`ms.ot`,
-  `qs.it`/`qs.ot`.
-- **ch10/ch12:** verify that no existing example delegates all of a parent's
-  resources; rewrite any that do.
-- **Error codes:** new error code per extension or reuse of existing codes if
-  appropriate.
-- **Sail (when redone):** execute functions for `*.it` need the precondition check;
-  tests need cases verifying self-depletion is refused.
+The cluster-style framing discussion completed during the v0.22
+chain. All architectural questions are settled; one sub-decision
+on instruction encoding is queued for the charter session.
 
-**Open framing questions for the cluster-style session that addresses this:**
+1. **MSE/CPE/QoS floor (Q1).** Option Beta. No architectural
+   floor on self-delegation for MSE Contracts, CPE Contracts, or
+   QoS Contracts. Software at each level is responsible for
+   retaining sufficient bandwidth, cache, and I/O resources for
+   its own operation. The asymmetry with CME is intentional: zero
+   banks is categorical failure (EC un-runnable); zero bandwidth
+   is degraded state (EC limps but recoverable).
 
-1. *What is the minimum the parent must retain?* Simplest rule: at least one of each
-   resource type (one bank, bw_class > 0, one cache way, etc.). A more conservative
-   rule could use implementation-defined floors via `*_caps` CSRs. The simplest rule
-   has the advantage of being uniform across implementations.
-2. *Error semantics?* Error code in `rd` (consistent with `MSE_ERR_CAP_EXCEEDED`)
-   vs. trap (more emphatic). Error-code path is gentler on software.
-3. *Does the invariant apply at L=0 root?* Almost certainly yes — the L=0 kernel
-   needs resources to remain operational — but the framing may differ from L>0.
-4. *Interaction with `ec.oe` (forced destruction)?* `ec.oe` returns child's resources
-   to parent. If the parent gave its last bank to a child then forced-destroyed the
-   child, the parent recovers the bank. Does transitional reclamation satisfy the
-   invariant, or must `ec.it` enforce a floor at delegation time? The latter is
-   cleaner (refuses bad operations rather than relying on recovery).
-5. *Cluster F (MSE↔QoS isomorphism) implications.* QoS per-domain semantics raise an
-   extra question: must the parent retain resources in every QoS domain it has
-   Contracts in, or just one?
+2. **CME mechanism (Q2).** Bank-0-unnamed at every delegation
+   level. Each EC sees its non-VMT banks numbered 0..K-1 in its
+   local view (charter §4.5.0, ch00 §0.11 — same local-view
+   property as MSE telescoping). Bank 0 is structurally
+   inaccessible to `ec.it`; an attempt to delegate the parent's
+   last bank is architecturally inexpressible, not refused at
+   runtime. The mechanism is the CME-side analog of memory
+   virtualization's address translation: an EC simply cannot
+   address what it cannot address.
 
-**When this happens:** After the v0.22 chain completes and cluster F (QoS) is
-settled.
+3. **L=0 exempt? (Q3)** No. The root EC follows the same rule.
+   An L=0 host kernel that delegated away all its banks would be
+   un-runnable; the bank-0-unnamed rule prevents this.
+
+4. **Where enforced (Q4).** At `ec.it` time, architecturally.
+   The Q2 mechanism implements this directly. There is no
+   error-code path; the operation cannot be expressed.
+
+5. **QoS multi-domain (Q5).** No special handling. Consistent
+   with Option Beta — software responsibility per domain. A
+   buggy EC could starve itself in one QoS domain while keeping
+   resources in another; this is software's concern.
+
+6. **Scope (Q6).** SELF preservation. The principle prevents an
+   EC from un-resourcing itself. A child can be left with zero
+   resources by `ec.ot` (cooperative revocation); that's a
+   different concern with different semantics.
+
+7. **`ec.ir` interaction (Q7).** Handled by Q2's mechanism.
+   `ec.ir` doesn't transfer resources; subsequent `ec.it` calls
+   are caught at the bank-0-unnamed step. No separate mechanism
+   needed.
+
+8. **VMT vs non-VMT (Q8).** Non-VMT bank 0 is essential and
+   architecturally unnamed for delegation. VMT banks (which hold
+   vector/matrix/tensor state) have no architectural retention
+   requirement. A hypervisor giving all VMT banks to a
+   vector-heavy guest is permitted; the hypervisor retains its
+   non-VMT bank 0 and remains runnable for non-vector code.
+
+9. **`ec.it` encoding redesign (Q9, with one pending
+   sub-decision).** The Q2 mechanism implies a breaking change
+   to `ec.it`'s operand semantics. The current encoding takes
+   `rs1` as a bank specifier (software names which bank to
+   delegate); the redesign repurposes `rs1` as the count of
+   banks to delegate in this call. Hardware always picks the
+   highest-numbered local non-VMT bank(s) from the parent's
+   Group. `rd` returns the number of banks remaining in the
+   parent's Group after the operation. Pending sub-decision for
+   the charter session: whether `rs1 = 0` is a no-op (zero
+   banks delegated) or signals "default count of 1." The
+   propagation cost of this encoding change (Sail, QEMU, all
+   `ec.it` usage in chapters, tests) is accepted per the
+   architect's framing decision.
+
+10. **Cooperative teardown path (Q10).** The normal flow is
+    cooperative, not adversarial. A parent EC (OS, hypervisor,
+    or higher-level supervisor like a container orchestrator)
+    signals its child to settle amicably; the child's process
+    termination (normal exit, signal, or notification) is
+    detected; the parent reclaims the child's resources via
+    `ec.ot` (cooperative revocation, ch02 §2.5.1); the child's
+    ECID is then reused or destroyed via `ec.oe`. The
+    Self-Preservation Invariant guards against pathological
+    self-destruction (a buggy or malicious EC trying to delegate
+    away its last resources), not against legitimate operations.
+    The invariant ensures that whatever an EC does with
+    delegation, its kernel remains runnable.
+
+**Required scope of the spec work** (updated from the
+deferred-work plan above):
+
+- **Charter:** add the Self-Preservation Invariant as a
+  normative principle in §5 (Delegation) or §6 (Architecture),
+  alongside the existing delegation rules.
+- **ch00:** explicit statement in §0.6 (Banks) or a new
+  subsection that bank 0 is the EC-local first non-VMT bank,
+  structurally retained.
+- **ch02:** §2.4 (Delegation) gains a sentence about
+  bank-0-unnamed; §2.6 (Invariants) gains an eighth invariant.
+- **ch03:** `ec.it` instruction semantics (§3.4) rewritten
+  for the count-based operand encoding. Returns banks remaining
+  in `rd`.
+- **ch07, ch09, ch11:** brief notes (perhaps an "X.Y
+  Self-preservation and software responsibility" subsection)
+  that MSE/CPE/QoS have no architectural retention floor.
+- **Sail:** the `ec.it` execute clause is rewritten for the new
+  semantics. The bank-addressing scheme may require deeper
+  rework, since the current Sail model treats banks symbolically
+  without local-view numbering. This is part of the Sail redo
+  plan (deferred until spec completes).
+- **work-items.md:** new "Cluster Self-Preservation" entry
+  documenting the resolution.
+
+**When this happens:** The Self-Preservation work can proceed
+once cluster F (QoS isomorphism) is settled, or in parallel if
+the architect prefers. Cluster F's charter framing decisions are
+complete; only the charter session itself is pending. The two
+cluster-style efforts (F and Self-Preservation) are
+independent — they touch different parts of the spec and don't
+have dependency between them.
+
+With the framing decisions settled, the next step is the charter
+session to add the Self-Preservation Invariant to normative spec,
+then propagation to ch00, ch02, ch03, ch07, ch09, ch11, and
+(later) the unified Sail redo. The `ec.it` encoding change in Q9
+is a breaking change to the instruction's operand semantics;
+propagation cost is accepted per the architect's framing decision.
 
 **Historical note:** This principle was firmly established in the ChatGPT-era CE
 Suite development and treated as foundational. It was lost in transition to the
