@@ -78,12 +78,71 @@ function clause read_CSR(0xFC5) =
   if cpe_enabled() then zeros() /* placeholder */ else zeros()
 
 /* ------------------------------------------------------------------ */
-/* MSE CSRs — stubs (ch13 §5)                                        */
+/* MSE CSRs (ch13 §5)                                                */
 /* ------------------------------------------------------------------ */
+
+/* 0x7C6 — mse_slot_ratio (WARL) */
+function clause read_CSR(0x7C6) =
+  if mse_enabled() then zero_extend(mse_slot_ratio) else zeros()
+function clause write_CSR(0x7C6, value) = {
+  if mse_enabled() then mse_slot_ratio = value[7..0] else ();
+  Ok(zero_extend(mse_slot_ratio))
+}
 
 /* 0xFC7 — mse_slot_ns (RO) */
 function clause read_CSR(0xFC7) =
-  if mse_enabled() then zeros() /* impl-defined; TODO */ else zeros()
+  if mse_enabled() then zero_extend(mse_slot_ns_val) else zeros()
+
+/* 0xFC8 — mse_max_nesting (RO) */
+function clause read_CSR(0xFC8) =
+  if mse_enabled() then zero_extend(mse_max_nesting) else zeros()
+
+/* 0x7C7 — mse_bw_cap (WARL) */
+function clause read_CSR(0x7C7) =
+  if mse_enabled() then zero_extend(mse_bw_cap) else zeros()
+function clause write_CSR(0x7C7, value) = {
+  if mse_enabled() then mse_bw_cap = value[7..0] else ();
+  Ok(zero_extend(mse_bw_cap))
+}
+
+/* 0xFC9 — mse_bw_sum (RO) */
+function clause read_CSR(0xFC9) =
+  if mse_enabled() then zero_extend(mse_bw_sum) else zeros()
+
+/* 0xFCA — mse_status (RO) */
+function clause read_CSR(0xFCA) =
+  if mse_enabled() then zero_extend(mse_status) else zeros()
+
+/* 0x7C8 — mse_violation (W1C) */
+function clause read_CSR(0x7C8) =
+  if mse_enabled() then zero_extend(mse_violation) else zeros()
+function clause write_CSR(0x7C8, value) = {
+  if mse_enabled() then {
+    if value[0] == 0b1 then mse_violation = 0b0
+  } else ();
+  Ok(zero_extend(mse_violation))
+}
+
+/* 0x7C9 — mse_violation_en (RW) */
+function clause read_CSR(0x7C9) =
+  if mse_enabled() then zero_extend(mse_violation_en) else zeros()
+function clause write_CSR(0x7C9, value) = {
+  if mse_enabled() then mse_violation_en = value[0..0] else ();
+  Ok(zero_extend(mse_violation_en))
+}
+
+/* 0xFD3 — mse_absolute_bw (RO) */
+function clause read_CSR(0xFD3) =
+  if mse_enabled() then
+    match find_mse_contract(current_ecid) {
+      Some(contract) => zero_extend(contract.bw_class),
+      None()         => zeros()
+    }
+  else zeros()
+
+/* 0xFD4 — mse_caps (RO) */
+function clause read_CSR(0xFD4) =
+  if mse_enabled() then zero_extend(mse_caps_val) else zeros()
 
 /* ------------------------------------------------------------------ */
 /* QoS CSRs — stubs (ch13 §6)                                        */

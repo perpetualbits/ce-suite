@@ -9,6 +9,7 @@ SAIL_RISCV ?= $(HOME)/git/sail-riscv
 CE_SOURCES = \
   model/ce_types.sail \
   model/ce_cme_types.sail \
+  model/ce_mse_types.sail \
   model/ce_state.sail \
   model/ce_ctrl.sail \
   model/ce_csr.sail \

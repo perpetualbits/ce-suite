@@ -593,7 +593,16 @@ ECID. Sum of children ≤ parent. `cp.ot`: revoke child Contract.
 
 ## Phase 10 — MSE execute functions
 
-### S29 · MSE state types and admission axiom
+**Cluster D note (v0.21 charter §4.5).** The cluster D resolution (commit
+6c46f5a) expanded the MSE Sail scope materially: 8-bit fields on a pre-flattened
+0–255 scale, per-delegation precision, multi-tier slot arbitration, dithered
+scheduling, and the full CSR set (`mse_absolute_bw` at 0xFD3, `mse_caps` at
+0xFD4). Items S29–S31 below are the pre-cluster-D descriptions; they are
+superseded by S29a–S29n which reflect the full v0.21 scope.
+
+---
+
+### S29 · MSE state types and admission axiom (pre-cluster-D)
 
 **What:** Define `MSE_Contract` type: `bw_class`, `lat_class`. Define the
 axiomatised admission function:
@@ -609,11 +618,11 @@ chip-global accounting is a black box (Sail v1 scope decision).
 
 **Depends on:** Phase 9 complete
 
-**Status:** ☐
+**Status:** Superseded by cluster D resolution (v0.21 charter §4.5). See S29a.
 
 ---
 
-### S30 · ms.ir / ms.or execute
+### S30 · ms.ir / ms.or execute (pre-cluster-D)
 
 **What:** `ms.ir`: call `admit_mse_contract`; on success, record Contract for
 ECID `rs1`. `ms.or`: revoke MSE Contract for ECID `rs1`, return bandwidth
@@ -623,11 +632,11 @@ to parent.
 
 **Depends on:** S29
 
-**Status:** ☐
+**Status:** Superseded by cluster D resolution (v0.21 charter §4.5). See S29b.
 
 ---
 
-### S31 · ms.it / ms.ot execute (delegation)
+### S31 · ms.it / ms.ot execute (delegation, pre-cluster-D)
 
 **What:** `ms.it`: split parent MSE Contract to child. Child `bw_class` must
 ≤ parent headroom. `ms.ot`: revoke child Contract.
@@ -635,6 +644,213 @@ to parent.
 **Spec ref:** ch09 §9.7–§9.8
 
 **Depends on:** S30
+
+**Status:** Superseded by cluster D resolution (v0.21 charter §4.5). See S29c.
+
+---
+
+### S29a · MSE Contract type, per-hart state, CSR plumbing (cluster D scaffolding)
+
+**What:** `MSE_Contract` struct (8-bit `bw_class`, 8-bit `lat_class`, 4-bit
+`precision`, `valid` flag); type aliases `bw_class_t`, `lat_class_t`,
+`precision_t`; `MSE_Contract_default`. Per-hart registers: `mse_slot_ratio`,
+`mse_bw_cap`, `mse_bw_sum`, `mse_status`, `mse_violation`, `mse_violation_en`.
+Implementation constants: `mse_slot_ns_val` (100 ns), `mse_max_nesting` (K=3),
+`mse_caps_val` (0x8388F0 zero-extended = v0.21-compliant). Contract pool
+`mse_contract_pool` (64 slots). Accessors `find_mse_contract`,
+`mse_contract_active`. Full CSR set: 0x7C6 (mse_slot_ratio, RW), 0xFC7
+(mse_slot_ns, RO), 0xFC8 (mse_max_nesting, RO), 0x7C7 (mse_bw_cap, RW),
+0xFC9 (mse_bw_sum, RO), 0xFCA (mse_status, RO), 0x7C8 (mse_violation, W1C),
+0x7C9 (mse_violation_en, RW), 0xFD3 (mse_absolute_bw, RO), 0xFD4
+(mse_caps, RO). No execute logic (ms.ir/ms.or/ms.it/ms.ot still
+Illegal_Instruction).
+
+**Spec ref:** charter §4.5, ch09 §9.4, ch13 §5
+
+**Depends on:** Phase 9 complete (relaxed: can proceed before CPE if needed)
+
+**Status:** ✓ Done — Sail-A session. New file `sail/model/ce_mse_types.sail`;
+updates to `ce_state.sail`, `ce_csr.sail`, `sail/Makefile`. Both `make check`
+and `make check-riscv` pass. Commit: (hash to be filled after this session's commit).
+
+---
+
+### S29b · ms.ir / ms.or execute
+
+**What:** `ms.ir`: validate ECID, admit Contract (cap check), record in
+`mse_contract_pool`, update `mse_bw_sum`. `ms.or`: revoke Contract, restore
+`mse_bw_sum`. Both update `mse_status`. Pre-flattened `bw_class` on 0–255
+scale (§9.4.1). Admission checks `bw_class + mse_bw_sum ≤ mse_bw_cap`.
+
+**Spec ref:** ch09 §9.5–§9.6, charter §4.5.6
+
+**Depends on:** S29a
+
+**Status:** ☐
+
+---
+
+### S29c · ms.it / ms.ot execute with telescoping
+
+**What:** `ms.it`: split parent Contract to child via
+`child_pre_flat = floor(parent_pre_flat × (child_bw_class / parent_scale))`.
+Enforce cap: sum(children) ≤ parent. Optionally set child `precision`. `ms.ot`:
+revoke child Contract recursively. Both update `mse_status`.
+
+**Spec ref:** ch09 §9.7–§9.8, charter §4.5.2
+
+**Depends on:** S29b
+
+**Status:** ☐
+
+---
+
+### S29d · Multi-tier arbitration decision function
+
+**What:** One-shot `mse_arbitrate` function implementing the three-tier CN
+slot selection: within-budget by `lat_class` → over-budget by `lat_class` →
+BE fallthrough. Round-robin tie-break.
+
+**Spec ref:** charter §4.5.4, ch09 §9.7.1
+
+**Depends on:** S29a
+
+**Status:** ☐
+
+---
+
+### S29e · Reconfiguration recomputation function
+
+**What:** `mse_recompute_subtree(e)` — recompute pre-flattened `bw_class` for
+all descendants of ECID `e` after a parent reconfiguration. Must complete before
+the next affected arbitration cycle (§4.5.3).
+
+**Spec ref:** charter §4.5.3, ch09 §9.4.5
+
+**Depends on:** S29c
+
+**Status:** ☐
+
+---
+
+### S29f · Tests: ms.ir / ms.or round-trip
+
+**What:** Verify that ms.ir admits a Contract, records it in `mse_contract_pool`,
+updates `mse_bw_sum`; ms.or revokes and restores `mse_bw_sum`. Check
+`mse_absolute_bw` CSR reads the admitted value.
+
+**Spec ref:** ch09 §9.5–§9.6
+
+**Depends on:** S29b
+
+**Status:** ☐
+
+---
+
+### S29g · Tests: single-level delegation
+
+**What:** ms.ir for parent, ms.it to child; verify child's pre-flattened
+`bw_class` is computed correctly (round-down); verify cap enforcement
+(sum(children) ≤ parent fails with error).
+
+**Spec ref:** ch09 §9.4.3, charter §4.5.2
+
+**Depends on:** S29c
+
+**Status:** ☐
+
+---
+
+### S29h · Tests: two-level and full-depth delegation
+
+**What:** Root → L=1 → L=2 → L=3. Verify round-down accumulation at each
+level matches the worked example in charter §4.5.2.
+
+**Spec ref:** charter §4.5.2
+
+**Depends on:** S29c
+
+**Status:** ☐
+
+---
+
+### S29i · Tests: reduced-precision delegation
+
+**What:** ms.it with `child_precision` = 4 bits. Verify child Contract stores
+4-bit effective precision; pre-flattened value computed on 4-bit scale.
+
+**Spec ref:** ch09 §9.4.3, charter §4.5.1
+
+**Depends on:** S29c
+
+**Status:** ☐
+
+---
+
+### S29j · Tests: cap enforcement
+
+**What:** Three children whose `bw_class` sum exceeds parent headroom — third
+ms.it returns error; first two remain valid. `mse_bw_sum` stays consistent.
+
+**Spec ref:** charter §4.5.6, ch09 §9.4.2
+
+**Depends on:** S29c
+
+**Status:** ☐
+
+---
+
+### S29k · Tests: reconfiguration cascade
+
+**What:** After parent reconfiguration (bw_class reduced), verify
+`mse_recompute_subtree` updates all descendant pre-flattened values correctly.
+Verify `mse_absolute_bw` reflects new values.
+
+**Spec ref:** charter §4.5.3
+
+**Depends on:** S29e
+
+**Status:** ☐
+
+---
+
+### S29l · Tests: arbitration decision (multiple scenarios)
+
+**What:** Verify `mse_arbitrate` selects correctly: EC within budget wins over
+EC over budget; EC over budget wins over BE fallthrough; round-robin tie-break
+rotates on equal `lat_class`.
+
+**Spec ref:** charter §4.5.4
+
+**Depends on:** S29d
+
+**Status:** ☐
+
+---
+
+### S29m · Tests: round-robin tie-break
+
+**What:** Two ECs with equal `lat_class` and budget; verify alternating grant
+across consecutive CN slots (round-robin tie-break).
+
+**Spec ref:** charter §4.5.4
+
+**Depends on:** S29d
+
+**Status:** ☐
+
+---
+
+### S29n · Tests: virtualization-layer divergence
+
+**What:** Three scenarios: (a) daemon-style delegation (L=0 → L=1 → L=2
+→ L=3 with precision reduction at each level); (b) no-Contract VM (ms.ir
+not called; EC competes as BE); (c) container at L=1 delegates to L=2
+with full parent precision.
+
+**Spec ref:** ch09 §9.4.3, charter §4.5.2
+
+**Depends on:** S29c
 
 **Status:** ☐
 
@@ -761,10 +977,23 @@ RISC-V ratification.
 | 22 | **S20** — CSR level/parent update | 7 | S6 |
 | 23 | **S23–S25** — CME validation suite | 8 | Phases 2–7 |
 | 24 | **S26–S28** — CPE execute | 9 | Phase 8 |
-| 25 | **S29–S31** — MSE execute | 10 | Phase 9 |
-| 26 | **S32–S34** — QoS execute | 11 | Phase 10 |
-| 27 | **S35–S37** — Integration and review | 12 | Phases 9–11 |
-| 28 | **S38** — Submission | 12 | S35–S37, P6 |
+| 25 | **S29a** — MSE Contract type, state, CSR plumbing (Sail-A) ✓ | 10 | Phase 9 |
+| 26 | **S29b** — ms.ir / ms.or execute (Sail-B) | 10 | S29a |
+| 27 | **S29c** — ms.it / ms.ot with telescoping (Sail-C) | 10 | S29b |
+| 28 | **S29d** — Multi-tier arbitration function (Sail-D) | 10 | S29a |
+| 29 | **S29e** — Reconfiguration recomputation (Sail-D/E) | 10 | S29c |
+| 30 | **S29f** — Tests: ms.ir/ms.or round-trip | 10 | S29b |
+| 31 | **S29g** — Tests: single-level delegation | 10 | S29c |
+| 32 | **S29h** — Tests: two-level and full-depth delegation | 10 | S29c |
+| 33 | **S29i** — Tests: reduced-precision delegation | 10 | S29c |
+| 34 | **S29j** — Tests: cap enforcement | 10 | S29c |
+| 35 | **S29k** — Tests: reconfiguration cascade | 10 | S29e |
+| 36 | **S29l** — Tests: arbitration decision | 10 | S29d |
+| 37 | **S29m** — Tests: round-robin tie-break | 10 | S29d |
+| 38 | **S29n** — Tests: virtualization-layer divergence | 10 | S29c |
+| 39 | **S32–S34** — QoS execute | 11 | Phase 10 |
+| 40 | **S35–S37** — Integration and review | 12 | Phases 9–11 |
+| 41 | **S38** — Submission | 12 | S35–S37, P6 |
 
 ---
 
