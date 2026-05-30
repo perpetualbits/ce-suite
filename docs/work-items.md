@@ -14,29 +14,24 @@ detailed design work that follows from locked architectural decisions.
 
 ---
 
-## ⚑ Current priority — Salvage clusters and PUB5
+## ⚑ Current priority — Cluster F (QoS), then Self-Preservation Invariant, then PUB5
 
-The ChatGPT-era CE Suite design sessions are being reviewed for ideas
-worth salvaging into the current spec. Discussion proceeds cluster by
-cluster; accepted items land here as new work items. Cluster G is
-complete (yielded D6, now ✓ resolved; two items archived). Clusters A, B, C, D,
-E, F, H remain to be discussed. PUB5 (pre-submission gap audit) is
-queued to follow cluster completion.
+The salvage cluster review is underway. Cluster G is complete (yielded D6, ✓ resolved).
+Cluster D MSE telescoping is ✓ resolved through v0.21 (substantive) and v0.22
+(corrective local-view revision; see "Cluster D Salvage" entry in Category D below).
 
-**Sail work (Phase 9 onward, S26+) is now lower priority** than salvage
-cluster decisions and the items they produce. The CPE, MSE, and QoS
-execute functions being drafted in Sail may require rework if cluster D,
-E, or F results in architectural changes.
+**Next priorities:**
 
-Sail S26+ work may continue in parallel because (a) any rework will be
-smaller than re-starting Sail cold, and (b) the toolchain familiarity
-gained is durable. But Sail work should not be defended on its own
-schedule: if a cluster decision arrives that requires rework, the rework
-takes priority over additional Sail progress.
+1. **Cluster F (MSE↔QoS isomorphism)** — framing decisions complete (refamiliarize.md
+   §"Cluster F"); charter session pending (no code-prompt drafted yet).
+2. **Self-Preservation Invariant** — flagged in refamiliarize.md (commit 34a0012);
+   deferred until cluster F lands; requires charter + ch02/ch03/ch07/ch09/ch11 work.
+3. **PUB5 §2–§4** — pre-submission gap audit axes 2–4; open.
+4. **Sail redo** — holistic redo after spec completes; deferred (see refamiliarize.md
+   §"Sail redo plan").
 
 P6 (opcode allocation) and P8 (Sail completion) both remain open.
-The submission email to `help@riscv.org` is in flight; a routing reply
-is expected on a weeks-to-month timescale.
+The submission email to `help@riscv.org` is in flight.
 
 ---
 
@@ -150,6 +145,87 @@ Sail `ce_cme_execute.sail` `ec.ob` SATP handling with conditional
 `flush_TLB(None(), None())` and supporting prelude additions (commit 2b9e9da).
 
 **Deferred:** ch19 `vsatp`/`hgatp` TLB invalidation analogue, pending D6.2 resolution.
+
+---
+
+### Cluster D Salvage — MSE Telescoping Resolution ✓ RESOLVED (v0.21 + v0.22)
+
+**v0.21 substantive work (commit 6c46f5a):** Cluster D (MSE telescoping and
+arbitration policy) was the largest architectural addition in the cluster review
+cycle. The resolution introduced:
+
+- **Telescoping with per-delegation precision.** MSE Contracts can be split
+  hierarchically via `ms.it`; each delegation step may reduce the child's precision
+  (1–8 bits). Round-down rounding preserves the "child receives at most parent's
+  promise" invariant.
+- **Pre-flattening.** Hardware computes the child's absolute bandwidth at delegation
+  time and stores it pre-flattened in the leaf Contract for O(1) arbitration.
+- **8-bit field widths.** `bw_class` and `lat_class` are 8-bit fields (max 255),
+  discoverable via `mse_caps`.
+- **Multi-tier slot arbitration.** Within CN slots: within-budget Contract holders
+  by `lat_class` → over-budget holders by `lat_class` → BE fallthrough. Idle
+  bandwidth is never wasted.
+- **Dithered slot scheduling.** Slot pattern satisfies `CN_FRAC` over each window
+  and bounds the maximum gap between consecutive CN slots to ⌈256/CN_FRAC⌉.
+  Preserves the (K+1) × slot_size_ns worst-case CN latency under interrupt nesting.
+- **Cap rule.** Group bandwidth cap enforced on pre-flattened absolute values;
+  round-down creates small unused capacity that flows via overflow or BE.
+- **D7.1 parked.** A formal priority-inversion / bandwidth-donation mechanism is
+  deferred to ratification-stage refinement (charter §8 item 10).
+
+**Propagated to (v0.21):** charter §4.5 (new section); ch09 §9.4–§9.5 (significant
+additions); ch10 (new usage examples); ch13 (new `mse_absolute_bw` and `mse_caps`
+CSRs).
+
+---
+
+**v0.22 corrective revision (2026-05-30):** The v0.21 work inadvertently described
+MSE telescoping in *global-view* terms — software at each delegation level would see
+CSR values representing fraction-of-total-system-bandwidth. This violated CE Suite's
+foundational property that software runs unchanged at any delegation level (the same
+property CME's Group-zero-from-anywhere already embodies). Without local-view
+semantics, kernel images would need depth-aware variants — incompatible with CE
+Suite's deployment goals.
+
+**Principle established:** *Software runs unchanged at any delegation level.* Each
+level sees its bandwidth on a 0–255 local scale representing fraction of *its own
+slice*. Hardware translates between levels transparently (stored-global for
+arbitration; local readback via Formula 2). Stated formally in charter §4.5.0 and
+ch00 §0.11 (architectural principle).
+
+**The math (ch09 §9.4.6):**
+- Formula 1 — storage at delegation: `s(c) = floor(s(p) × b(c) / 256)`
+- Formula 2 — local readback: `r(e) = floor(s(e) × 256 / s(p(e)))`
+- Verification: substituting Formula 1 into Formula 2 gives `r(c) ≈ b(c)`
+  with bounded round-down residual. Software at any depth sees the value its
+  parent wrote.
+
+**Hardware mechanics unchanged from v0.21:** multi-tier slot arbitration, dithered
+slot scheduling, round-down rounding, pre-flattening, reconfiguration timing.
+
+**Commit chain:**
+
+| Step | Commit |
+|---|---|
+| Charter v0.22 §4.5.0 + §4.5.1/2/3 revision | d535088 |
+| ch09 — new §9.4.6 mathematical foundation + section revisions | 62f2474 |
+| ch13 — §5.9 local-view rewrite + §5.4/§5.5 stored-global annotations | abab423 |
+| docs/meta/web-claude-project-instructions.md stub | 9c63ebb |
+| ch10 — extensive recast of MSE usage examples | 668153f |
+| docs/refamiliarize.md "Current Work in Progress" section | d50152c |
+| ch05 §5.7 — Linux SCHED_DEADLINE local-view mapping (ceil × 255) | 539bbcc |
+| refamiliarize Self-Preservation Invariant note | 34a0012 |
+| ch00 — new §0.11 foundational architectural principle | b140e85 |
+| Sail-A patch — `read_CSR(0xFD3)` returns local view (Formula 2) | 446bdb2 |
+| Sail-A hash back-fill | 9bfbe11 |
+
+**Audit history:** The global-view error was surfaced by the architect late in the
+cluster D framing session. Key insight: "Every OS and distro .iso would have to be
+aware of where it would land. L0, L1, L2, L3. A nightmare." The v0.22 chain
+corrects this before any downstream Sail redo or third-party implementation could
+encode the wrong semantics. The OS-developer-perspective check ("does code at level N
+work identically to code at level 0?") is now a default framing question for all
+future salvage cluster sessions — see refamiliarize.md §"Workflow improvement noted."
 
 ---
 
