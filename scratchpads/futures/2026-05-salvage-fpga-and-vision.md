@@ -126,3 +126,16 @@ Separately, the "Hypercube Chiplet Architecture" chat contains a much more ambit
 ## Bottom Line
 
 You have the right board. The resource budget is not the constraint. The path forward is: learn Vivado + SystemVerilog, get a working VexRiscv or picoRV64 core running on your DDR3, then start attaching the CME datapath — using the SRAM bank designs and one-hot enable schemes already worked out in the ChatGPT sessions. The RVV VLEN question is a decision you can defer: start with VLEN=128 (or even no vector) and add it once the core CME is working. That is both the most honest assessment of where things stood, and the most practical next step.
+
+---
+
+## Disposition (2026-05-29)
+
+- **H.1 — FPGA implementation roadmap (Artix-7 board, learning path):**
+  → Promoted to `hw/work-items.md`. The phased plan there is the
+  authoritative reference. Gating: work is optional and should not
+  begin until Sail Phase 12 is complete.
+- **H.2 — Hypercube chiplet vision:** → Pending separate
+  disposition session (archive).
+- **H.3 — Vector-unit composability:** → Pending separate
+  disposition session (archive).
