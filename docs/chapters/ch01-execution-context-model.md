@@ -31,7 +31,7 @@ coordinated RISC-V extensions:
 
 Together the goal is provable Worst-Case Execution Time and certifiability at
 ASIL D / DO-178C / FDA Class III levels, at an estimated 5–15% transistor
-overhead per core.
+overhead per core (stratified by deployment class in Appendix C §C.4).
 
 This chapter is the conceptual introduction. It explains what each core object
 is and why the design is shaped the way it is. Byte-level layouts are in
