@@ -74,8 +74,8 @@ delegation tree — the identity layer that all four extensions share
 
 The target outcome is provable Worst-Case Execution Time and
 certifiability for ASIL D, FDA Class III, and DO-178C workloads, at an
-estimated 5–15% transistor overhead per core (dominated by bank SRAM;
-see §6).
+estimated 5–15% transistor overhead per core (stratified by deployment
+class in Appendix C §C.4).
 
 CE Suite is specified for both RV32 and RV64.
 
@@ -317,41 +317,74 @@ submission.
 
 ==== 7.1 Area overhead
 
-The 5–15% per-core area overhead estimate breaks down by component:
+The 5–15% per-core transistor overhead (stratified by deployment class
+in Appendix C §C.4) reflects three distinct deployment tiers. The
+figures below are derived from `tools/ce-sizing-calculator.py` and
+calibrated against concrete public baseline cores.
 
-[width="100%",cols="32%,37%,31%",options="header",]
+[width="100%",cols="25%,25%,25%,25%",options="header",]
 |===
-|Component |Area driver |Character
-|CME bank SRAM |Fast on-chip SRAM, 1 KB per non-VMT bank (RV64) |The
-dominant variable; scales linearly with the number of
-simultaneously-resident banks per hart
+|Deployment class |CE SRAM total |vs in-order baseline¹ |vs large OoO
+baseline²
+|CE-MinimalRT (microcontroller / embedded RTOS) |6.5 KB |1.6–1.8% |0.5%
 
-|ECID EC++[]++ array |Small SRAM per hart (≈1 KB for 16 active ECID
-entries) |Fixed overhead; cheap
+|CE-RT (multi-partition RT, mixed criticality) |35.1 KB |5.0–5.8% |1.5%
 
-|CPE tag bits |Additional tag bits in existing L1/L2 cache arrays
-|Roughly 10–20% of tag SRAM area; distributed
-
-|MSE arbiter |Contract table {plus} time-slot scheduler at the memory
-controller |Shared across all cores; not per-core cost
-
-|QoS arbiter |Equivalent to MSE, placed at the NoC/DMA |Shared; not
-per-core cost
-
-|Instruction decode |24 R-type instructions, one funct3/funct7 decode
-tree |Negligible
+|CE-Full (server-class, nested virtualization) |94.3 KB |12.9–14.7%
+|3.8%
 |===
 
-The dominant variable is the CME bank SRAM. An implementation with 16
-non-VMT banks per hart (16 KB) on a 7 nm process contributes roughly
-0.1–0.3% of core area. Scaling to 64 banks drives the estimate toward
-the upper end of the 5–15% range. MSE and QoS arbiter logic is a
-one-time per-chip cost, not a per-core cost, which amortizes well on
-many-core SoCs.
+¹ In-order baseline: SiFive U84 (0.28 mm², 7 nm) / ARM Cortex-A55 (0.32
+mm², 7 nm); percentage range spans U84 (lower end) to A55 (higher
+end). +
+² Large OoO baseline: SiFive P670-class with vector unit (~0.85 mm², 5
+nm). +
+Full breakdown by node, baseline, and component is in Appendix C §C.4 of
+the specification, derived from `tools/ce-sizing-calculator.py`.
 
-The 5–15% range is comparable to the cost of adding a hardware FPU, and
-provides in return: provable WCET, 1–9 cycle context switches, and a
-hardware-enforced isolation substrate for safety-critical certification.
+CE-Full at 12.9–14.7% against in-order baselines sits at the upper bound
+of the headline range. Against large OoO baselines where CE-Full is the
+natural deployment, the per-core overhead is 3.8%. The 5–15% range
+accurately characterises the CE-RT tier across realistic baseline cores.
+
+The per-core cost breaks down by component. CPE tag bits are charged to
+the cache arrays, not to the core CE block; MSE and QoS arbiter logic is
+a one-time per-chip cost amortised across all cores on the SoC.
+
+[width="100%",cols="34%,33%,33%",options="header",]
+|===
+|Component |Per-core |Per-chip
+|CME Bank SRAM (NV {plus} VMT banks) |Dominant; scales with bank count
+|—
+
+|EC[e] table hot set |Small fixed (~0.5–4 KB) |—
+
+|Bank tags (owner ECID, dirty, lock) |Tiny (~16–272 B) |—
+
+|S/R staging banks |~2–10 KB |—
+
+|Copy engine {plus} decoders |Small fixed logic |—
+
+|CPE tag bits (in cache, not core) |Adds to cache tag SRAM |—
+
+|MSE arbiter (memory controller) |— |One-time per chip
+
+|QoS arbiter (NoC / DMA) |— |One-time per chip
+
+|Instruction decode |Negligible |—
+
+|Discovery CSRs |Negligible |—
+|===
+
+MSE and QoS arbiter costs amortise well on many-core SoCs: on a 16-core
+CE-RT deployment, the per-core arbiter amortisation adds less than 0.3%.
+
+The CE-RT overhead is in the same range as adding a hardware
+double-precision FPU to a comparable core; the CE-Full overhead is
+comparable to adding both an FPU and a hardware vector unit, depending
+on deployment class. CE Suite provides in return: provable WCET, 1–9
+cycle context switches, and a hardware-enforced isolation substrate for
+safety-critical certification.
 
 ==== 7.2 Software compatibility
 

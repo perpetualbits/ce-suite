@@ -52,6 +52,16 @@ another hart before the switch, the kernel must issue an explicit
 visibility must be established before `ec.ob` is issued, not after. The
 normative migration fence sequence in §17.5 covers this case.
 
+*TLB invalidation and RVWMO.* When the restore mask includes bit 6
+(SATP) and the restored SATP differs from the current SATP, `ec.ob`
+performs a TLB invalidation atomically with the restore — this is a
+translation-cache coherence operation, not a RVWMO fence, and does not
+affect the "`no implicit fence`" conclusion above. `ec.ob` issues no
+load or store to the RISC-V address space regardless of whether TLB
+invalidation occurs. The rule and its normative authority are in Chapter
+3 §3.1 (TLB Invalidation on SATP Restore) and the CE Suite Project
+Instructions §6.8.
+
 ==== 17.2.2 Same-hart context switches
 
 When `ec.ib` and `ec.ob` are used to switch between two ECIDs on the

@@ -509,6 +509,13 @@ register groups participate in the operation:
 If bit 4 (PC) is set in an `ec.ob` mask, execution jumps to the restored
 program counter immediately on commit of the instruction.
 
+If bit 6 (SATP) is set in an `ec.ob` mask and the restored SATP differs
+from the current SATP, hardware performs a TLB invalidation atomically
+with the restore; implementations may skip the invalidation when SATP is
+unchanged. Full semantics are in Chapter 3 §3.1 (TLB Invalidation on
+SATP Restore); normative authority is the CE Suite Project Instructions
+§6.8.
+
 Bits not assigned above are reserved and must be zero.
 
 *RV32 note.* On RV32, the operand register is 32 bits, so bits 32–63 of
