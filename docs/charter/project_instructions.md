@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.19
+**Version:** 0.20
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -52,7 +52,7 @@ The five extensions are:
 The target outcome: provable Worst-Case Execution Time, certifiability for
 ASIL D / FDA Class III / DO-178C, 1–2 cycle context switches, and bounded
 memory- and I/O-access latency, at an estimated 5–15% transistor overhead
-per core.
+per core (stratified by deployment class in Appendix C §C.4).
 
 ---
 
@@ -778,7 +778,16 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.19 (this version).** Resolved D6 (TLB behavior on context restore). §6.8
+- **v0.20 (this version).** §1 area-overhead claim refined: the "5–15%"
+  per-core range is retained as the digestible summary, with an inline
+  cross-reference to Appendix C §C.4 for stratification by deployment class
+  (CE-MinimalRT, CE-RT, CE-Full) and against specific public baselines
+  (SiFive U84, Cortex-A55, P670-class). The v2 sizing calculator
+  (`tools/ce-sizing-calculator.py`, commit 891361c) is the authoritative
+  source for these figures. No normative semantic change; this is a
+  precision refinement to the headline pitch.
+
+- **v0.19.** Resolved D6 (TLB behavior on context restore). §6.8
   added: `ec.ob` with bit 6 (SATP) set in the mask now has normative TLB
   semantics — when the restored SATP differs from the current SATP, hardware
   performs an `sfence.vma`-equivalent invalidation atomically with the restore;
