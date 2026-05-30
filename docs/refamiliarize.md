@@ -118,6 +118,93 @@ architecture.
 | PUB5 §4 | Cross-chapter references audit. |
 | D6.1, D6.2, D6.3 | TLB scope, H-extension analogues, charter §1 wording on cross-address-space cost (charter §8, v0.19). |
 
+### Self-Preservation Invariant (critical pending architectural work)
+
+**Status: deferred, but required before RISC-V International submission.**
+
+The principle: *A non-leaf EC must retain enough resources for itself to remain
+operational. No EC may delegate all of any resource type to children.* This applies
+uniformly to banks (CME), MSE Contracts, CPE Contracts, and QoS Contracts.
+
+The principle was established in the MSE salvage scratchpad
+(`scratchpads/mse/101-scratchpad.md` axiom #6, "Non-Delegation of Self") but was
+**not propagated into the normative specification.** A spec-side gap exists in every
+resource extension:
+
+- `ec.it` does not check whether the parent retains at least one bank. A program
+  calling `ec.it` N times (where N is the parent's bank count) would succeed and
+  leave the parent with zero banks.
+- `ms.it` does not check whether the parent retains any MSE bandwidth slice for
+  itself.
+- `cp.it` does not check whether the parent retains any CPE cache way for itself.
+- `qs.it` does not check whether the parent retains any QoS I/O bandwidth for
+  itself.
+- The corresponding `*.ot` (revoke) instructions can leave the parent EC with zero
+  of the revoked resource type after the operation completes.
+
+ch02 §2.6 has seven listed invariants; the Self-Preservation Invariant is not among
+them.
+
+**Why it matters.** An EC with zero banks cannot context-switch in — its register
+state has nowhere to load from; the EC is effectively un-runnable. An EC with zero
+MSE Contract has no guaranteed memory bandwidth; it competes as best-effort and
+cannot make forward progress under load. The same concern applies for CPE (no
+guaranteed cache → WCET analysis fails) and QoS (no guaranteed I/O bandwidth). The
+hypervisor running at L=1 must retain its own resources to remain operational while
+it allocates to L=2 VMs. A hypervisor that delegated all banks/Contracts to its
+children would be unable to context-switch its own kernel code to make further
+allocation decisions — this applies at every non-leaf level.
+
+**Required scope of the spec work.** This is a charter-touching architectural
+addition. Expected propagation chain when undertaken:
+
+- **Charter:** add the Self-Preservation Invariant as a normative principle alongside
+  the existing delegation rules in §5.
+- **ch02 §2.6:** add as an eighth invariant; each `*.it` / `*.ot` instruction's spec
+  gains a precondition check.
+- **ch03 §3.4** (`ec.it`/`ec.ot` semantics): add the precondition check; specify the
+  error code returned when the operation would leave the parent with zero banks.
+- **ch07, ch09, ch11:** same shape for `cp.it`/`cp.ot`, `ms.it`/`ms.ot`,
+  `qs.it`/`qs.ot`.
+- **ch10/ch12:** verify that no existing example delegates all of a parent's
+  resources; rewrite any that do.
+- **Error codes:** new error code per extension or reuse of existing codes if
+  appropriate.
+- **Sail (when redone):** execute functions for `*.it` need the precondition check;
+  tests need cases verifying self-depletion is refused.
+
+**Open framing questions for the cluster-style session that addresses this:**
+
+1. *What is the minimum the parent must retain?* Simplest rule: at least one of each
+   resource type (one bank, bw_class > 0, one cache way, etc.). A more conservative
+   rule could use implementation-defined floors via `*_caps` CSRs. The simplest rule
+   has the advantage of being uniform across implementations.
+2. *Error semantics?* Error code in `rd` (consistent with `MSE_ERR_CAP_EXCEEDED`)
+   vs. trap (more emphatic). Error-code path is gentler on software.
+3. *Does the invariant apply at L=0 root?* Almost certainly yes — the L=0 kernel
+   needs resources to remain operational — but the framing may differ from L>0.
+4. *Interaction with `ec.oe` (forced destruction)?* `ec.oe` returns child's resources
+   to parent. If the parent gave its last bank to a child then forced-destroyed the
+   child, the parent recovers the bank. Does transitional reclamation satisfy the
+   invariant, or must `ec.it` enforce a floor at delegation time? The latter is
+   cleaner (refuses bad operations rather than relying on recovery).
+5. *Cluster F (MSE↔QoS isomorphism) implications.* QoS per-domain semantics raise an
+   extra question: must the parent retain resources in every QoS domain it has
+   Contracts in, or just one?
+
+**When this happens:** After the v0.22 chain completes and cluster F (QoS) is
+settled.
+
+**Historical note:** This principle was firmly established in the ChatGPT-era CE
+Suite development and treated as foundational. It was lost in transition to the
+claude.ai project. Surface-level review of ch02 §2.6 missed it because the existing
+invariants address related but different concerns (unique ownership, delegation depth,
+parent-only modification); "parent must retain resources" is structurally novel and
+was not in any prior review's scope. This is exactly the kind of axiom that fails the
+OS-developer-perspective discipline (see "Workflow improvement noted" below): a
+hypervisor developer writing code at L=1 would discover this missing constraint the
+moment they tried to delegate; the architect caught it during cluster F framing.
+
 ### Workflow improvement noted
 
 During cluster D framing, an axis was missed in the initial framing: "From the OS
