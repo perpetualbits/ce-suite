@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.22
+**Version:** 0.23
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -668,6 +668,36 @@ Forced destruction of an ECID (and its subtree) must always succeed, even
 if the target is a zombie, blocked, or hostile. See §6.5 for the
 instruction (`ec.oe`).
 
+### 5.4 Self-Preservation Invariant
+
+1. A non-leaf EC must retain enough of each resource type to remain
+   operational. No EC may delegate all of any one resource type to its
+   children.
+2. The invariant applies uniformly to CME Banks, MSE Contracts, CPE Contracts,
+   and QoS Contracts, and at every delegation level including `L = 0`. The root
+   EC is not exempt.
+3. **Rationale.** An EC with zero Banks is un-runnable: its register state has
+   nowhere to load from on context restore. An EC with zero MSE, CPE, or QoS
+   Contract is not un-runnable but degraded — it competes as best-effort and
+   may fail to make forward progress or to meet WCET bounds. A hypervisor at
+   `L = 1`, like any non-leaf EC, must retain its own resources to continue
+   making allocation decisions for its children.
+4. **CME enforcement is architectural.** The CME Bank case is enforced
+   structurally by the bank-0-unnamed rule (§6.9): an EC cannot delegate its
+   last non-VMT Bank, because that Bank is not nameable as a delegation target.
+   No runtime check and no error code are involved; the operation is
+   inexpressible.
+5. **MSE, CPE, and QoS carry no architectural floor.** The architecture places
+   no minimum-retention floor on MSE Contracts, CPE Contracts, or QoS
+   Contracts. Software at each level is responsible for retaining sufficient
+   bandwidth, cache, and I/O resources for its own operation. The asymmetry
+   with CME Banks is intentional: zero Banks is categorical failure, whereas
+   zero bandwidth, cache, or I/O is a recoverable degraded state.
+6. **Scope is self-preservation only.** The invariant prevents an EC from
+   un-resourcing itself. It does not prevent a parent from leaving a child with
+   zero resources through cooperative revocation (`ec.ot`); that is a separate,
+   intentional capability with its own semantics (§5.2, §5.3).
+
 ---
 
 ## 6. CME instruction principles
@@ -811,9 +841,9 @@ operand; the status CSRs (`cme_status`, `mse_status`, `qos_status`,
 `cpe_status`) are updated in parallel for diagnostic use but are **not**
 the primary error channel.
 
-#### Success-path `rd` for `ec.ib` and `ec.oe`
+#### Success-path `rd` for `ec.ib`, `ec.oe`, and `ec.it`
 
-Two CME instructions return success-path information in `rd` rather than
+Three CME instructions return success-path information in `rd` rather than
 an error code, because they cannot produce a soft failure:
 
 - **`ec.ib rd, rs1`** — saves the running context; either succeeds or
@@ -823,6 +853,11 @@ an error code, because they cannot produce a soft failure:
 - **`ec.oe rd, rs1`** — forced destroy; always succeeds (§6.5). `rd`
   returns the total count of ECIDs freed, including the target itself.
   Callers that do not need the count write to `x0`.
+- **`ec.it`** — delegates Banks to a child tenant (§6.9); either succeeds or
+  raises a trap. `rd` returns the count of non-VMT Banks remaining in the
+  parent's Group after the operation. Callers that do not need the count write
+  to `x0`. The full operand list and enumerated trap causes are in Chapter 3
+  (§3.4).
 
 These instructions do not return an error code in `rd`; they raise a trap
 on any error path. The `rd = x0` discard convention applies.
@@ -880,6 +915,48 @@ resolved.
 This rule resolves D6 in `docs/work-items.md`. The full
 specification of `ec.ob`'s TLB behavior, including any cycle-cost
 qualifications, is in ch03 once propagated.
+
+### 6.9 Bank-0-unnamed delegation and `ec.it` operand semantics
+
+1. **Local Bank numbering.** Each EC sees its non-VMT Banks numbered
+   `0 .. K-1` in its own local view, where `K` is the count of non-VMT Banks
+   the EC holds. This local-view numbering is the CME analog of the local-view
+   property established for MSE telescoping (§4.5.0): software at any delegation
+   level observes the same numbering scheme regardless of depth.
+2. **Bank 0 is structurally retained.** Local Bank 0 — the EC's first non-VMT
+   Bank — is not nameable as a delegation target. An EC therefore cannot
+   delegate its last non-VMT Bank; the attempt is architecturally inexpressible
+   rather than refused at runtime. This is the enforcement mechanism for the
+   CME case of the Self-Preservation Invariant (§5.4), and it holds at every
+   level including `L = 0`.
+3. **`ec.it` operand semantics.** `ec.it` (delegate Banks to a child tenant)
+   takes `rs1` as the **count** of non-VMT Banks to delegate in the call, not a
+   Bank specifier. Hardware delegates the highest-numbered local non-VMT
+   Bank(s) from the parent's Group, never local Bank 0. On success, `rd`
+   returns the count of non-VMT Banks remaining in the parent's Group after the
+   operation.
+4. **`rs1 = 0` is a no-op.** Zero Banks are delegated and `rd` returns the
+   parent's non-VMT Bank count unchanged.
+5. **VMT Banks are exempt.** VMT Banks (holding vector/matrix/tensor state)
+   carry no retention requirement and may be delegated in full. An EC that has
+   delegated all VMT Banks remains runnable for non-vector code on its retained
+   non-VMT Bank 0.
+6. **Error handling is by trap, not by error code.** Because `rd` carries a
+   success-path value (Banks remaining), `ec.it` does not return an error code
+   in `rd`. Delegation-rule violations — for example `L = D` (§5.1), an invalid
+   or stale child ECID, or a Group-ownership violation — raise a trap. `ec.it`
+   thus belongs to the success-path-`rd` family alongside `ec.ib` and `ec.oe`
+   (§6.6): it either succeeds, with `rd` = Banks remaining, or it traps. The
+   high-frequency self-preservation error ("delegate my last Bank") is not a
+   trap case at all; it is inexpressible (point 2). The enumerated trap causes
+   are specified in Chapter 3 (§3.4).
+7. **Breaking change.** This repurposing of `rs1` from a Bank specifier to a
+   count is a breaking change to `ec.it`'s operand semantics; chapters and
+   models using the earlier Bank-specifier encoding are obsolete on this point
+   and refactor on contact (cf. §6.2). The complete `ec.it` instruction
+   definition — full operand list including the child-tenant target and
+   encoding — is specified in Chapter 3 (§3.4) and propagated in a separate
+   session.
 
 ---
 
@@ -1040,7 +1117,40 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.22 (this version).** Local-view semantics for telescoping (cluster D
+- **v0.23 (this version).** Self-Preservation Invariant added as a normative
+  principle.
+
+  Establishes that a non-leaf EC must retain enough of each resource type to
+  remain operational; no EC may delegate all of any one resource type to its
+  children. Added as §5.4 (cross-cutting principle) with the CME enforcement
+  mechanism in §6.9.
+
+  - **§5.4.** Applies to CME Banks and MSE/CPE/QoS Contracts, at all levels
+    including `L = 0`. CME is enforced architecturally via bank-0-unnamed;
+    MSE/CPE/QoS carry no architectural floor and are software's responsibility.
+    Scope is self-preservation only; cooperative revocation of a child is
+    unaffected.
+
+  - **§6.9.** Bank-0-unnamed local numbering: each EC's first non-VMT Bank
+    (local Bank 0) is not nameable for delegation, making delegation of an EC's
+    last non-VMT Bank inexpressible. `ec.it` is redesigned so `rs1` is the count
+    of Banks to delegate (highest-numbered local non-VMT Banks chosen by
+    hardware), `rd` returns Banks remaining, and `rs1 = 0` is a no-op. VMT Banks
+    are exempt. Delegation-rule violations (`L = D`, invalid child, ownership)
+    trap rather than returning an error code; `ec.it` joins the
+    success-path-`rd` family in §6.6. This is a breaking change to `ec.it`'s
+    operand encoding.
+
+  - **§6.6.** `ec.it` added to the success-path-`rd` instruction list alongside
+    `ec.ib` and `ec.oe`.
+
+  Propagation to ch00 (§0.6 Banks), ch02 (§2.4 delegation note; §2.6 gains an
+  eighth invariant), ch03 (§3.4 `ec.it` rewrite), ch07/ch09/ch11
+  (software-responsibility notes for CPE/MSE/QoS), and the unified Sail redo
+  follows in subsequent commits. `docs/work-items.md` gains a Cluster
+  Self-Preservation entry.
+
+- **v0.22.** Local-view semantics for telescoping (cluster D
   revision).
 
   The v0.21 commit (6c46f5a) described §4.5's MSE telescoping in *global view*
@@ -1233,4 +1343,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.22.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.23.*
