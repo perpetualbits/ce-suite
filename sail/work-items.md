@@ -675,7 +675,7 @@ and `make check-riscv` pass. Commit: 8572aa0.
 
 v0.22 propagation patch: `read_CSR(0xFD3)` updated to return local view per
 Formula 2 of ch09 §9.4.6 — `floor(stored × 256 / parent_stored)` at L≥1;
-at L=0 returns stored value directly. Both checks pass. Commit: [v0.22-patch].
+at L=0 returns stored value directly. Both checks pass. Commit: 446bdb2.
 
 ---
 
