@@ -1045,6 +1045,25 @@ review pressure, and prevents the proposal from being characterized as
    chapter(s) where the mechanism is specified, and verify the
    mechanism is fully specified rather than merely named.
 
+   **Status (2026-05-29):** The area-claim sub-item is substantially
+   addressed. The "5–15% transistor overhead" claim is now backed by:
+   - `tools/ce-sizing-calculator.py` (v2, commit 891361c) — replaced the
+     v1 calculator with industry-current SRAM data and concrete baselines.
+   - `docs/chapters/appendix-c-implementation-guidance.md` §C.4
+     (commit e6ea612) — stratified analysis by deployment class with named
+     public baselines (SiFive U84, Cortex-A55, P670-class).
+   - Charter §1 (v0.20, commit 6581fc1) — headline "5–15%" range retained
+     with inline cross-reference to Appendix C §C.4.
+   - `docs/chapters/ch01-execution-context-model.md` §1 (commit 5f297e7)
+     — same refinement propagated from charter.
+   - `docs/submission/submission-brief.md` §7.1 (commit 824ac10) — full
+     rework with stratified table and per-component breakdown.
+
+   Remaining gap: empirical validation against an actual RISC-V
+   implementation (synthesis numbers from the hw/ work plan, when
+   undertaken). This is captured in `hw/work-items.md` and does NOT
+   block PUB5 closure. The other three axes (items 2–4) remain open.
+
 2. **Global-state-mutating instructions.** For every CE instruction
    that mutates hart-global state (SATP via mask bit 6, mstatus,
    interrupt enables, fence state, ASID, contexts visible to other
