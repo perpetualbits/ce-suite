@@ -19,6 +19,134 @@ Only then start editing chapters.
 
 ---
 
+## Current Work in Progress (as of 2026-05-30)
+
+This section captures the state of work currently in flight. It is informational,
+not normative, and is updated periodically as work progresses. Future fresh sessions
+reading the orientation chain encounter this section and can resume work from here
+without depending on prior chat-session context.
+
+### v0.22 cluster D propagation chain
+
+The v0.21 cluster D resolution (commit 6c46f5a) inadvertently described MSE
+telescoping in *global-view* terms — software at each delegation level would see CSR
+values representing fraction-of-total-system-bandwidth. This violated the foundational
+design principle that software runs unchanged at any delegation level (the same
+property CME's group-zero-from-anywhere already embodies). v0.22 corrects this to
+local-view semantics: each level sees its bandwidth on a 0–255 scale representing
+fraction of *its own slice*.
+
+**Chain status:**
+
+| Step | Commit | Status |
+|---|---|---|
+| Charter v0.22 §4.5.0 + §4.5.1/2/3 revision | d535088 | ✓ |
+| ch09 — §9.4.6 math foundation + section revisions | 62f2474 | ✓ |
+| ch13 — §5.9 rewrite + §5.4/§5.5 annotations | abab423 | ✓ |
+| ch10 — extensive recast (multiple examples + scattered references) | 668153f | ✓ |
+| ch05 §5.7 — Linux SCHED_DEADLINE mapping | — | Queued |
+| ch00 — architectural philosophy statement | — | Queued |
+| Sail-A patch — one-line shift in read_CSR(0xFD3) | — | Queued |
+| work-items.md — v0.22 bookkeeping | — | Queued |
+| make adoc — architect runs directly | — | Queued |
+
+**The math (settled in v0.22, ch09 §9.4.6):**
+
+Formula 1 (storage update at delegation):
+  s(c) = floor( s(p) × b(c) / N )  where N = 256
+
+Formula 2 (local readback):
+  r(e) = floor( s(e) × N / s(p(e)) )
+
+At L=0, s(p(e)) = N by definition, so r(e) = s(e). The verification of the principle:
+substituting Formula 1 into Formula 2 gives r(c) ≈ b(c) with bounded round-down
+residual.
+
+**Hardware mechanics unchanged from v0.21:** multi-tier arbitration
+(within-budget → over-budget → BE fallthrough), dithered slot scheduling with bounded
+gap ⌈256/CN_FRAC⌉, round-down rounding, pre-flattening with tight reconfiguration
+timing.
+
+### Cluster F (MSE↔QoS isomorphism)
+
+Framing decisions complete (during the v0.22 work session):
+
+- **F1:** 8+8 bit fields for qs.ir / qs.it descriptors.
+- **F2:** Telescoping NOT adopted for QoS in v1 — only meaningful when VMs have
+  direct hardware I/O (IOMMU/passthrough), narrower than MSE's universal
+  applicability. Conservative stance: "only support what explicitly makes sense."
+- **F3–F6:** Adopt MSE's pre-flattening, multi-tier slot arbitration, dithered
+  scheduling, round-down rounding, and domain-isolated overflow for QoS.
+- **F7:** Keep qs.ir doing double duty (Contract assignment + DMA channel binding).
+- **F8:** Accept encoding pressure on RV32 (more qs.* operations become
+  pointer-form-only).
+
+**Charter session pending:** cluster F charter prompt has not been drafted; it should
+follow after the v0.22 chain completes. The prompt will follow the cluster D charter
+pattern but with narrower scope (no telescoping section for QoS).
+
+### Sail redo plan
+
+The existing Sail work (S5–S25 for CME, plus Sail-A scaffolding for MSE at commits
+8572aa0 + f625796) is preserved as **reference material**, not as the foundation for
+next steps. Cluster D propagation revealed a structural issue: the existing CME
+execute functions (ec.oe, ec.ot, possibly ec.ob) were written before MSE Contracts
+existed in the Sail model, and their interaction with the new MSE state was deferred
+to "Sail v1 scope" stubs.
+
+After the v0.22 chain completes and cluster F propagates, the Sail model will be
+**redone holistically** with a unified work-items plan that treats *interoperability
+between instructions and their effects on CSRs* as a first-class concern from the
+start. The existing CME work informs the new plan but does not constrain the new
+architecture.
+
+**Known cross-cutting issues to resolve in the Sail redo:**
+
+- `ec.oe` must revoke MSE Contracts owned by destroyed ECIDs.
+- `ec.ot` probably must revoke the child's MSE Contracts (verify against ch03 §3.4).
+- `mse_bw_cap` auto-update on `ec.ob` is a spec ambiguity — ch13 §5.4 says
+  "updated by ms.ir/ms.it/ms.ot" but the description implies it should track the
+  running ECID. Resolve in spec before Sail encodes either interpretation.
+
+### Other open items
+
+| Item | Description |
+|---|---|
+| D7.1 | Priority inversion / formal bandwidth donation (parked in charter §8 for ratification-stage refinement). |
+| PUB5 §2 | Global-state-mutating instructions audit (gap audit, separate from §1 area-claim which is closed). |
+| PUB5 §3 | Implementation-defined surfaces audit. |
+| PUB5 §4 | Cross-chapter references audit. |
+| D6.1, D6.2, D6.3 | TLB scope, H-extension analogues, charter §1 wording on cross-address-space cost (charter §8, v0.19). |
+
+### Workflow improvement noted
+
+During cluster D framing, an axis was missed in the initial framing: "From the OS
+developer's perspective, does code at level N work identically to code at level 0?"
+The local-view-vs-global-view issue surfaced after v0.21 had already committed because
+the framing question didn't surface it. For future cluster framings (cluster F and
+beyond), include this question explicitly: any extension touching
+nested-virtualization-relevant semantics must be evaluated for
+software-runs-unchanged-at-any-level conformance.
+
+### Disaster recovery
+
+The web-Claude project instructions are mirrored in the repo at
+`docs/meta/web-claude-project-instructions.md` for disaster recovery purposes (e.g.,
+loss of claude.ai project access). That file is a standalone safety copy and is NOT
+part of the normative orientation chain. See the file's own preamble for the
+disaster-recovery procedure.
+
+### Routing reply (external)
+
+The RISC-V International routing reply remains in flight. Architect to follow up if
+no progress within a reasonable timeframe.
+
+---
+
+*This section is dated. Future sessions will update or replace it as work progresses.*
+
+---
+
 ## Part A — Where we are
 
 ### A.1 The project in one paragraph
