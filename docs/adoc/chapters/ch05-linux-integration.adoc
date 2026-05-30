@@ -309,7 +309,8 @@ admission control.
 
 ==== 5.7.2 Mapping Task Parameters to MSE Contract Fields
 
-Each MSE Contract carries two 4-bit fields (Chapter 9, §9.4.1):
+Each MSE Contract carries two 8-bit fields (Chapter 9, §9.4.1) on the
+calling EC’s local scale:
 
 * *`bw_class`* — guaranteed minimum CN-slot count per window; maps
 from the task’s declared peak DRAM bandwidth requirement.
@@ -323,20 +324,42 @@ and an optional per-task memory bandwidth annotation:
 [width="100%",cols="50%,50%",options="header",]
 |===
 |Input |MSE mapping
-|Peak DRAM bandwidth (fraction of total bus) |`bw_class`:
-`ceil(fraction × 15)`
+|Peak DRAM bandwidth (fraction of _this EC’s slice_) |`bw_class`:
+`ceil(fraction × 255)`
 
 |Deadline period (Tᵢ) |`lat_class`: shorter period → lower value →
 higher priority
 |===
 
-*Example.* On a system with `mse_slot_ns` = 100 ns and maximum
-DRAM bandwidth 20 GB/s:
+*Note on the local-view scale.* The `bw_class` value the kernel
+passes to `ms.ir` is on the calling EC’s local 0–255 scale, where 256
+represents 100% of that EC’s slice (charter §4.5.0; ch09 §9.4.6). At L=0
+(the host kernel on bare metal), the EC’s slice is the full system, so
+fraction-of-slice equals fraction-of-total — no special handling is
+needed. At L≥1 (Linux running in a VM), the EC’s slice is whatever
+fraction of system bandwidth was delegated by the parent; the kernel
+computes `bw_class` from fraction-of-its-slice without needing to
+know its depth. The same kernel code works at any delegation level —
+this is the local-view property of CE Suite (charter §4.5.0).
 
-* Task A: 2 ms period, 2 GB/s peak → `lat_class` = 1, `bw_class`
-= 2
-* Task B: 8 ms period, 1 GB/s peak → `lat_class` = 3, `bw_class`
-= 1
+*Example — Linux at L=0 (host kernel).* On a system with
+`mse_slot_ns` = 100 ns and maximum DRAM bandwidth 20 GB/s, with
+the host kernel running at L=0 (the host’s slice equals total system
+bandwidth):
+
+* Task A: 2 ms period, 2 GB/s peak → 10% of slice →
+`ceil(0.10 × 255) = 26` → `bw_class` = 26, `lat_class` = 1.
+* Task B: 8 ms period, 1 GB/s peak → 5% of slice →
+`ceil(0.05 × 255) = 13` → `bw_class` = 13, `lat_class` = 3.
+
+*Example — Linux at L=1 in a VM.* Suppose the same Linux kernel runs in
+a VM where the hypervisor delegated 50% of the host’s bandwidth slice
+(10 GB/s effective for the VM). For Task A at 2 GB/s peak: 2 GB/s ÷ 10
+GB/s = 20% of the VM’s slice. `ceil(0.20 × 255) = 51`. The kernel passes
+`bw_class = 51` to `ms.ir`. Hardware internally translates this to
+the global stored value using Formula 1 of ch09 §9.4.6, invisible to the
+kernel. The kernel code is identical to the L=0 case — only the slice’s
+absolute size changes, not the local-view scale.
 
 A task that declares no memory bandwidth requirement, or that belongs to
 `SCHED_OTHER`, gets `bw_class` = 0 (best-effort, competes in BE
@@ -415,15 +438,23 @@ scheduler hot path.
 MSE Contracts compose naturally with Linux cgroups (Chapter 9, §9.4.2).
 A cgroup is represented by a parent ECID with a group bandwidth cap set
 at cgroup creation time. When a task inside the cgroup calls
-`sched_setattr()`, `ms.ir` enforces:
+`sched_setattr()`, `ms.ir` admits the task only if the cgroup’s
+bandwidth cap is not exceeded. The hardware enforces the cap on
+stored-global values (ch09 §9.4.2; ch09 §9.4.6):
 
 ....
-bw_class_task + Σ bw_class(existing Contract holders in cgroup) ≤ bw_cap(cgroup_ecid)
+Σ s(c) for each child Contract c in cgroup ≤ s_cap(cgroup_ecid)
 ....
+
+where `s(c)` is the stored-global value computed from each Contract’s
+local `bw_class` via Formula 1 of ch09 §9.4.6. Software passes
+local-view `bw_class` to `ms.ir`; the conversion to stored global
+happens internally and is invisible to the kernel. The kernel observes
+the result via `MSE_ERR_CAP_EXCEEDED` (3) when the cap would
+be exceeded.
 
 This prevents a single container from claiming more DRAM bandwidth than
 its cgroup budget allows, even when the global CN budget has headroom.
-`MSE_ERR_CAP_EXCEEDED` (3) is the error code for this case.
 
 The kernel sets `bw_cap(cgroup_ecid)` via `ms.ir` on the
 cgroup’s own ECID at cgroup creation time, distributing bandwidth
