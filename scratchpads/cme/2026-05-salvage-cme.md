@@ -228,3 +228,16 @@ The ideas that translate cleanly into RTL starting points are:
 **Architectural direction:** distributed bank slices (Idea E) — this is the right long-term direction for multi-cluster OoO cores, and the VULM/IULM concept (Idea F) is the cleanest version of it for the vector and interrupt domains specifically.
 
 **Not for RTL yet:** multiple full register sets (Idea D) — only appropriate for S and R (2 full-width sets), not for the general bank store.
+
+---
+
+## Disposition (2026-05-29)
+
+- **Cluster A — CME register-bank physical implementation (Ideas A, B, C; Write-ups 1 and 2; area tables):**
+  → Promoted to `docs/chapters/appendix-c-implementation-guidance.md`.
+  Industry precedents (§C.2), the one-hot/pass-gate sketch (§C.3), register-class-grouped
+  buses, mask-gated segments, area estimates (§C.4), and the speculative R-preload
+  optimization (§C.5) are now captured there as non-normative implementation guidance.
+- **Cluster B — CME distributed-bank variations (Ideas E and F: VULM, IULM, distributed
+  slices for OoO cores):** → Also promoted to Appendix C §C.6 alongside cluster A.
+  Framed as speculative directions requiring further architectural work.
