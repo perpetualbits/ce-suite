@@ -21,12 +21,12 @@ CSR address map:
 |-------|------------------------|--------|-------|
 | 0x7C0–0x7CE | 0111 (M-mode RW) | Read/Write | 15 |
 | 0xFC0–0xFCF | 1111 (M-mode RO) | Read-Only | 16 |
-| 0xFD1–0xFD2 | 1111 (M-mode RO) | Read-Only | 2 |
+| 0xFD1–0xFD4 | 1111 (M-mode RO) | Read-Only | 4 |
 
-**Note.** The 0xFC0–0xFCF range (16 entries) is fully assigned. Two additional CME
-virtualization CSRs use provisional addresses 0xFD1–0xFD2 in the same M-mode
-RO encoding class. Address 0xFD0 is provisionally assigned to
-`ce_present` by Chapter 16 (discovery).
+**Note.** The 0xFC0–0xFCF range (16 entries) is fully assigned. Four additional
+CSRs use provisional addresses 0xFD1–0xFD4 in the same M-mode RO encoding class:
+two CME virtualization CSRs (0xFD1–0xFD2) and two MSE read-only CSRs (0xFD3–0xFD4).
+Address 0xFD0 is provisionally assigned to `ce_present` by Chapter 16 (discovery).
 
 **All addresses are provisional.** Real submission to RISC-V International
 requires allocated CSR addresses. The assignments here serve as a complete
@@ -402,7 +402,10 @@ Contract-Normal / Best-Effort slot split for this hart's DRAM channel.
 `CN_FRAC / 256` gives the fraction of slots allocated to CN traffic. The reset
 value 128 corresponds to a 50 % split. Implementations may restrict legal values
 to a minimum granularity; WARL rounds a written value to the nearest legal
-setting. The BE fraction must remain at least one slot per cycle.
+setting. The BE fraction must remain at least one slot per cycle. The slot pattern
+is dithered (Chapter 9 §9.2.4): the maximum gap between consecutive CN slots is
+bounded by ⌈256 / CN_FRAC⌉ slots, guaranteeing bounded worst-case wait time for
+Contract holders.
 
 **Effect timing.** Changes take effect at the next slot boundary
 (implementation-defined latency, typically one slot period).
@@ -446,29 +449,32 @@ Bandwidth cap for the current ECID's Contract on this hart.
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
 | XLEN-1:8 | *reserved* | WIRI | 0 | — |
-| 7:0 | CAP | WARL | 0 | `bw_class` ceiling for the current ECID's group; 0 = no cap |
+| 7:0 | CAP | WARL | 0 | Pre-flattened `bw_class` ceiling for the current ECID's group on the 0–255 absolute scale; 0 = no cap |
 
 **Semantics.** Hardware updates `CAP` on every `ms.ir`, `ms.it`, and `ms.ot`
 call to reflect the active ECID's Contract-assigned bandwidth allocation.
 M-mode firmware may also write `CAP` directly to impose an additional ceiling;
 hardware stores the minimum of the written value and the Contract-assigned value.
-Writing 0 removes any software-imposed cap.
+Writing 0 removes any software-imposed cap. All cap values are on the
+pre-flattened 0–255 absolute scale (charter §4.5.6; Chapter 9 §9.4.2).
 
 ---
 
 ### 5.5 `mse_bw_sum` — 0xFC9
 
-Running sum of `bw_class` across admitted CN Contract holders on this hart.
+Running sum of pre-flattened `bw_class` across admitted CN Contract holders on this hart.
 
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
 | XLEN-1:8 | *reserved* | WIRI | 0 | — |
-| 7:0 | SUM | RO | 0 | Sum of `bw_class` for all currently-admitted CN Contracts on this hart |
+| 7:0 | SUM | RO | 0 | Sum of pre-flattened `bw_class` for all currently-admitted CN Contracts on this hart |
 
 **Semantics.** Hardware maintains this sum for admission control
 (Chapter 9 §7.3). Software reads it to assess remaining CN bandwidth budget
 before admitting new Contracts. The hardware invariant `SUM ≤ total_cn_budget`
-is enforced atomically on every `ms.ir` and `ms.it`.
+is enforced atomically on every `ms.ir` and `ms.it`. All values are on the
+pre-flattened 0–255 absolute scale (charter §4.5.1); `SUM` is bounded by
+`mse_slot_ratio.CN_FRAC`. See Chapter 9 §9.7.1 for arbitration scope.
 
 ---
 
@@ -514,6 +520,81 @@ Interrupt enable for `mse_violation`.
 
 Level-triggered; remains asserted while `VIOL = 1`. Interrupt routing is
 implementation-defined.
+
+---
+
+### 5.9 `mse_absolute_bw` — 0xFD3
+
+Pre-flattened bandwidth of the currently running EC on this hart.
+
+| Bits | Field | Access | Reset | Description |
+|------|-------|--------|-------|-------------|
+| XLEN-1:8 | *reserved* | WIRI | 0 | — |
+| 7:0 | BW | RO | 0 | Pre-flattened `bw_class` of the currently running EC on the 0–255 absolute scale |
+
+**Semantics.** `BW` reflects the running EC's effective bandwidth value: the
+pre-flattened absolute `bw_class` that the memory controller reads during CN slot
+arbitration (Chapter 9 §9.4.5). This is the post-telescoping value after all
+round-down in the delegation chain. A value of 0 means the running EC has no MSE
+Contract and competes as best-effort only.
+
+Hardware updates `BW` atomically with `ec.ob` when a new EC becomes the running
+EC on this hart. The value matches what the memory controller uses in tier-1 CN
+slot arbitration (Chapter 9 §9.7.1). Reading this CSR has no side effects; it is
+a pure observation.
+
+**Use case.** WCET analysis: compute the running EC's bandwidth guarantee in
+absolute terms. Monitoring: a kernel can periodically read `mse_absolute_bw` to
+confirm bandwidth allocation matches expectation. Debugging: confirm that a
+telescoping chain produced the expected pre-flattened value (Chapter 10 §10.10).
+
+**Cross-references.** Charter §4.5.1 (pre-flattened 0–255 scale); charter §4.5.3
+(pre-flattening semantics and reconfiguration); Chapter 9 §9.4.5; Chapter 10 §10.10.
+
+---
+
+### 5.10 `mse_caps` — 0xFD4
+
+MSE capability register advertising implementation-specific field widths and features.
+
+| Bits | Field | Access | Reset | Description |
+|------|-------|--------|-------|-------------|
+| XLEN-1:24 | *reserved* | WIRI | 0 | — |
+| 23:20 | MAX_PRECISION | RO | impl | Maximum `child_precision` value supported by `ms.it` (1–8, indicating bit widths 1 to 8) |
+| 19:16 | MAX_NESTING | RO | impl | Maximum interrupt nesting depth; same value as `mse_max_nesting.K` |
+| 15:12 | LAT_BITS | RO | impl | Actual decoded width of `lat_class` in bits (4–8) |
+| 11:8 | BW_BITS | RO | impl | Actual decoded width of `bw_class` in bits (4–8) |
+| 7 | DITHER | RO | impl | 1 = dithered slot scheduling per Chapter 9 §9.2.4; 0 = contiguous-block (legacy/limited) |
+| 6 | OVERFLOW | RO | impl | 1 = multi-tier over-budget overflow per Chapter 9 §9.7.1 supported; 0 = strict-budget only |
+| 5 | TELESCOPING | RO | impl | 1 = telescoping with per-delegation `child_precision` supported; 0 = fixed full precision only |
+| 4 | RECONFIG_ATOMIC | RO | impl | 1 = parent reconfiguration completes before the next affected arbitration cycle; 0 = batched reconfiguration only |
+| 3:0 | *reserved* | WIRI | 0 | — |
+
+**Semantics.** All fields are read-only static capability flags reflecting the
+implementation's decoded capabilities. They do not change at runtime.
+
+`BW_BITS` and `LAT_BITS` indicate the actual decoded width (4–8 bits) of the
+`bw_class` and `lat_class` Contract fields. Software must not pass values outside
+the range `[0, 2^BW_BITS − 1]` or `[0, 2^LAT_BITS − 1]` to `ms.ir` or `ms.it`
+(Chapter 9 §9.4.1). A value of 4 indicates the minimum supported width per
+charter §4.5.1; higher values indicate richer implementations.
+
+`MAX_NESTING` replicates `mse_max_nesting.K` (§5.3) for single-CSR-read access;
+both fields are always equal and software may read either.
+
+`DITHER`, `OVERFLOW`, `TELESCOPING`, and `RECONFIG_ATOMIC` are all 1 in a fully
+v0.21-compliant implementation. A value of 0 indicates a non-compliant or
+transitional implementation; portable software should check these bits and fall
+back gracefully.
+
+**Use case.** A WCET-aware kernel reads `mse_caps` at boot to determine which MSE
+features it may rely on. A driver reads `BW_BITS` and `LAT_BITS` to learn the
+Contract parameter range for `ms.ir` and `ms.it`. A virtualization layer checks
+`TELESCOPING` before using `ms.it` with `child_precision` (Chapter 9 §9.4.3).
+
+**Cross-references.** Charter §4.5.1 (field widths and discoverable decoded widths);
+charter §4.5.4 (multi-tier arbitration); charter §4.5.5 (dithered scheduling);
+Chapter 9 §9.4.1; Chapter 9 §9.7.1.
 
 ---
 
@@ -674,7 +755,7 @@ Interrupt routing is implementation-defined.
 | Condition | Outcome |
 |-----------|---------|
 | Any CE Suite CSR access from privilege below M-mode | *illegal instruction* (see Chapter 14 for S-mode relaxations) |
-| Write to any CE Suite RO CSR (0xFC0–0xFCF, 0xFD1–0xFD2) | *illegal instruction* (RISC-V privilege spec §4.1) |
+| Write to any CE Suite RO CSR (0xFC0–0xFCF, 0xFD1–0xFD4) | *illegal instruction* (RISC-V privilege spec §4.1) |
 | Write to a reserved field in an RW CSR | Ignored (WIRI) |
 | Domain-scoped CSR access with invalid domain in `qos_domain_sel` | *illegal instruction* |
 | Access to `cme_seal_key` from S-mode or below | *illegal instruction* (`S_EN` does not relax this restriction) |
@@ -728,6 +809,8 @@ Interrupt routing is implementation-defined.
 | *(0xFD0)* | *(`ce_present` — Chapter 16)* | *CE substrate* | *impl* |
 | 0xFD1 | `current_ecid_level` | CME | 0 |
 | 0xFD2 | `current_ecid_parent` | CME | 0 |
+| 0xFD3 | `mse_absolute_bw` | MSE | 0 |
+| 0xFD4 | `mse_caps` | MSE | impl |
 
 ---
 
