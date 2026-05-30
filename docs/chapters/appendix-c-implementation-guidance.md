@@ -179,55 +179,101 @@ complexity is in the SRAM array layout, not in the data-path logic.
 
 ## C.4 Area-Cost Estimates
 
-This section provides back-of-envelope area estimates for the Option A
-reference profile from Chapter 4 §4.5. These numbers are derived from the
-feasibility analysis in `scratchpads/cme/2026-05-salvage-cme.md` and are
-illustrative only — actual area depends heavily on process node, SRAM
-compiler choices, and implementation discipline.
+These estimates are derived from the stratified model in
+`tools/ce-sizing-calculator.py` (v2 revision, 2026-05-29). That calculator
+replaced an earlier single-configuration model and stratifies costs across
+three deployment classes aligned with the capability profiles in Appendix B.
+The values here are a summary; for the full per-node, per-component
+breakdown (Bank, staging, EC[e] table, bank tag, logic), run the script.
 
-### C.4.1 Reference configuration
+All numbers are illustrative. Actual area depends on process-node SRAM
+compiler choices, the specific core the CE Suite attaches to, and design
+discipline. They are back-of-envelope estimates derived from public
+industry data, not sign-off numbers.
 
-The analysis used the following configuration at 16/12 nm process:
+### C.4.1 Stratified estimates by deployment class
 
-| Component | Size | Notes |
-|-----------|------|-------|
-| 64 NV banks | 64 × 1 KB = 64 KB | SRAM; 1 KB per bank per Chapter 0 §0.6 |
-| 4 VMT banks | 4 × 4 KB = 16 KB | SRAM; 4 KB typical for VLEN=256 |
-| S staging bank + R staging bank | ~10 KB total | Flip-flops or SRAM; ~1 register file each |
-| **Total** | **~90 KB** | **~5.1 M transistors** |
+Three representative configurations cover the deployment range for CE Suite
+v1. The "CE SRAM total" column includes Bank arrays, S/R staging banks,
+EC[e] hot-set SRAM, and Bank tag SRAM; it excludes CPE per-cacheline tag
+costs, which are attributed to the cache and reported separately in §C.4.3.
 
-Estimated silicon area for the bank arrays alone at 16/12 nm: approximately
-0.036 mm². Including bank-select decoder, tag storage, and dirty-bit logic:
-approximately 0.046 mm².
+| Deployment class | CE SRAM total | CE area at 7 nm | vs SiFive U84 (7nm) | vs Cortex-A55 (7nm) | vs P670-class (5nm) |
+|-----------------|---------------|-----------------|---------------------|---------------------|---------------------|
+| CE-MinimalRT | 6.5 KB | 0.0050 mm² | 1.79 % | 1.57 % | 0.46 % |
+| CE-RT | 35.1 KB | 0.0161 mm² | 5.75 % | 5.03 % | 1.47 % |
+| CE-Full | 94.3 KB | 0.0413 mm² | 14.74 % | 12.90 % | 3.78 % |
 
-### C.4.2 As a fraction of host core area
+**Baselines used:**
+- *SiFive U84* — OoO superscalar, A72-class, 7 nm, 0.28 mm² core area
+  (publicly disclosed by SiFive, 2020).
+- *ARM Cortex-A55* — in-order, ARMv8.2-A, 7 nm, ~0.32 mm² core area
+  (estimated from Snapdragon 855 die analysis).
+- *SiFive P670-class* — OoO with vector unit, A78-class, 5 nm, ~0.85 mm²
+  core area (estimated; bare-core area not publicly disclosed).
 
-| Host core type | Core area | CME area fraction | Transistor fraction |
-|---------------|-----------|-------------------|---------------------|
-| Small in-order | ~0.7 mm² | ~6.6 % | ~28 % |
-| Mid in-order | ~1.5 mm² | ~3.1 % | ~17 % |
-| Small OoO | ~3.0 mm² | ~1.5 % | ~8.5 % |
-
-The transistor fraction is notable on very small in-order cores, but those
-cores are not the primary CE Suite target. For the OoO-class cores where CME
-provides the highest value, the area overhead is comfortably below 2 %.
+All three are core-only areas, excluding L2 and L3 cache. The "CE area at
+7 nm" column evaluates per-core CE overhead at the 7 nm SRAM bitcell density
+(0.027 µm²/bit, periphery factor 1.4) for the U84 and A55 comparisons; the
+P670 column uses the 5 nm node (0.021 µm²/bit).
 
 A useful comparison: a hardware double-precision FPU typically adds 5–15 % of
-core area; a hardware vector unit (VLEN=256) adds 10–25 %. At 1–2 % overhead
-for a full CME implementation, the CE Suite adds less area than a hardware FPU
-while providing deterministic multi-context switching for all workload classes.
+core area; a hardware vector unit (VLEN=256) adds 10–25 %. CE-MinimalRT adds
+less overhead than an FPU on any of the listed baselines. CE-Full on a large
+OoO core (P670-class) adds 3.78 % — less than an FPU on the same core.
 
-### C.4.3 Process node scaling
+### C.4.2 Process node and SRAM scaling
 
-SRAM density scales roughly as (process node)² in area per bit. At 7 nm the
-~90 KB configuration would occupy approximately 0.010–0.015 mm² for the
-arrays, reducing the overhead fraction further. The transistor logic (decoder,
-tag, dirty bits) scales similarly. At 3 nm, the CME overhead becomes negligible
-relative to cache and execution unit area.
+**SRAM scaling stalled at N3.** The TSMC N3E bitcell area (0.021 µm²/bit)
+is identical to the N5 bitcell area — SRAM arrays did not shrink materially
+from N5 to N3E (per TSMC IEDM 2022 disclosures). Unlike logic gates, which
+continued to scale, SRAM reached a density plateau at N3E. The
+`tools/ce-sizing-calculator.py` NODE_BITCELL_UM2 table documents this for
+all major process nodes.
 
-The charter §1 estimate of 5–15 % transistor overhead is therefore
-conservative; the 1–2 % OoO figure above is for the SRAM arrays. The higher
-figure applies to very small in-order cores, which are not the primary target.
+The implication for CE Suite implementors: shrinking the process node beyond
+5 nm does not materially reduce the SRAM-dominated Bank array cost. The
+gains at N3 come primarily from logic density (copy engine, decoder, tag
+logic), not from the Bank arrays. The P670-class CE-Full estimate
+(0.0321 mm² at 5 nm) is only ~22 % smaller than the U84 CE-Full estimate
+(0.0413 mm² at 7 nm), reflecting this partial scaling.
+
+At 28 nm (embedded FPGA target or mature-node ASIC), CE-MinimalRT adds
+roughly 0.016 mm², putting it at ~2.7 % of a comparable in-order core —
+still single-digit.
+
+### C.4.3 CPE per-cacheline tag attribution
+
+CPE adds a small per-cacheline ownership tag to every cache line in the
+L1/L2 arrays. This overhead adds area to the *existing cache arrays*, not
+to the core's CE logic block. The correct accounting attributes CPE tag
+costs to the cache, not the core; the §C.4.1 CE SRAM totals exclude them.
+
+Estimates at 7 nm (0.027 µm²/bit, periphery factor 1.4):
+- **CE-MinimalRT** — no CPE configured; no tag overhead.
+- **CE-RT** (6 bits/cacheline on 64 KB L1I+L1D): ~768 bytes of additional
+  cache tag SRAM, approximately 0.0003 mm².
+- **CE-Full** (6 bits/cacheline on 576 KB L1+L2): ~6.75 KB of additional
+  cache tag SRAM, approximately 0.0024 mm².
+
+These are non-trivial but small fractions of the cache's own area. They do
+not affect the §C.4.1 per-core percentage figures.
+
+### C.4.4 Per-chip shared costs
+
+Two CE Suite components are per-chip costs, amortized across all cores on a
+SoC, and are NOT included in the §C.4.1 percentages:
+
+- **MSE arbiter** (memory controller): contract table and bandwidth
+  scheduler. Estimated O(0.01–0.05 mm²) total, regardless of core count.
+  On a 16-core SoC this amortizes to ≤ 0.003 mm² per core.
+- **QoS arbiter** (NoC/DMA controller): similar magnitude, similarly
+  amortized.
+
+Including them in per-core figures would double-count on multi-core SoCs
+where one arbiter serves many cores. For a 16-core CE-RT SoC, the total
+per-core overhead including arbiter amortization is approximately 5.75 % +
+≤ 0.3 % — still within the CE-RT deployment band.
 
 ---
 
