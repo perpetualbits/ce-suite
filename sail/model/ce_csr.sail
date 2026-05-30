@@ -131,12 +131,41 @@ function clause write_CSR(0x7C9, value) = {
   Ok(zero_extend(mse_violation_en))
 }
 
-/* 0xFD3 — mse_absolute_bw (RO) */
+/* 0xFD3 — mse_absolute_bw (RO)
+ * v0.22: returns local view per ch09 §9.4.6 Formula 2:
+ *   local = floor(stored × 256 / parent_stored)
+ * At L=0: parent_stored = N = 256 by definition → local = stored (no transform).
+ * At L≥1: look up parent's stored bw_class and apply Formula 2.
+ * Defensive zeros(): parent has no Contract or parent_stored = 0. */
 function clause read_CSR(0xFD3) =
   if mse_enabled() then
     match find_mse_contract(current_ecid) {
-      Some(contract) => zero_extend(contract.bw_class),
-      None()         => zeros()
+      None()         => zeros(),
+      Some(contract) =>
+        match lookup_ec(current_ecid) {
+          None()      => zeros(),
+          Some(entry) =>
+            if entry.delegation_L == 0b00 then
+              /* L=0: local view equals stored value directly */
+              zero_extend(contract.bw_class)
+            else {
+              /* L≥1: Formula 2 — local = floor(stored × 256 / parent_stored) */
+              match find_mse_contract(entry.parent_ecid) {
+                None()                => zeros(),
+                Some(parent_contract) => {
+                  let p = unsigned(parent_contract.bw_class);
+                  if p == 0 then zeros()
+                  else {
+                    let s       = unsigned(contract.bw_class);
+                    let local   = (s * 256) / p;
+                    /* local ≤ 255 by Formula 1 invariant; clamp defensively */
+                    let clamped = if local > 255 then 255 else local;
+                    zero_extend(to_bits(8, clamped))
+                  }
+                }
+              }
+            }
+        }
     }
   else zeros()
 
