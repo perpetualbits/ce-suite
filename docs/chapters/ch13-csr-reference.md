@@ -458,11 +458,19 @@ hardware stores the minimum of the written value and the Contract-assigned value
 Writing 0 removes any software-imposed cap. All cap values are on the
 pre-flattened 0–255 absolute scale (charter §4.5.6; Chapter 9 §9.4.2).
 
+**Important:** `mse_bw_cap` holds a *stored global* value (charter §4.5.3;
+Chapter 9 §9.4.6). It is used in cap-rule enforcement by hardware (Chapter 9
+§9.4.2) and is not the local view that software at the running EC typically reads.
+For the local-view value of the running EC's bandwidth allocation, use
+`mse_absolute_bw` (§5.9). Implementations may expose `mse_bw_cap` for
+system-level monitoring or debugging, but standard OS kernels and applications do
+not consult it during normal operation.
+
 ---
 
 ### 5.5 `mse_bw_sum` — 0xFC9
 
-Running sum of pre-flattened `bw_class` across admitted CN Contract holders on this hart.
+Running sum of stored-global `bw_class` values across admitted CN Contract holders on this hart.
 
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
@@ -470,11 +478,18 @@ Running sum of pre-flattened `bw_class` across admitted CN Contract holders on t
 | 7:0 | SUM | RO | 0 | Sum of pre-flattened `bw_class` for all currently-admitted CN Contracts on this hart |
 
 **Semantics.** Hardware maintains this sum for admission control
-(Chapter 9 §7.3). Software reads it to assess remaining CN bandwidth budget
+(Chapter 9 §9.7.3). Software reads it to assess remaining CN bandwidth budget
 before admitting new Contracts. The hardware invariant `SUM ≤ total_cn_budget`
 is enforced atomically on every `ms.ir` and `ms.it`. All values are on the
 pre-flattened 0–255 absolute scale (charter §4.5.1); `SUM` is bounded by
 `mse_slot_ratio.CN_FRAC`. See Chapter 9 §9.7.1 for arbitration scope.
+
+**Important:** `mse_bw_sum` is a *stored global* value (charter §4.5.3;
+Chapter 9 §9.4.6). It is the running sum used in arbitration accounting and
+admission control, not the local view that software at the running EC typically
+reads. For the local-view value of the running EC's bandwidth allocation, use
+`mse_absolute_bw` (§5.9). Implementations may expose `mse_bw_sum` for
+system-level monitoring.
 
 ---
 
@@ -525,31 +540,56 @@ implementation-defined.
 
 ### 5.9 `mse_absolute_bw` — 0xFD3
 
-Pre-flattened bandwidth of the currently running EC on this hart.
+Local-view bandwidth of the currently running EC on this hart.
 
 | Bits | Field | Access | Reset | Description |
 |------|-------|--------|-------|-------------|
 | XLEN-1:8 | *reserved* | WIRI | 0 | — |
 | 7:0 | BW | RO | 0 | Pre-flattened `bw_class` of the currently running EC on the 0–255 absolute scale |
 
-**Semantics.** `BW` reflects the running EC's effective bandwidth value: the
-pre-flattened absolute `bw_class` that the memory controller reads during CN slot
-arbitration (Chapter 9 §9.4.5). This is the post-telescoping value after all
-round-down in the delegation chain. A value of 0 means the running EC has no MSE
-Contract and competes as best-effort only.
+**Semantics.** `mse_absolute_bw` returns the *local view* of the currently running
+EC's bandwidth allocation: the fraction of the EC's own slice, expressed on the
+0–255 scale where 256 represents 100% of that EC's slice (charter §4.5.0).
 
-Hardware updates `BW` atomically with `ec.ob` when a new EC becomes the running
-EC on this hart. The value matches what the memory controller uses in tier-1 CN
-slot arbitration (Chapter 9 §9.7.1). Reading this CSR has no side effects; it is
-a pure observation.
+The value is computed by hardware at read time as:
 
-**Use case.** WCET analysis: compute the running EC's bandwidth guarantee in
-absolute terms. Monitoring: a kernel can periodically read `mse_absolute_bw` to
-confirm bandwidth allocation matches expectation. Debugging: confirm that a
-telescoping chain produced the expected pre-flattened value (Chapter 10 §10.10).
+```
+r(e) = floor( s(e) × N / s(p(e)) )
+```
 
-**Cross-references.** Charter §4.5.1 (pre-flattened 0–255 scale); charter §4.5.3
-(pre-flattening semantics and reconfiguration); Chapter 9 §9.4.5; Chapter 10 §10.10.
+where `s(e)` is the stored global value of the running EC, `s(p(e))` is the stored
+global value of the EC's parent (or N = 256 at L=0, since the root EC's parent is
+conceptually the system as a whole), and N = 256. See Chapter 9 §9.4.6
+(Mathematical foundation of telescoping) for the derivation and verification of
+this formula (Formula 2).
+
+The value approximately equals the `child_bw_class` written to the parent's `ms.it`
+descriptor when this EC was delegated to. The difference is at most a small number
+of units due to round-down rounding in Formula 1 of Chapter 9 §9.4.6 at each
+delegation level.
+
+A value of 0 means the running EC has no MSE Contract and competes as best-effort
+only.
+
+Hardware updates `BW` atomically when a new EC becomes the running EC on this hart
+(via `ec.ob`) and when the EC's Contract is reconfigured (via `ms.ir`, `ms.it`, or
+`ms.ot`). Reading this CSR has no side effects.
+
+**Use case.** *WCET analysis:* at any delegation level, software computes its
+bandwidth guarantee in local terms. At L=0, the readback equals fraction-of-total
+directly. At L>0, the readback is fraction-of-own-slice; software that needs
+fraction-of-total can compose with the delegation chain (using `current_ecid_level`
+and parent information from Chapter 0 §0.8). *Monitoring:* a kernel can read this
+CSR to verify its bandwidth allocation matches expectation; the local-view scale
+means the same monitoring code works at any delegation depth. *Debugging:*
+confirms that a telescoping delegation chain produced the expected local-view value
+(matching the `child_bw_class` the parent wrote, within rounding residual;
+Chapter 10 §10.10).
+
+**Cross-references.** Charter §4.5.0 (software transparency at any delegation
+level); charter §4.5.1 (Contract precision and 0–N scale); charter §4.5.3
+(pre-flattening and reconfiguration timing); Chapter 9 §9.4.6 (mathematical
+foundation — Formula 2); Chapter 10 §10.10 (reading example).
 
 ---
 
