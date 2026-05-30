@@ -324,4 +324,67 @@ defined. Any change would require bumping the instruction encoding revision.
 
 ---
 
+## 19. CPE soft-partition hints (PREFETCH_CLASS, WEIGHT)
+
+**Status:** Future work, not part of v1. Orthogonal to F1's
+CPE encoding decision.
+
+**Source:** Surfaced during the salvage analysis of the
+alternative CPE encoding proposal (Cluster E discussion,
+2026-05-29). The alternative encoding itself was rejected
+(see `scratchpads/cpe/2026-05-salvage-cpe.md` for the
+rejection rationale and ch07 for the current encoding).
+These two hint ideas are independent of the encoding
+question.
+
+**The idea:**
+
+Current CPE (ch07) uses strict way-mask partitioning: a
+partition either includes a cache way or it does not. This
+is correct for hard-real-time and isolation use cases.
+But many workloads sit in between — they would benefit
+from biased cache behavior without strict isolation. Two
+candidate hint mechanisms:
+
+- **PREFETCH_CLASS:** software-supplied hint per ECID about
+  the expected prefetch pattern (e.g. streaming, pointer-
+  chasing, random). The prefetcher could use this hint to
+  bias its aggressiveness, prefetch distance, or
+  replacement-policy decisions for lines belonging to that
+  ECID. The hint is advisory — hardware may ignore it
+  entirely without affecting correctness.
+
+- **WEIGHT:** software-supplied weighting (e.g. 1–16) for
+  soft partition pressure. When the cache is over-
+  subscribed and the replacement policy has to choose a
+  victim, weights bias the selection toward less-weighted
+  ECIDs first. This is softer than way-mask partitioning
+  (no guarantees) but useful for QoS-like behavior in
+  workloads that cannot afford the area cost of full
+  partitioning.
+
+**Why future-only:**
+
+Both hints are non-essential for the v1 use cases CE Suite
+targets (RT/safety-critical isolation, virtualization
+isolation, fairness with hard guarantees). They would
+complement those use cases for general-purpose workloads
+where strict isolation is wasteful. v1 should ship without
+them; a v2 extension can revisit if implementer demand
+materializes.
+
+**Implementation sketch:**
+
+Most likely a new CSR (e.g., `cpe_hint`) carrying per-ECID
+hint values, with bits assigned to PREFETCH_CLASS and
+WEIGHT fields. Probing via `cpe_caps` (an additional
+capability bit). No new instructions required; the existing
+`cp.ir`/`cp.it` pattern is unaffected.
+
+Reserved-bit policy: existing `cpe_caps` reserved bits in
+ch07 §7.7 must accommodate this addition without breaking
+prior implementations.
+
+---
+
 *End of Future Directions.*

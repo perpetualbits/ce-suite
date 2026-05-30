@@ -125,3 +125,64 @@ Software cache coloring. This was acknowledged as a real and useful technique bu
 CPE's essential value proposition, distilled: **a hard real-time EC on a hart can reserve a set of cache ways in its private L1/L2. Those ways are never evicted by any other EC. When CME switches the hard real-time EC back in, its working set is still hot.** The 1-cycle context switch of CME and the persistent partition of CPE together eliminate two of the three classical sources of real-time latency jitter: context save/restore time and cache cold-start time. The third (TLB stale translation) is handled by the automatic sfence.vma-on-SATP-change rule in CME.
 
 All of this is implementable with known techniques (way masks, locked ways, per-ECID replacement policy bits), and has clear precedent in Intel CAT and ARM MPAM. The RISC-V gap is real — nothing standardizes this today — and CPE fills it cleanly.
+
+---
+
+## Cluster E disposition — alternative CPE encoding rejected (2026-05-29)
+
+The salvage's two-instruction `cp.ip`/`cp.op` encoding with
+packed flags (COUPLE_L1L2, LOCK_EN, INLINE) was reviewed
+against the current ch07 specification (the F1 resolution).
+**Disposition: REJECTED. F1 stands.**
+
+Rationale:
+
+1. **Functional content already present.** Every flag the
+   salvage proposed exists in ch07 §7.4's partition descriptor:
+   - `couple` bit (= COUPLE_L1L2)
+   - `lock_en` bit (= LOCK_EN)
+   - Bit [XLEN-1] selects inline vs pointer form (= INLINE
+     mode)
+   - `level_sel` field selects L1 / L2 / both
+   Same functionality, different placement (descriptor bits
+   rather than instruction bits).
+
+2. **The unified `{i,o}{r,t}` pattern is normative.** F1
+   established `cp.ir`/`cp.or`/`cp.it`/`cp.ot` consistent with
+   `ms.{i,o}{r,t}` and `qs.{i,o}{r,t}` across the CE Suite.
+   The pattern is cited in ch00 §0.9. Renaming CPE alone to
+   `cp.ip`/`cp.op` would make CPE the odd extension out and
+   break a hard-won consistency.
+
+3. **QUERY operation realized as CSR.** The salvage proposed
+   a dedicated query instruction; ch07 §7.7 provides this via
+   the `cpe_caps` CSR (RO). CSR-based capability discovery is
+   more RISC-V idiomatic and consistent with how `cme_caps`
+   and other CE Suite extensions handle the same need.
+
+4. **Delegation is cleanly separated.** F1's `cp.it`/`cp.ot`
+   give CPE first-class delegation semantics matching CME's
+   `ec.it`/`ec.ot`. Fusing delegation into a unified
+   `cp.ip`/`cp.op` (as the salvage proposed) would lose this
+   parallelism without architectural gain.
+
+5. **L3 deferral is consistent.** The salvage's "L3 out of
+   scope, revisit later" position is what ch07 already does —
+   the descriptor covers L1 and L2; L3-private partitioning
+   is a future-extension question.
+
+**What was preserved:** Two orthogonal hint ideas
+(PREFETCH_CLASS, WEIGHT) are genuinely independent of the
+encoding question. These have been added to
+`docs/future-directions.md` as candidate future work. They
+could be implemented as a `cpe_hint` CSR or a new instruction
+later without touching F1's encoding decision.
+
+**What was rejected:** The encoding-format change
+(`cp.ip`/`cp.op` two-instruction pattern), the dedicated
+QUERY instruction (replaced by `cpe_caps` CSR), and
+fused-delegation packing (covered by `cp.it`/`cp.ot`).
+
+This disposition does NOT preclude future CPE encoding
+discussions for genuinely new functionality. It closes only
+this specific alternative-encoding proposal.
