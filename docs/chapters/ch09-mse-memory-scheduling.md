@@ -70,6 +70,28 @@ In steady state with N active Contract holders each claiming one CN slot per pai
 - BE traffic fills all slots not consumed by Contract holders, so total bus utilization
   approaches 100 % under load.
 
+### 9.2.4 Dithered slot scheduling and bounded gap
+
+The slot pattern within a window must satisfy `mse_slot_ratio.CN_FRAC` over the
+window's slot count. In addition, the maximum gap between consecutive CN slots is
+bounded by ⌈256 / CN_FRAC⌉ slots, and the maximum gap between consecutive BE slots is
+similarly bounded.
+
+This bounded-gap property is required to preserve the worst-case CN latency guarantee
+under interrupt nesting: a Contract holder waiting for its next CN slot waits at most
+one gap period regardless of `CN_FRAC` value, which ensures the (K+1) × slot_size
+latency bound in §9.3.2 remains valid across the full range of `CN_FRAC` settings.
+
+Implementations satisfy this property by any mechanism. The spec specifies the
+guarantee (bounded gap), not the mechanism.
+
+**Example.** With `CN_FRAC = 192` (75% CN, 25% BE), the maximum CN gap is
+⌈256/192⌉ = 2. The repeating 4-slot pattern CCCB... satisfies this: every 4 slots
+holds exactly 3 CN and 1 BE, and the longest gap between two CN slots is 1 (one BE
+slot separating them). A Contract holder waiting for its next CN slot waits at most 1
+additional slot period. By contrast, placing all 192 CN slots contiguously would
+create a 64-slot gap for BE traffic — 64 times the bounded-gap worst case.
+
 ---
 
 ## 9.3 Interrupt Accommodation and Latency Bounds
@@ -136,52 +158,103 @@ CP field plus admission-control state in implementation-defined per-controller S
 
 Each MSE Contract holds two fields set by the privileged actor that creates it:
 
-| Field | Width | Meaning |
+| Field | Architectural width | Meaning |
 |---|---|---|
-| `bw_class` | 4 bits | Minimum bandwidth class: how many CN slots per window the holder is guaranteed. 0 = best-effort only. |
-| `lat_class` | 4 bits | Latency class: priority within CN slot arbitration. Lower value = higher priority. 0 = best-effort only. |
+| `bw_class` | 8 bits max | Guaranteed minimum CN slots per window, on the pre-flattened 0–255 absolute scale (see §9.4.5). 0 = best-effort only. |
+| `lat_class` | 8 bits max | Priority within CN slot arbitration. Lower value = higher priority. 0 = best-effort only. |
+
+Both fields have a maximum architectural width of 8 bits. Implementations may decode
+fewer bits and advertise the actual decoded width via the `mse_caps` CSR (Chapter 13).
+The minimum supported decoded width is 4 bits per field for meaningful MSE support.
+Software discovers the actual decoded widths by reading `mse_caps`.
 
 Both fields are zero for best-effort ECIDs. An ECID with both fields non-zero is a
 **Contract holder**; it participates in CN slot arbitration.
 
-`bw_class` and `lat_class` are carried in the bank's CP field (chapter 0 §0.6) and
+`bw_class` and `lat_class` are carried in the bank's CP field (Chapter 0 §0.6) and
 loaded atomically by `ec.ob` on context switch. The memory controller reads these
 fields from per-hart registers, not from RAM, during arbitration.
 
 ### 9.4.2 Group bandwidth cap
 
 The privileged actor that creates an ECID may set a **group bandwidth cap** on it:
-a ceiling on the total `bw_class` sum across all ECIDs in that ECID's delegation
-subtree. The cap is stored in `EC[e]` (implementation-defined field) and checked in
-O(1) on every `ms.ir` call.
+a ceiling on the total pre-flattened `bw_class` sum across all ECIDs in that ECID's
+delegation subtree. The cap is stored in `EC[e]` (implementation-defined field) and
+checked in O(1) on every `ms.ir` and `ms.it` call.
 
-Hardware enforces:
+Hardware enforces the cap on pre-flattened absolute values:
 
 ```
-sum(bw_class, subtree(e)) ≤ bw_cap(e)
+sum(pre-flattened bw_class, subtree(e)) ≤ bw_cap(e)
 ```
 
-A child cannot claim more guaranteed bandwidth than the parent has delegated. This
-is the mechanism that prevents a tenant VM from over-committing global memory
-resources.
+where all values are on the 0–255 absolute scale.
 
-### 9.4.3 Hierarchical splitting
+A child cannot claim more guaranteed bandwidth than the parent has delegated. This is
+the mechanism that prevents a tenant VM from over-committing global memory resources.
+
+Round-down rounding during telescoping (§9.4.3) typically creates a small residual
+within each group — the sum of children's pre-flattened values is less than the
+parent's due to rounding. This residual is not lost: it flows via the multi-tier
+over-budget overflow or BE fallthrough in §9.7.1.
+
+### 9.4.3 Hierarchical splitting and telescoping
 
 A privileged actor may split an MSE Contract into a parent Contract and one or more
-child Contracts. Each child's `bw_class` must be ≤ the parent's
-`bw_class` minus what the parent retains. The sum of all children's `bw_class` values
-must never exceed the parent's `bw_class`.
+child Contracts via `ms.it` (§9.5). Splitting is **atomic**: if the hardware admission
+check fails, no state is changed.
 
-Splitting is performed via `ms.it` (§9.5) and is **atomic**: if the hardware
-admission check fails, no state is changed.
+**Telescoping.** When delegating, the parent specifies the child's bandwidth share as
+a value on the parent's local precision scale. The hardware computes the child's
+pre-flattened bandwidth by multiplying the parent's pre-flattened value by the child's
+fraction, rounded down:
+
+```
+child_pre_flattened = floor(parent_pre_flattened × (child_bw_class / parent_scale))
+```
+
+where `parent_scale` is the parent's local precision range (e.g., 256 for 8-bit
+precision). The result is stored as the child's pre-flattened value. The parent may
+optionally specify the child's local precision (1–8 bits) in the delegation descriptor
+(§9.5 `ms.it`); if omitted, the child uses the parent's precision.
+
+**Cap enforcement.** The sum of all children's pre-flattened `bw_class` values must
+not exceed the parent's pre-flattened `bw_class` (§9.4.2). Round-down guarantees this
+invariant holds even at the extreme, since `floor(x) ≤ x` always.
+
+**Example.** A hypervisor holds pre-flattened `bw_class = 76`. It delegates to three
+VMs at 50%, 25%, and 12% of its slice:
+
+- VM-A: floor(76 × 50/100) = 38
+- VM-B: floor(76 × 25/100) = 19
+- VM-C: floor(76 × 12/100) = floor(9.12) = 9
+
+Sum of children = 66. Residual = 76 − 66 = 10, available for over-budget overflow via
+§9.7.1 tier 2.
 
 ### 9.4.4 Dissolution
 
 When an ECID's Contract is revoked (via `ms.or` or `ec.oe`), the Contract dissolves
-and its `bw_class` is returned to the parent ECID's cap headroom. If the ECID has
-child Contracts, those are revoked first, recursively. This is
-always O(log N) via the radix tree and always succeeds — even for zombie or hostile
-ECIDs.
+and its pre-flattened `bw_class` is returned to the parent ECID's cap headroom. If
+the ECID has child Contracts, those are revoked first, recursively. This is always
+O(log N) via the radix tree and always succeeds — even for zombie or hostile ECIDs.
+
+### 9.4.5 Pre-flattening
+
+The hardware maintains the **pre-flattened `bw_class`** in the leaf Contract: the
+absolute bandwidth value on the 0–255 scale computed once at delegation time (§9.4.3).
+Arbitration reads this value in O(1) with no runtime multiplication.
+
+When a parent Contract is reconfigured (its pre-flattened bandwidth changes via a
+privileged operation), all descendant Contracts in its subtree are recomputed. The
+recomputation must complete before the next arbitration cycle that involves any
+affected Contract holder. Implementations may briefly stall arbitration on affected
+harts during recomputation; non-affected harts continue unaffected.
+
+The `mse_absolute_bw` CSR (specified in Chapter 13) allows software to read the
+running EC's effective pre-flattened `bw_class` — the value the memory controller uses
+in arbitration. This is useful for monitoring, admission-control accounting, and
+debugging.
 
 ---
 
@@ -212,24 +285,27 @@ opaque group ID.
 * **Syntax**: `ms.ir rd, rs1, rs2`
   * `rd`: 0 on success; error code on failure.
   * `rs1`: Target ECID.
-  * `rs2`: Contract parameters. Inline form (bit `[XLEN-1]` = 0): bits 3:0 =
-    `bw_class`, bits 7:4 = `lat_class`, bits `[XLEN-2]`:8 reserved (must be zero).
+  * `rs2`: Contract parameters. Inline form (bit `[XLEN-1]` = 0): bits 7:0 =
+    `bw_class`, bits 15:8 = `lat_class`, bits `[XLEN-2]`:16 reserved (must be zero).
     Pointer form (bit `[XLEN-1]` = 1): bits `[XLEN-2]`:0 are a pointer to an
     `MSE_Contract_Params` struct (see below).
 * **Pointer form struct:**
 ```c
 struct MSE_Contract_Params {
-    uint8_t  bw_class;    /* bandwidth class (0 = best-effort) */
-    uint8_t  lat_class;   /* latency class (0 = best-effort) */
+    uint8_t  bw_class;    /* pre-flattened bandwidth class, 0–255 (0 = best-effort) */
+    uint8_t  lat_class;   /* latency class, 0–255 (0 = best-effort) */
     uint16_t reserved;    /* must be zero */
 };
 ```
 * **Semantics**:
   1. Checks that `rs1` is a valid, allocated ECID on this hart.
-  2. Checks that `bw_class(rs2) + existing_sum(subtree(parent(rs1))) ≤ bw_cap(parent(rs1))`.
-     If not, returns `MSE_ERR_CAP_EXCEEDED` in `rd`; no state changes.
-  3. Sets `EC[rs1].bw_class` and `EC[rs1].lat_class`.
-  4. Updates the running bandwidth sum for all ancestor groups up to the root.
+  2. Checks that `bw_class(rs2) + existing_sum(subtree(parent(rs1))) ≤ bw_cap(parent(rs1))`
+     (all values on 0–255 absolute scale). If not, returns `MSE_ERR_CAP_EXCEEDED` in
+     `rd`; no state changes.
+  3. Sets `EC[rs1].bw_class` and `EC[rs1].lat_class` to the supplied values (stored as
+     pre-flattened absolute values on the 0–255 scale).
+  4. Updates the running pre-flattened bandwidth sum for all ancestor groups up to the
+     root.
   5. The change takes effect on the next `ec.ob` that loads ECID `rs1`. If ECID
      `rs1` is currently running on this hart, the new Contract parameters are
      applied immediately to the per-hart memory controller registers; the new
@@ -269,18 +345,21 @@ struct MSE_Contract_Params {
   | Bits | Field | Meaning |
   |---|---|---|
   | 15:0 | `child_ecid` | Child ECID to receive the split Contract |
-  | 19:16 | `child_bw_class` | Bandwidth class to delegate (0 = inherit parent's full class) |
-  | 23:20 | `child_lat_class` | Latency class to delegate (0 = inherit parent's full class) |
-  | `[XLEN-2]`:24 | — | Reserved; must be zero |
+  | 23:16 | `child_bw_class` | Bandwidth class to delegate on parent's precision scale (0 = inherit parent's full class) |
+  | 31:24 | `child_lat_class` | Latency class to delegate (0 = inherit parent's full class). On RV32, only bits 30:24 (7 bits); values 128–255 require pointer form. |
+  | 35:32 *(RV64 only)* | `child_precision` | Child's local precision in bits (1–8). 0 = use parent's precision unchanged. |
+  | `[XLEN-2]`:36 | — | Reserved; must be zero. On RV32, no bits are available here. |
   | `[XLEN-1]` | `ptr` | 1 = pointer form; bits `[XLEN-2]`:0 point to `MSE_Delegation_Params` |
 
   Pointer form struct:
 ```c
 struct MSE_Delegation_Params {
     uint16_t child_ecid;       /* child ECID to receive the split Contract */
-    uint8_t  child_bw_class;   /* bandwidth class to delegate (0 = inherit parent's) */
+    uint8_t  child_bw_class;   /* bandwidth class on parent's precision scale (0 = inherit) */
     uint8_t  child_lat_class;  /* latency class to delegate (0 = inherit parent's) */
-    uint32_t reserved;         /* must be zero */
+    uint8_t  child_precision;  /* child's local precision 1–8 bits; 0 = use parent's unchanged */
+    uint8_t  reserved1;        /* must be zero */
+    uint16_t reserved2;        /* must be zero */
 };
 ```
 
@@ -288,11 +367,15 @@ struct MSE_Delegation_Params {
 
 * **Semantics**:
   1. Verifies `child_ecid` is a child of `rs1` in the delegation tree.
-  2. Performs the split: transfers `child_bw_class` and `child_lat_class` to the
-     child; if both are 0, the child inherits the parent's full class.
-  3. Admission check: `bw_class(child) + existing_sum(subtree(rs1)) ≤ bw_cap(rs1)`.
-     If the check fails, returns `MSE_ERR_CAP_EXCEEDED`; no state changes.
-  4. Updates running sums atomically.
+  2. Computes the child's pre-flattened bandwidth:
+     `floor(parent_pre_flattened × (child_bw_class / parent_scale))`. If
+     `child_bw_class` = 0, the child inherits the parent's full pre-flattened value.
+     If `child_precision` is non-zero, sets the child's local precision accordingly;
+     otherwise the child uses the parent's precision.
+  3. Admission check: `pre_flattened(child) + existing_sum(subtree(rs1)) ≤ bw_cap(rs1)`
+     (all values on 0–255 absolute scale). If the check fails, returns
+     `MSE_ERR_CAP_EXCEEDED`; no state changes.
+  4. Updates running pre-flattened sums atomically.
 * **Cycles**: 1–8 (log of delegation depth).
 
 ---
@@ -320,8 +403,10 @@ struct MSE_Delegation_Params {
 | `mse_slot_ratio` | RW (privileged) | CN/BE slot split. Bits 7:0 = CN fraction (0–255, where 128 = 50 %). Implementations may restrict to a set of legal values. |
 | `mse_slot_ns` | RO | Slot size in nanoseconds (implementation-defined). |
 | `mse_max_nesting` | RO | Maximum interrupt nesting depth K supported by this implementation. |
-| `mse_bw_cap` | RW (privileged) | Per-hart register holding the bandwidth cap for the currently loaded ECID's group. Updated by `ms.ir` / `ms.it` / `ms.ot`. |
-| `mse_bw_sum` | RO | Running sum of `bw_class` across all active Contract holders on this hart. |
+| `mse_bw_cap` | RW (privileged) | Per-hart register holding the pre-flattened bandwidth cap for the currently loaded ECID's group. Updated by `ms.ir` / `ms.it` / `ms.ot`. |
+| `mse_bw_sum` | RO | Running sum of pre-flattened `bw_class` across all active Contract holders on this hart. |
+| `mse_absolute_bw` | RO | Pre-flattened `bw_class` of the currently running EC on this hart — the value the memory controller uses in arbitration. Useful for monitoring and debugging. Full specification in Chapter 13. |
+| `mse_caps` | RO | Capability register advertising the implementation's decoded field widths for `bw_class` and `lat_class`, and other MSE parameters. Full specification in Chapter 13. |
 | `mse_status` | RO | Result code from the last MSE operation on this hart. |
 | `mse_violation` | RO (sticky) | Set when a Contract holder does not receive its guaranteed CN slot in the expected window. Cleared by writing 1. Raises an interrupt if `mse_violation_en` is set. |
 | `mse_violation_en` | RW (privileged) | Enable interrupt on `mse_violation`. |
@@ -330,19 +415,63 @@ struct MSE_Delegation_Params {
 
 ## 9.7 Arbitration
 
-### 9.7.1 Per-access arbitration (CN slots)
+### 9.7.1 Per-access arbitration (CN slots) — multi-tier policy
 
-Within each CN slot, the memory controller selects one requesting EC using the
-following rule, executed in O(1) hardware:
+Within each CN slot, the memory controller selects the winning Contract holder using
+the following three-tier rule, executed in O(1) hardware:
 
-1. Collect all harts with a pending DRAM request and a non-zero `lat_class`.
-2. Select the hart with the **lowest `lat_class` value** (highest priority).
-3. Ties broken by round-robin among tied harts.
-4. Grant that hart a burst of size proportional to its `bw_class` (implementation
-   maps `bw_class` to a burst length, typically 1–16 cache lines).
+**Tier 1 — Within-budget Contract holders.** A Contract holder is *within budget* when
+it has consumed fewer than its guaranteed `bw_class` slots in the current window.
+Among all within-budget harts with a pending DRAM request, the hart with the lowest
+`lat_class` value wins (lower = higher priority). Ties are broken by round-robin: each
+hart's most-recent grant time is tracked; among equally-prioritized contenders the
+least-recently-served hart wins.
 
-Best-effort requests (zero `lat_class`) are not eligible in CN slots; they wait for
+**Tier 2 — Over-budget Contract holders.** If no within-budget Contract holder
+requests memory in this CN slot, Contract holders that have already consumed their
+full `bw_class` guaranteed slots but still want memory compete. Selection follows the
+same rule: lowest `lat_class` wins, round-robin tie-break.
+
+**Tier 3 — Best-effort fallthrough.** If no Contract holder of any tier requests
+memory in this CN slot, the slot becomes available to best-effort traffic. BE harts
+compete by round-robin.
+
+A BE slot (from the `mse_slot_ratio` alternation) is always available to best-effort
+traffic independently of the CN slot policy.
+
+The tier ordering guarantees three properties:
+- Every Contract holder receives at least its promised `bw_class` slots per window
+  (tier 1 serves within-budget holders before over-budget demands).
+- Idle Contract bandwidth does not go to waste (tiers 2 and 3 absorb it).
+- BE traffic always has a path to memory via dedicated BE slots plus CN fallthrough.
+
+Best-effort requests (zero `lat_class`) are never eligible in CN slots; they wait for
 the next BE slot.
+
+**Worked example.** Window = 256 slots. `CN_FRAC = 128` (50/50), giving 128 CN and
+128 BE slots per window (dithered per §9.2.4). Three active Contracts, all requesting
+memory throughout the window:
+
+| EC | `bw_class` | `lat_class` | Budget |
+|---|---|---|---|
+| EC-A | 8 | 1 *(highest priority)* | 8 slots |
+| EC-B | 4 | 3 | 4 slots |
+| EC-C | 16 | 5 | 16 slots |
+
+**CN slots 1–8:** EC-A, EC-B, EC-C all within budget. EC-A has `lat_class = 1`
+(lowest) and wins all 8 slots. EC-A is now at budget.
+
+**CN slots 9–12:** EC-B and EC-C within budget; EC-A over-budget. EC-B wins
+(`lat_class = 3 < 5`). EC-B is now at budget.
+
+**CN slots 13–28:** Only EC-C within budget. EC-C wins all 16 slots. EC-C is now at
+budget. Within-budget phase complete: 8 + 4 + 16 = 28 CN slots used.
+
+**CN slots 29–128:** All Contracts over-budget (tier 2). EC-A has `lat_class = 1`
+(highest priority among over-budget holders) and wins all 100 remaining CN slots.
+
+Final tally: EC-A = 8 (guaranteed) + 100 (over-budget) = 108 total CN slots. EC-B = 4.
+EC-C = 16. All three received their guaranteed minimum; no CN slot was unused.
 
 ### 9.7.2 Per-access arbitration (BE slots)
 
@@ -493,6 +622,103 @@ result in a0 (a0=x10=`01010`, a1=x11=`01011`, a2=x12=`01100`):
   implementation-defined for v1.0: software may deny the request, queue the
   Contract, or use another strategy. Richer slow-path semantics are deferred.
 - **Cross-hart ECS sharing during migration.** Deferred to a future revision.
+
+---
+
+## 9.13 Worked Example: Telescoping Delegation and Multi-Tier Arbitration
+
+This section shows the complete MSE flow for a hypervisor managing three virtual
+machines: bandwidth allocation via telescoping delegation, arbitration across a
+scheduling window, and the interplay of guaranteed minimum and over-budget consumption.
+The scenario is representative of a L=1 hypervisor in a mixed-criticality system.
+
+### 9.13.1 Setup
+
+The system has 256-slot windows with `CN_FRAC = 128` (50/50 CN/BE split), dithered
+per §9.2.4, giving 128 CN and 128 BE slots per window. The root ECID (L=0) holds
+`bw_class = 255` (full system bandwidth). Firmware delegates a 30% slice to a
+hypervisor ECID (hyp_ecid, L=1) and the hypervisor creates three guest ECIDs (L=2).
+
+**Step 1.** Hypervisor claims its bandwidth via `ms.ir`. A 30% share of 256 =
+floor(76.8) = 76 (round-down).
+
+```asm
+# Inline ms.ir: bits 7:0 = bw_class = 76, bits 15:8 = lat_class = 2
+li   a2, ((2 << 8) | 76)      # 0x0240
+ms.ir a0, hyp_ecid, a2         # a0 = 0 on success
+```
+
+Hypervisor's pre-flattened `bw_class` = 76.
+
+**Step 2.** Hypervisor delegates to three VMs via `ms.it`.
+
+| VM | Requested fraction | Pre-flattened `bw_class` | `lat_class` |
+|---|---|---|---|
+| VM-A (high priority) | 50% of 76 | floor(38.0) = 38 | 1 |
+| VM-B (medium priority) | 25% of 76 | floor(19.0) = 19 | 5 |
+| VM-C (low priority) | 12% of 76 | floor(9.12) = 9 | 10 |
+
+Residual in hypervisor: 76 − (38 + 19 + 9) = 10 units, available for over-budget
+overflow to the hypervisor's subtree.
+
+```asm
+# Delegate to VM-A: child_bw_class = 38, child_lat_class = 1
+# Inline ms.it: bits 15:0 = child_ecid, 23:16 = child_bw_class, 31:24 = child_lat_class
+li   t0, vm_a_ecid
+ori  t0, t0, (38 << 16)        # child_bw_class = 38
+ori  t0, t0, (1 << 24)         # child_lat_class = 1
+ms.it a0, hyp_ecid, t0
+
+# Delegate to VM-B: child_bw_class = 19, child_lat_class = 5
+li   t0, vm_b_ecid
+ori  t0, t0, (19 << 16)
+ori  t0, t0, (5 << 24)
+ms.it a0, hyp_ecid, t0
+
+# Delegate to VM-C: child_bw_class = 9, child_lat_class = 10
+li   t0, vm_c_ecid
+ori  t0, t0, (9 << 16)
+ori  t0, t0, (10 << 24)
+ms.it a0, hyp_ecid, t0
+```
+
+### 9.13.2 A typical scheduling window (all VMs active)
+
+All three VMs are requesting memory throughout the window (128 CN slots available).
+
+**Within-budget phase (tier 1):**
+
+- CN slots 1–38: VM-A wins all (`lat_class = 1` lowest). VM-A budget exhausted.
+- CN slots 39–57: VM-B wins all (`lat_class = 5` next lowest). VM-B budget exhausted.
+- CN slots 58–66: VM-C wins all (`lat_class = 10`). VM-C budget exhausted.
+- Total within-budget consumption: 38 + 19 + 9 = 66 CN slots.
+
+**Over-budget phase (tier 2):**
+
+- CN slots 67–128: All three VMs over-budget. VM-A has `lat_class = 1` (highest
+  priority) and wins all 62 remaining CN slots.
+
+**Final tally:**
+
+| VM | Guaranteed | Received | Guarantee met? |
+|---|---|---|---|
+| VM-A | 38 | 38 + 62 = 100 | ✓ |
+| VM-B | 19 | 19 | ✓ |
+| VM-C | 9 | 9 | ✓ |
+
+All VMs received their guaranteed minimum. VM-A's high `lat_class` priority caused it
+to absorb the over-budget bandwidth. VM-B and VM-C were unharmed — the tier 1 rule
+served their budgets first.
+
+### 9.13.3 A window where VM-A is idle
+
+If VM-A makes no DRAM requests in a window, tier 1 finds no requester for VM-A's 38
+budget slots. Those CN slots fall to tier 2 (VM-B and VM-C compete; VM-B wins by
+`lat_class`) or tier 3 (BE fallthrough if neither VM-B nor VM-C wants more). No slot
+goes unused.
+
+This illustrates the guaranteed-minimum-but-no-waste property: unused budget flows
+usefully to other Contract holders or best-effort traffic rather than being discarded.
 
 ---
 
