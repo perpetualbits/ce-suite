@@ -160,7 +160,7 @@ Each MSE Contract holds two fields set by the privileged actor that creates it:
 
 | Field | Architectural width | Meaning |
 |---|---|---|
-| `bw_class` | 8 bits max | Guaranteed minimum CN slots per window, on the pre-flattened 0–255 absolute scale (see §9.4.5). 0 = best-effort only. |
+| `bw_class` | 8 bits max | Guaranteed minimum CN slots per window, expressed on the local 0–255 scale of this EC's own slice (see §9.4.6). 0 = best-effort only. |
 | `lat_class` | 8 bits max | Priority within CN slot arbitration. Lower value = higher priority. 0 = best-effort only. |
 
 Both fields have a maximum architectural width of 8 bits. Implementations may decode
@@ -175,28 +175,40 @@ Both fields are zero for best-effort ECIDs. An ECID with both fields non-zero is
 loaded atomically by `ec.ob` on context switch. The memory controller reads these
 fields from per-hart registers, not from RAM, during arbitration.
 
+**Local view and stored global.** The `bw_class` value software reads from CSRs
+(`mse_absolute_bw`) and writes via `ms.ir` and `ms.it` descriptors is always on the
+*local* 0–255 scale of the running EC's own slice: a value of 128 means "50% of my
+allocation," regardless of how deep in the delegation tree the EC sits. Hardware
+maintains a separate *stored global* representation for arbitration — a pre-flattened
+absolute value representing fraction of total system bandwidth (charter §4.5.3). The
+conversion between local and stored global is performed by hardware at delegation time
+(Formula 1, §9.4.6) and at CSR readback time (Formula 2, §9.4.6). Software at any
+delegation level uses the same 0–255 range, consistent with charter §4.5.0.
+
 ### 9.4.2 Group bandwidth cap
 
 The privileged actor that creates an ECID may set a **group bandwidth cap** on it:
-a ceiling on the total pre-flattened `bw_class` sum across all ECIDs in that ECID's
+a ceiling on the total stored-global `bw_class` sum across all ECIDs in that ECID's
 delegation subtree. The cap is stored in `EC[e]` (implementation-defined field) and
 checked in O(1) on every `ms.ir` and `ms.it` call.
 
-Hardware enforces the cap on pre-flattened absolute values:
+Hardware enforces the cap on stored global values (§9.4.6 notation):
 
 ```
-sum(pre-flattened bw_class, subtree(e)) ≤ bw_cap(e)
+sum( s(c) for each child c in subtree(e) ) ≤ s_cap(e)
 ```
 
-where all values are on the 0–255 absolute scale.
+where all values are stored global values on the 0–255 absolute scale. These stored
+global values are the hardware-internal pre-flattened representation; software reads
+local view via `mse_absolute_bw`, not the stored globals directly.
 
 A child cannot claim more guaranteed bandwidth than the parent has delegated. This is
 the mechanism that prevents a tenant VM from over-committing global memory resources.
 
-Round-down rounding during telescoping (§9.4.3) typically creates a small residual
-within each group — the sum of children's pre-flattened values is less than the
-parent's due to rounding. This residual is not lost: it flows via the multi-tier
-over-budget overflow or BE fallthrough in §9.7.1.
+Round-down rounding during telescoping (§9.4.3, Formula 1 of §9.4.6) typically
+creates a small residual within each group — the sum of children's stored global
+values is less than the parent's due to rounding. This residual is not lost: it
+flows via the multi-tier over-budget overflow or BE fallthrough in §9.7.1.
 
 ### 9.4.3 Hierarchical splitting and telescoping
 
@@ -205,56 +217,206 @@ child Contracts via `ms.it` (§9.5). Splitting is **atomic**: if the hardware ad
 check fails, no state is changed.
 
 **Telescoping.** When delegating, the parent specifies the child's bandwidth share as
-a value on the parent's local precision scale. The hardware computes the child's
-pre-flattened bandwidth by multiplying the parent's pre-flattened value by the child's
-fraction, rounded down:
+`child_bw_class` on the parent's *local* 0–255 scale: a value where 256 represents
+100% of the parent's own slice, 128 represents 50%, and so on. Hardware applies
+Formula 1 (§9.4.6) to compute the child's stored global value:
 
 ```
-child_pre_flattened = floor(parent_pre_flattened × (child_bw_class / parent_scale))
+s(child) = floor( s(parent) × child_bw_class / 256 )
 ```
 
-where `parent_scale` is the parent's local precision range (e.g., 256 for 8-bit
-precision). The result is stored as the child's pre-flattened value. The parent may
-optionally specify the child's local precision (1–8 bits) in the delegation descriptor
-(§9.5 `ms.it`); if omitted, the child uses the parent's precision.
+where `s(parent)` is the parent's stored global value. The result is stored in the
+child's leaf Contract for O(1) arbitration. When the child subsequently reads
+`mse_absolute_bw`, hardware applies Formula 2 (§9.4.6) to convert back to local view:
 
-**Cap enforcement.** The sum of all children's pre-flattened `bw_class` values must
-not exceed the parent's pre-flattened `bw_class` (§9.4.2). Round-down guarantees this
-invariant holds even at the extreme, since `floor(x) ≤ x` always.
+```
+r(child) = floor( s(child) × 256 / s(parent) )
+```
 
-**Example.** A hypervisor holds pre-flattened `bw_class = 76`. It delegates to three
-VMs at 50%, 25%, and 12% of its slice:
+The parent may optionally specify the child's local precision (1–8 bits) in the
+delegation descriptor (§9.5 `ms.it`); if omitted, the child uses the parent's
+precision.
 
-- VM-A: floor(76 × 50/100) = 38
-- VM-B: floor(76 × 25/100) = 19
-- VM-C: floor(76 × 12/100) = floor(9.12) = 9
+**Cap enforcement.** The sum of all children's stored global values must not exceed
+the parent's stored global value (§9.4.2). Round-down in Formula 1 guarantees this
+invariant holds since `floor(x) ≤ x` always.
 
-Sum of children = 66. Residual = 76 − 66 = 10, available for over-budget overflow via
-§9.7.1 tier 2.
+**Example.** A hypervisor at L=1 has stored global `s = 76` (delegated 30% of total
+by L=0). Its local readback is `r = floor(76 × 256 / 256) = 76` (since L=0 is root
+with stored global = 256). The hypervisor delegates to three VMs by writing
+`child_bw_class` on its own local 0–255 scale:
+
+| VM | `child_bw_class` | Stored global `s(child)` | Local readback `r(child)` | % of total |
+|---|---|---|---|---|
+| VM-A (50%) | 128 | `floor(76 × 128 / 256) = 38` | `floor(38 × 256 / 76) = 128` | 14.8% |
+| VM-B (25%) | 64  | `floor(76 × 64 / 256) = 19`  | `floor(19 × 256 / 76) = 64`  | 7.4% |
+| VM-C (12.5%) | 32 | `floor(76 × 32 / 256) = 9`  | `floor(9 × 256 / 76) = 30`   | 3.5% |
+
+VM-A and VM-B see their local readback equal to the `child_bw_class` their parent
+wrote — exactly 50% and 25% of their slice, respectively. VM-C sees 30 instead of
+32 — a 2-unit round-down residual (the inner floor in Formula 1 lost a fraction).
+
+Sum of stored globals = 38 + 19 + 9 = 66. Residual = 76 − 66 = 10 stored global
+units, available for over-budget overflow via §9.7.1 tier 2.
+
+The key property: each VM's kernel reads `mse_absolute_bw` and sees a value on the
+same 0–255 local scale regardless of delegation depth. The kernel running in VM-A
+sees 128 (50%) whether VM-A is at L=2, L=1, or L=0. Software runs unchanged.
 
 ### 9.4.4 Dissolution
 
 When an ECID's Contract is revoked (via `ms.or` or `ec.oe`), the Contract dissolves
-and its pre-flattened `bw_class` is returned to the parent ECID's cap headroom. If
+and its stored global `bw_class` is returned to the parent ECID's cap headroom. If
 the ECID has child Contracts, those are revoked first, recursively. This is always
 O(log N) via the radix tree and always succeeds — even for zombie or hostile ECIDs.
 
 ### 9.4.5 Pre-flattening
 
-The hardware maintains the **pre-flattened `bw_class`** in the leaf Contract: the
-absolute bandwidth value on the 0–255 scale computed once at delegation time (§9.4.3).
-Arbitration reads this value in O(1) with no runtime multiplication.
+The hardware maintains the **stored global value** `s(e)` in the leaf Contract: an
+absolute bandwidth value on the 0–255 scale computed once at delegation time using
+Formula 1 (§9.4.6). Arbitration reads this value in O(1) with no runtime
+multiplication. The stored global value is a hardware-internal representation;
+software observes it only through the local readback in `mse_absolute_bw`.
 
-When a parent Contract is reconfigured (its pre-flattened bandwidth changes via a
-privileged operation), all descendant Contracts in its subtree are recomputed. The
-recomputation must complete before the next arbitration cycle that involves any
-affected Contract holder. Implementations may briefly stall arbitration on affected
-harts during recomputation; non-affected harts continue unaffected.
+When a parent Contract is reconfigured (its stored global value changes via a
+privileged operation), all descendant Contracts in its subtree are recomputed.
+Hardware retains the `child_bw_class` from the original `ms.it` call and reapplies
+Formula 1 with the new parent stored global: `new_s(child) = floor(new_s(parent) ×
+child_bw_class / 256)`. The recomputation must complete before the next arbitration
+cycle that involves any affected Contract holder. Implementations may briefly stall
+arbitration on affected harts during recomputation; non-affected harts continue
+unaffected.
 
-The `mse_absolute_bw` CSR (specified in Chapter 13) allows software to read the
-running EC's effective pre-flattened `bw_class` — the value the memory controller uses
-in arbitration. This is useful for monitoring, admission-control accounting, and
-debugging.
+The `mse_absolute_bw` CSR (Chapter 13) returns the running EC's bandwidth in **local
+view** (Formula 2 of §9.4.6): `floor(s(e) × 256 / s(parent(e)))`. This value
+represents the EC's fraction of its own allocated slice on the 0–255 scale,
+consistent with charter §4.5.0. It is useful for monitoring, admission-control
+accounting, and debugging.
+
+### 9.4.6 Mathematical foundation of telescoping
+
+This subsection presents the mathematical foundation of the local-view principle
+(charter §4.5.0) formally, for design verification and for implementer reference.
+
+#### 9.4.6.1 Symbols
+
+| Symbol | Meaning |
+|---|---|
+| N | The architectural scale: N = 256. The 8-bit `bw_class` field has range [0, N). |
+| L(e) | Delegation level of EC e: 0 at root, increasing with depth. |
+| s(e) | Stored global value of EC e: hardware-internal pre-flattened bandwidth on the [0, N] scale, where N represents 100% of total system bandwidth. |
+| p(e) | Parent EC of e in the delegation tree. For an EC at L=0, p(e) is conceptually "the system as a whole," with s(p(e)) = N. |
+| b(c) | The `child_bw_class` value the parent wrote in the `ms.it` descriptor when delegating to c. On the parent's local [0, N] scale (where N represents 100% of parent's slice). |
+| r(e) | Local readback at e: the value software reads from `mse_absolute_bw`. On the running EC's own local [0, N] scale. |
+
+#### 9.4.6.2 Formulas
+
+**Formula 1 — Storage update at delegation.** When parent p delegates to child c
+with descriptor value b(c):
+
+```
+s(c) = floor( s(p) × b(c) / N )
+```
+
+The floor operation implements round-down rounding (charter §4.5.6).
+
+**Formula 2 — Local readback.** When software at EC e reads `mse_absolute_bw`:
+
+```
+r(e) = floor( s(e) × N / s(p(e)) )
+```
+
+At L=0, where s(p(e)) = N by definition, this reduces to r(e) = s(e): the root EC
+reads its stored value directly.
+
+#### 9.4.6.3 Verification of the local-view principle
+
+The local-view principle (charter §4.5.0) requires that software at any delegation
+level interprets `bw_class` on the same [0, N] scale with the same meaning ("fraction
+of my slice"), regardless of depth. Formally: for a child c delegated by parent p
+with descriptor value b(c), the local readback r(c) must approximate b(c).
+
+**Theorem.** r(c) ≈ b(c), with the approximation differing by at most
+floor(N / s(p)) + 1 units.
+
+**Proof sketch.** Substitute Formula 1 into Formula 2:
+
+```
+r(c) = floor( s(c) × N / s(p) )
+     = floor( floor(s(p) × b(c) / N) × N / s(p) )
+```
+
+Treating the inner floor as exact (ignoring the rounding term for a moment):
+
+```
+r(c) ≈ (s(p) × b(c) / N) × N / s(p) = b(c)
+```
+
+The inner floor in Formula 1 loses at most 1 unit. After multiplication by N and
+division by s(p), this loss propagates as at most N/s(p) units in r(c). The outer
+floor adds at most 1 more unit. So: b(c) - r(c) ≤ floor(N / s(p)) + 1.
+
+In typical deployments s(p) is on the order of N (e.g., 76, 192), making the
+rounding residual a small fraction of N. The principle holds: parent writes b, child
+reads back r ≈ b.
+
+#### 9.4.6.4 Consequences
+
+- **Software runs unchanged at any delegation level.** A kernel reading
+  `mse_absolute_bw` sees "fraction of my slice" regardless of whether it runs at
+  L=0, L=1, L=2, or L=3. The value it sees equals the value its parent wrote in the
+  `ms.it` descriptor, up to a small rounding residual.
+
+- **The stored global is invisible to software.** s(e) is used for arbitration
+  accounting (the multi-tier policy of §9.7.1 and the cap rule of §9.4.2). It is not
+  directly observable; `mse_absolute_bw` always returns the local view via Formula 2.
+
+- **The cap rule is exact in stored global terms.** Cap enforcement (§9.4.2) operates
+  on stored global values, which are exact modulo round-down. This is correct: the
+  cap concerns global resource accounting, not software-visible local values.
+
+- **Round-down residual flows to overflow or BE.** Capacity lost by the floor in
+  Formula 1 becomes available via the multi-tier overflow policy (§9.7.1) or BE
+  fallthrough.
+
+#### 9.4.6.5 Reference computation
+
+For implementers, the standard computation pattern is:
+
+```
+At ms.it execution (parent p delegating to child c):
+  s_p = parent's stored global
+  b   = child_bw_class from the ms.it descriptor
+  s_c = floor(s_p × b / N)      // integer division, round-down
+  store s_c in child's leaf Contract
+  store b in child's record (for reconfiguration recomputation)
+
+At mse_absolute_bw CSR read for running EC e:
+  s_e  = stored global of e (from leaf Contract)
+  s_pe = stored global of e's parent (N at L=0)
+  r_e  = floor(s_e × N / s_pe)  // integer division, round-down
+  return r_e
+```
+
+Both computations are O(1) given direct stored-global lookup.
+
+#### 9.4.6.6 Worked numerical example
+
+L=0 host: s = 256, r = 256 (root, s(p) = N).
+L=1 hypervisor delegated 30% by L=0: b = 76 (30% of 256 ≈ 76.8, floor → 76),
+  s = floor(256 × 76 / 256) = 76,
+  r = floor(76 × 256 / 256) = 76.
+
+L=1 delegates three children:
+
+| EC | b (child_bw_class) | s(child) = floor(76 × b / 256) | r(child) = floor(s × 256 / 76) |
+|---|---|---|---|
+| VM-A (50%) | 128 | floor(76 × 128 / 256) = 38 | floor(38 × 256 / 76) = 128 (exact) |
+| VM-B (25%) | 64  | floor(76 × 64 / 256) = 19  | floor(19 × 256 / 76) = 64 (exact)  |
+| VM-C (12.5%) | 32 | floor(76 × 32 / 256) = 9   | floor(9 × 256 / 76) = 30 (residual: parent wrote 32, child sees 30) |
+
+VM-C sees 30 instead of 32 — a 2-unit round-down residual. The lost capacity
+(about 0.8% of total system bandwidth) flows to L=1's over-budget pool.
 
 ---
 
@@ -292,19 +454,22 @@ opaque group ID.
 * **Pointer form struct:**
 ```c
 struct MSE_Contract_Params {
-    uint8_t  bw_class;    /* pre-flattened bandwidth class, 0–255 (0 = best-effort) */
+    uint8_t  bw_class;    /* bandwidth class, 0–255 on the calling EC's local scale (0 = best-effort) */
     uint8_t  lat_class;   /* latency class, 0–255 (0 = best-effort) */
     uint16_t reserved;    /* must be zero */
 };
 ```
 * **Semantics**:
   1. Checks that `rs1` is a valid, allocated ECID on this hart.
-  2. Checks that `bw_class(rs2) + existing_sum(subtree(parent(rs1))) ≤ bw_cap(parent(rs1))`
-     (all values on 0–255 absolute scale). If not, returns `MSE_ERR_CAP_EXCEEDED` in
-     `rd`; no state changes.
-  3. Sets `EC[rs1].bw_class` and `EC[rs1].lat_class` to the supplied values (stored as
-     pre-flattened absolute values on the 0–255 scale).
-  4. Updates the running pre-flattened bandwidth sum for all ancestor groups up to the
+  2. Converts the supplied `bw_class` from the calling EC's local scale to a stored
+     global value using Formula 1 (§9.4.6): `s = floor(s(caller) × bw_class / 256)`.
+     At L=0, s(caller) = 256, so the stored global equals `bw_class` directly.
+  3. Checks that `s + existing_sum(subtree(parent(rs1))) ≤ s_cap(parent(rs1))`
+     (all values are stored global values on the 0–255 absolute scale). If not, returns
+     `MSE_ERR_CAP_EXCEEDED` in `rd`; no state changes.
+  4. Sets `EC[rs1].bw_class` and `EC[rs1].lat_class`: the stored global `s` is written
+     to the leaf Contract; `lat_class` is stored as supplied.
+  5. Updates the running stored-global bandwidth sum for all ancestor groups up to the
      root.
   5. The change takes effect on the next `ec.ob` that loads ECID `rs1`. If ECID
      `rs1` is currently running on this hart, the new Contract parameters are
@@ -345,7 +510,7 @@ struct MSE_Contract_Params {
   | Bits | Field | Meaning |
   |---|---|---|
   | 15:0 | `child_ecid` | Child ECID to receive the split Contract |
-  | 23:16 | `child_bw_class` | Bandwidth class to delegate on parent's precision scale (0 = inherit parent's full class) |
+  | 23:16 | `child_bw_class` | Bandwidth class to delegate, on the parent's local 0–255 scale (256 = 100% of parent's slice; 128 = 50%; 0 = inherit parent's full stored global) |
   | 31:24 | `child_lat_class` | Latency class to delegate (0 = inherit parent's full class). On RV32, only bits 30:24 (7 bits); values 128–255 require pointer form. |
   | 35:32 *(RV64 only)* | `child_precision` | Child's local precision in bits (1–8). 0 = use parent's precision unchanged. |
   | `[XLEN-2]`:36 | — | Reserved; must be zero. On RV32, no bits are available here. |
@@ -355,7 +520,7 @@ struct MSE_Contract_Params {
 ```c
 struct MSE_Delegation_Params {
     uint16_t child_ecid;       /* child ECID to receive the split Contract */
-    uint8_t  child_bw_class;   /* bandwidth class on parent's precision scale (0 = inherit) */
+    uint8_t  child_bw_class;   /* bandwidth class on parent's local 0-255 scale (0 = inherit parent's full stored global) */
     uint8_t  child_lat_class;  /* latency class to delegate (0 = inherit parent's) */
     uint8_t  child_precision;  /* child's local precision 1–8 bits; 0 = use parent's unchanged */
     uint8_t  reserved1;        /* must be zero */
@@ -367,15 +532,16 @@ struct MSE_Delegation_Params {
 
 * **Semantics**:
   1. Verifies `child_ecid` is a child of `rs1` in the delegation tree.
-  2. Computes the child's pre-flattened bandwidth:
-     `floor(parent_pre_flattened × (child_bw_class / parent_scale))`. If
-     `child_bw_class` = 0, the child inherits the parent's full pre-flattened value.
+  2. Applies Formula 1 (§9.4.6) to compute the child's stored global:
+     `s(child) = floor(s(parent) × child_bw_class / 256)`. If `child_bw_class` = 0,
+     the child inherits the parent's full stored global value. Hardware also stores
+     `child_bw_class` for use in future reconfiguration recomputation (§9.4.5).
      If `child_precision` is non-zero, sets the child's local precision accordingly;
      otherwise the child uses the parent's precision.
-  3. Admission check: `pre_flattened(child) + existing_sum(subtree(rs1)) ≤ bw_cap(rs1)`
-     (all values on 0–255 absolute scale). If the check fails, returns
+  3. Admission check: `s(child) + existing_sum(subtree(rs1)) ≤ s_cap(rs1)` (all values
+     are stored global values on the 0–255 absolute scale). If the check fails, returns
      `MSE_ERR_CAP_EXCEEDED`; no state changes.
-  4. Updates running pre-flattened sums atomically.
+  4. Updates running stored-global sums atomically.
 * **Cycles**: 1–8 (log of delegation depth).
 
 ---
@@ -403,9 +569,9 @@ struct MSE_Delegation_Params {
 | `mse_slot_ratio` | RW (privileged) | CN/BE slot split. Bits 7:0 = CN fraction (0–255, where 128 = 50 %). Implementations may restrict to a set of legal values. |
 | `mse_slot_ns` | RO | Slot size in nanoseconds (implementation-defined). |
 | `mse_max_nesting` | RO | Maximum interrupt nesting depth K supported by this implementation. |
-| `mse_bw_cap` | RW (privileged) | Per-hart register holding the pre-flattened bandwidth cap for the currently loaded ECID's group. Updated by `ms.ir` / `ms.it` / `ms.ot`. |
-| `mse_bw_sum` | RO | Running sum of pre-flattened `bw_class` across all active Contract holders on this hart. |
-| `mse_absolute_bw` | RO | Pre-flattened `bw_class` of the currently running EC on this hart — the value the memory controller uses in arbitration. Useful for monitoring and debugging. Full specification in Chapter 13. |
+| `mse_bw_cap` | RW (privileged) | Per-hart register holding the stored-global bandwidth cap (`s_cap`) for the currently loaded ECID's group. Used in arbitration accounting (§9.4.2); this is a stored global value, not local view. Updated by `ms.ir` / `ms.it` / `ms.ot`. |
+| `mse_bw_sum` | RO | Running sum of stored-global `bw_class` values across all active Contract holders on this hart. Used in arbitration accounting; this is a stored global value, not local view. |
+| `mse_absolute_bw` | RO | Local-view bandwidth of the currently running EC: `floor(s(e) × 256 / s(parent(e)))`, where 256 represents 100% of this EC's slice (§9.4.6 Formula 2). Useful for monitoring, accounting, and debugging. Full specification in Chapter 13. |
 | `mse_caps` | RO | Capability register advertising the implementation's decoded field widths for `bw_class` and `lat_class`, and other MSE parameters. Full specification in Chapter 13. |
 | `mse_status` | RO | Result code from the last MSE operation on this hart. |
 | `mse_violation` | RO (sticky) | Set when a Contract holder does not receive its guaranteed CN slot in the expected window. Cleared by writing 1. Raises an interrupt if `mse_violation_en` is set. |
@@ -448,11 +614,19 @@ The tier ordering guarantees three properties:
 Best-effort requests (zero `lat_class`) are never eligible in CN slots; they wait for
 the next BE slot.
 
+**Note on stored global values.** The budget tracking (how many CN slots each
+Contract holder has consumed toward its `bw_class` guarantee) operates on stored
+global values `s(e)` (§9.4.6), not on local readback values. The `bw_class` the
+arbitration hardware compares against is the stored global from the leaf Contract —
+the same value written by Formula 1 at delegation time. Software reads the
+local-view equivalent via `mse_absolute_bw` (Formula 2). The relationship between
+the two is given by §9.4.6.
+
 **Worked example.** Window = 256 slots. `CN_FRAC = 128` (50/50), giving 128 CN and
 128 BE slots per window (dithered per §9.2.4). Three active Contracts, all requesting
 memory throughout the window:
 
-| EC | `bw_class` | `lat_class` | Budget |
+| EC | `bw_class` (stored global) | `lat_class` | Budget |
 |---|---|---|---|
 | EC-A | 8 | 1 *(highest priority)* | 8 slots |
 | EC-B | 4 | 3 | 4 slots |
@@ -635,62 +809,74 @@ The scenario is representative of a L=1 hypervisor in a mixed-criticality system
 ### 9.13.1 Setup
 
 The system has 256-slot windows with `CN_FRAC = 128` (50/50 CN/BE split), dithered
-per §9.2.4, giving 128 CN and 128 BE slots per window. The root ECID (L=0) holds
-`bw_class = 255` (full system bandwidth). Firmware delegates a 30% slice to a
-hypervisor ECID (hyp_ecid, L=1) and the hypervisor creates three guest ECIDs (L=2).
+per §9.2.4, giving 128 CN and 128 BE slots per window. Firmware assigns 30% of total
+system bandwidth to a hypervisor ECID (hyp_ecid, L=1), which then delegates slices to
+three guest ECIDs (L=2).
 
-**Step 1.** Hypervisor claims its bandwidth via `ms.ir`. A 30% share of 256 =
-floor(76.8) = 76 (round-down).
+**Step 1.** Firmware (at L=0) assigns the hypervisor's bandwidth via `ms.ir`.
+Firmware passes `bw_class = 76` on L=0's local 0–255 scale (76/256 ≈ 29.7% of
+total; since L=0 is root, local = stored global).
 
 ```asm
-# Inline ms.ir: bits 7:0 = bw_class = 76, bits 15:8 = lat_class = 2
+# Inline ms.ir: bits 7:0 = bw_class = 76 (on L=0 local scale), bits 15:8 = lat_class = 2
 li   a2, ((2 << 8) | 76)      # 0x0240
 ms.ir a0, hyp_ecid, a2         # a0 = 0 on success
 ```
 
-Hypervisor's pre-flattened `bw_class` = 76.
+Hardware stores s(hyp_ecid) = floor(256 × 76 / 256) = 76 globally.
+The hypervisor reads `mse_absolute_bw` and sees r = floor(76 × 256 / 256) = 76
+(its local view: 76/256 ≈ 29.7% of its own slice, which at L=1 is 29.7% of total).
 
-**Step 2.** Hypervisor delegates to three VMs via `ms.it`.
+**Step 2.** Hypervisor delegates to three VMs via `ms.it`. Each `child_bw_class` is
+on the hypervisor's local 0–255 scale (256 = 100% of L=1's slice).
 
-| VM | Requested fraction | Pre-flattened `bw_class` | `lat_class` |
-|---|---|---|---|
-| VM-A (high priority) | 50% of 76 | floor(38.0) = 38 | 1 |
-| VM-B (medium priority) | 25% of 76 | floor(19.0) = 19 | 5 |
-| VM-C (low priority) | 12% of 76 | floor(9.12) = 9 | 10 |
+| VM | `child_bw_class` (local scale) | Stored global `s(VM)` | Local readback `r(VM)` | `lat_class` |
+|---|---|---|---|---|
+| VM-A (high priority) | 128 (50%) | floor(76 × 128 / 256) = 38 | floor(38 × 256 / 76) = 128 | 1 |
+| VM-B (medium priority) | 64 (25%) | floor(76 × 64 / 256) = 19  | floor(19 × 256 / 76) = 64  | 5 |
+| VM-C (low priority)   | 32 (12.5%) | floor(76 × 32 / 256) = 9  | floor(9 × 256 / 76) = 30   | 10 |
 
-Residual in hypervisor: 76 − (38 + 19 + 9) = 10 units, available for over-budget
-overflow to the hypervisor's subtree.
+Residual: 76 − (38 + 19 + 9) = 10 stored global units, available for over-budget
+overflow or BE traffic.
 
 ```asm
-# Delegate to VM-A: child_bw_class = 38, child_lat_class = 1
+# Delegate to VM-A: child_bw_class = 128 (50% on hyp's local scale), child_lat_class = 1
 # Inline ms.it: bits 15:0 = child_ecid, 23:16 = child_bw_class, 31:24 = child_lat_class
 li   t0, vm_a_ecid
-ori  t0, t0, (38 << 16)        # child_bw_class = 38
+li   t1, (128 << 16)           # child_bw_class = 128 (50% of hypervisor's slice)
+or   t0, t0, t1
 ori  t0, t0, (1 << 24)         # child_lat_class = 1
-ms.it a0, hyp_ecid, t0
+ms.it a0, hyp_ecid, t0         # hardware computes s(VM-A) = 38, stores b=128 for reconfig
 
-# Delegate to VM-B: child_bw_class = 19, child_lat_class = 5
+# Delegate to VM-B: child_bw_class = 64 (25%), child_lat_class = 5
 li   t0, vm_b_ecid
-ori  t0, t0, (19 << 16)
+li   t1, (64 << 16)            # child_bw_class = 64 (25% of hypervisor's slice)
+or   t0, t0, t1
 ori  t0, t0, (5 << 24)
-ms.it a0, hyp_ecid, t0
+ms.it a0, hyp_ecid, t0         # hardware computes s(VM-B) = 19
 
-# Delegate to VM-C: child_bw_class = 9, child_lat_class = 10
+# Delegate to VM-C: child_bw_class = 32 (12.5%), child_lat_class = 10
 li   t0, vm_c_ecid
-ori  t0, t0, (9 << 16)
+li   t1, (32 << 16)            # child_bw_class = 32 (12.5% of hypervisor's slice)
+or   t0, t0, t1
 ori  t0, t0, (10 << 24)
-ms.it a0, hyp_ecid, t0
+ms.it a0, hyp_ecid, t0         # hardware computes s(VM-C) = 9; r(VM-C) = 30 (residual)
 ```
+
+Each VM kernel reads `mse_absolute_bw` and sees its local view: VM-A sees 128, VM-B
+sees 64, VM-C sees 30. Each kernel interprets this as "fraction of my slice" — the
+same code handles any of these values correctly regardless of delegation depth.
 
 ### 9.13.2 A typical scheduling window (all VMs active)
 
 All three VMs are requesting memory throughout the window (128 CN slots available).
+Arbitration operates on stored global values: s(VM-A) = 38, s(VM-B) = 19, s(VM-C) = 9.
 
 **Within-budget phase (tier 1):**
 
-- CN slots 1–38: VM-A wins all (`lat_class = 1` lowest). VM-A budget exhausted.
-- CN slots 39–57: VM-B wins all (`lat_class = 5` next lowest). VM-B budget exhausted.
-- CN slots 58–66: VM-C wins all (`lat_class = 10`). VM-C budget exhausted.
+- CN slots 1–38: VM-A wins all (`lat_class = 1` lowest). VM-A budget (38 slots) exhausted.
+- CN slots 39–57: VM-B wins all (`lat_class = 5` next lowest). VM-B budget (19 slots) exhausted.
+- CN slots 58–66: VM-C wins all (`lat_class = 10`). VM-C budget (9 slots) exhausted.
 - Total within-budget consumption: 38 + 19 + 9 = 66 CN slots.
 
 **Over-budget phase (tier 2):**
@@ -700,15 +886,20 @@ All three VMs are requesting memory throughout the window (128 CN slots availabl
 
 **Final tally:**
 
-| VM | Guaranteed | Received | Guarantee met? |
-|---|---|---|---|
-| VM-A | 38 | 38 + 62 = 100 | ✓ |
-| VM-B | 19 | 19 | ✓ |
-| VM-C | 9 | 9 | ✓ |
+| VM | s (stored global budget) | r (local view) | CN slots received | Guarantee met? |
+|---|---|---|---|---|
+| VM-A | 38 | 128 (50% of slice) | 38 + 62 = 100 | ✓ |
+| VM-B | 19 | 64 (25% of slice)  | 19            | ✓ |
+| VM-C | 9  | 30 (~12% of slice) | 9             | ✓ |
 
 All VMs received their guaranteed minimum. VM-A's high `lat_class` priority caused it
 to absorb the over-budget bandwidth. VM-B and VM-C were unharmed — the tier 1 rule
 served their budgets first.
+
+If VM-A's kernel reads `mse_absolute_bw`, it sees 128 (50% of its slice). The kernel
+does not know that its actual throughput is 38/128 ≈ 29.7% of CN capacity — it just
+knows it has 50% of its world. The same kernel image runs unchanged whether installed
+at L=0, L=1, L=2, or L=3.
 
 ### 9.13.3 A window where VM-A is idle
 
