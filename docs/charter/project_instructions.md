@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.21
+**Version:** 0.22
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -393,6 +393,42 @@ and the group bandwidth cap. These rules are MSE-specific. The Contract axioms i
 per-extension delegation instructions) apply to all three Contract types; the rules
 here refine those axioms for MSE.
 
+#### §4.5.0 — Software transparency at any delegation level
+
+**Principle: software runs unchanged at any delegation level.**
+
+This is the foundational principle of CE Suite delegation. An operating system,
+hypervisor, application, or workload is unaware of its level in the delegation
+tree by default. The MSE bandwidth-class fields it reads from CSRs, the descriptor
+values it writes via `ms.ir` and `ms.it`, and the resources it observes via
+`mse_bw_cap`, `mse_bw_sum`, and `mse_absolute_bw` all use the same 0–255 scale
+regardless of whether the software is running at L0, L1, L2, or L3.
+
+Each level operates on a 0–255 view of *its own slice*. The fact that the slice
+is itself a fraction of a parent's slice is invisible to software at this level.
+Hardware translates between levels transparently: stored values for arbitration
+are computed in absolute global form (per §4.5.3 pre-flattening), but the
+software-facing CSRs and descriptor fields always present the local view
+appropriate to the running EC's delegation level.
+
+This parallels the analogous property of CME: an L1 hypervisor, running with
+delegated banks, sees its world as if it had Group 0 — the parent's delegation
+tree above it is invisible. The telescoping mechanism extends this property to
+MSE bandwidth allocation.
+
+Software that needs to know its level for diagnostic purposes can query
+`current_ecid_level` (Chapter 13 §3.x). No level-aware behavior is required for
+any standard OS, hypervisor, application, or workload. The same kernel image
+runs unchanged whether installed at L0 (bare metal), L1 (under a host
+hypervisor), L2 (in a nested VM), or L3 (deeply nested).
+
+Why this matters: without this property, software would need to be aware of its
+installation depth to interpret bandwidth-class values correctly. Every OS
+distribution would need to ship variants for different host environments, or have
+configuration steps that propagate parent-context information. By design, CE Suite
+makes this unnecessary. This is the central architectural property that makes
+CE Suite practically deployable in real multi-tenant environments.
+
 #### §4.5.1 — Contract precision and the 0–255 absolute scale
 
 An MSE Contract carries two fields that the memory controller evaluates each
@@ -408,42 +444,69 @@ may decode fewer bits and advertise the decoded width via the `mse_caps` CSR
 (specified in Chapter 13). The minimum supported decoded width is 4 bits per field
 for meaningful MSE support.
 
-When telescoping (§4.5.2) reduces precision at delegation, the stored Contract value
-is normalized to a common 0–255 scale that represents fraction-of-total-system-
-bandwidth. The hardware computes this value once at delegation time and stores it
-pre-flattened in the leaf Contract; subsequent arbitration reads the value directly.
+When a Contract is telescoped at delegation (§4.5.2), the hardware maintains two
+representations of `bw_class`:
+
+- **Stored (hardware-internal):** a pre-flattened absolute value on the 0–255 scale
+  representing fraction of total system bandwidth. Hardware computes this value once
+  at delegation time; subsequent arbitration reads it in O(1) (§4.5.3).
+- **Software view (local):** the value returned by `mse_absolute_bw` and used in
+  `ms.ir`/`ms.it` descriptor fields is on the running EC's local 0–255 scale,
+  representing fraction of *its own slice*. Hardware converts between stored and
+  local values at read time. Software at any delegation level uses the same 0–255
+  range, consistent with §4.5.0.
 
 **Worked example.** Suppose the system has 256-slot windows and
-`mse_slot_ratio.CN_FRAC = 192` (75% CN, 25% BE). A root Contract holding
-`bw_class = 64` (on the 0–255 scale) is guaranteed 64 CN slots per window, which is
-64/192 ≈ 33% of available CN time and 64/256 = 25% of total window time. A child
-Contract telescoped to 50% of the parent receives a pre-flattened `bw_class = 32`
-(rounded down from 32.0, which happens to be exact here). The child is guaranteed 32
-CN slots per window = 12.5% of total window time.
+`mse_slot_ratio.CN_FRAC = 192` (75% CN, 25% BE). A root Contract at L=0 holds
+`bw_class = 64` (on the 0–255 scale), guaranteed 64 CN slots per window (64/192 ≈
+33% of available CN time; 64/256 = 25% of total window time). At L=0, local view
+equals the pre-flattened storage value — no conversion needed.
+
+The L=0 operator delegates 50% of this Contract to an L=1 hypervisor by calling
+`ms.it` with `child_bw_class = 128` (= 50% on the 0–255 local scale). Hardware
+computes the pre-flattened storage value as `floor(64 × 128 / 256) = 32` (exact
+here). The L=1 hypervisor reads `mse_absolute_bw` and receives `bw_class = 128`
+(= `floor(32 × 256 / 64)`): 50% on its own local scale. The hypervisor is
+guaranteed 32 CN slots per window = 12.5% of total window time, though it need
+not track this global figure.
 
 #### §4.5.2 — Telescoping at delegation
 
 When a Contract is delegated from a parent ECID to a child ECID via `ms.it`, the
-parent specifies the child's bandwidth share as a value on the parent's local
-precision scale, and optionally the child's local precision (1–8 bits).
+parent specifies the child's bandwidth share as `child_bw_class` on the parent's
+local 0–255 scale — a value where 256 represents 100% of the parent's own slice,
+128 represents 50%, and so on. The child's local precision (1–8 bits) may also be
+specified.
 
-The hardware computes the child's pre-flattened bandwidth as the parent's
-pre-flattened value times the child's local fraction, **rounded down** to the nearest
-representable value on the 0–255 scale.
+The hardware computes the child's pre-flattened storage value as the parent's
+pre-flattened value times the child's local fraction, **rounded down**:
+`child_stored = floor(parent_stored × child_bw_class / 256)`. When the child reads
+`mse_absolute_bw`, hardware converts back to local view:
+`child_local = floor(child_stored × 256 / parent_stored)`. Round-down at delegation
+may cause the returned local value to differ from the original `child_bw_class` by
+a small amount; lost capacity flows to over-budget or BE traffic (§4.5.4).
 
-A child may further reduce precision when delegating to a grandchild. Implementations
-support delegation depth up to D (§5.1); recursive telescoping at each level uses
-this same mechanism.
+A child may further delegate to a grandchild using this same mechanism, applying its
+own stored value as the new parent. Implementations support delegation depth up to
+D (§5.1).
 
-**Worked example.** Root holds 256 (= 100% of total). L=0 delegates 30% to L=1
-hypervisor: 0.30 × 256 = 76.8, rounded down to 76. L=1's pre-flattened value is
-76 (= 29.7% of total). L=1 then delegates 50% of its slice to L=2 VM:
-0.50 × 76 = 38.0, exact. L=2's pre-flattened value is 38 (= 14.8% of total). L=2
-delegates 33% to L=3 guest: 0.33 × 38 = 12.54, rounded down to 12. L=3's
-pre-flattened value is 12 (= 4.7% of total). Each level loses a small amount of
-precision to round-down; the lost capacity is not wasted — it returns to the
-parent's available bandwidth pool for further delegation or over-budget overflow
-(§4.5.4).
+**Worked example.** L=0 holds a root Contract with `bw_class = 128` (global
+pre-flattened: 128; local: 128 — same at the root). Each level delegates 50% of
+its slice to the next level.
+
+| Level | `child_bw_class` passed | Stored global            | Local readback                    |
+|-------|------------------------|--------------------------|-----------------------------------|
+| L=0   | (root)                 | 128                      | 128                               |
+| L=1   | 128 (50% of L=0)       | `floor(128×128/256) = 64`| `floor(64×256/128) = 128`         |
+| L=2   | 128 (50% of L=1)       | `floor(64×128/256) = 32` | `floor(32×256/64) = 128`          |
+| L=3   | 128 (50% of L=2)       | `floor(32×128/256) = 16` | `floor(16×256/32) = 128`          |
+
+The stored global values (128, 64, 32, 16) are the hardware-internal pre-flattened
+representation, halving at each level as each child holds 50% of its parent's
+absolute bandwidth. The local readback values are 128 at every level — the same
+value regardless of delegation depth. A kernel or hypervisor that reads
+`mse_absolute_bw = 128` and interprets it as "I hold 50% of my allocation" is
+correct at L=0, L=1, L=2, or L=3. Software runs unchanged.
 
 #### §4.5.3 — Pre-flattening and reconfiguration completion
 
@@ -451,23 +514,46 @@ The hardware maintains the pre-flattened bandwidth value in the leaf Contract.
 Arbitration reads this value in O(1).
 
 When a parent Contract is reconfigured (its bandwidth value changes via a privileged
-operation), all descendant Contracts in its subtree are recomputed. The recomputation
-must complete before the next arbitration cycle that involves any affected Contract
-holder. Implementations may briefly stall arbitration on affected harts during
-recomputation; non-affected harts continue unaffected.
+operation), all descendant Contracts in its subtree are recomputed. Hardware retains
+the local fraction specified at delegation time (`child_bw_class` from `ms.it`) and
+derives the new stored global value as `floor(new_parent_stored × child_bw_class /
+256)`. The recomputation must complete before the next arbitration cycle that
+involves any affected Contract holder. Implementations may briefly stall arbitration
+on affected harts during recomputation; non-affected harts continue unaffected.
 
-A pre-flattened bandwidth readback CSR (`mse_absolute_bw` or similar; final name and
-address in Chapter 13) allows software to read the running EC's effective bandwidth
-value as stored in the leaf Contract.
+The `mse_absolute_bw` CSR (Chapter 13) returns the running EC's bandwidth in
+**local view**: hardware converts the stored pre-flattened global value to the local
+0–255 scale using `floor(stored_global × 256 / parent_stored_global)`. Software at
+any delegation level reads the same scale — fraction of its own slice — consistent
+with §4.5.0.
 
-**Worked example.** A hypervisor at L=1 holds pre-flattened 76 (29.7% of total). It
-has 3 child Contracts: L=2-A (38, = 50% of L=1's slice), L=2-B (19, = 25% of
-L=1's slice), L=2-C (12, ≈ 16% of L=1's slice). Each L=2 has its own children.
-The hypervisor decides to reduce its allocation to 25% of total (= pre-flattened 64).
-After the privileged re-allocation, the hardware recomputes: L=2-A becomes 32
-(= 50% of 64), L=2-B becomes 16 (= 25% of 64), L=2-C becomes 10 (≈ 16% of 64).
-All descendants of L=2-A, L=2-B, L=2-C are similarly recomputed. The next
-arbitration involving any of these harts uses the new values.
+**Worked example.** The root (L=0) holds stored global = 192. It has delegated to an
+L=1 hypervisor: stored global = 96, local readback = `floor(96 × 256 / 192) = 128`
+(50% of L=0's slice). The hypervisor has three child Contracts:
+
+| Child | `child_bw_class` | Stored global | Local readback (`floor(× 256 / 96)`) |
+|-------|-----------------|---------------|--------------------------------------|
+| L=2-A | 128 (50%)       | 48            | `floor(48 × 256 / 96) = 128`         |
+| L=2-B | 64 (25%)        | 24            | `floor(24 × 256 / 96) = 64`          |
+| L=2-C | 32 (12.5%)      | 12            | `floor(12 × 256 / 96) = 32`          |
+
+Each L=2 EC reads `mse_absolute_bw` and sees its fraction of the hypervisor's
+slice, unaware of L=0's global allocation.
+
+The root now reduces L=1's allocation: L=1 stored global changes from 96 to 64.
+Hardware recomputes each child's stored global from the retained local fraction:
+
+| Child | Local fraction | New stored global           | New local readback (`floor(× 256 / 64)`) |
+|-------|---------------|-----------------------------|-----------------------------------------|
+| L=2-A | 128/256 = 50% | `floor(64 × 128 / 256) = 32` | `floor(32 × 256 / 64) = 128`           |
+| L=2-B | 64/256 = 25%  | `floor(64 × 64 / 256) = 16`  | `floor(16 × 256 / 64) = 64`            |
+| L=2-C | 32/256 = 12.5%| `floor(64 × 32 / 256) = 8`   | `floor(8 × 256 / 64) = 32`             |
+
+The L=2 local readback values are identical before and after the reconfiguration.
+From each L=2 EC's perspective, its bandwidth class is the same fraction of its
+parent's slice — the reconfiguration at L=1 is invisible in the local view. All
+descendants of the recomputed Contracts are similarly updated. The next arbitration
+involving any affected hart uses the new stored values.
 
 #### §4.5.4 — Multi-tier slot arbitration
 
@@ -954,7 +1040,50 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.21 (this version).** Cluster D resolution: MSE telescoping with
+- **v0.22 (this version).** Local-view semantics for telescoping (cluster D
+  revision).
+
+  The v0.21 commit (6c46f5a) described §4.5's MSE telescoping in *global view*
+  terms: software at every delegation level would see CSR values representing
+  fraction of total system bandwidth. This was inconsistent with the architect's
+  design intent that software runs unchanged at any delegation level — the same
+  property CME's group-zero-from-any-level already embodies.
+
+  v0.22 introduces §4.5.0 stating this principle prominently, and revises
+  §4.5.1, §4.5.2, §4.5.3 to clarify that:
+
+  - Hardware stores pre-flattened absolute values internally (for O(1)
+    arbitration). This is unchanged from v0.21.
+
+  - Software-facing CSR readback (`mse_absolute_bw`) returns a value on the
+    running EC's *local* 0–255 scale, representing fraction of *its own slice*.
+    The conversion from stored global to readback local is
+    `floor(stored_global × 256 / parent_stored_global)`, performed at read time
+    by hardware.
+
+  - Descriptor fields (`bw_class` in `ms.ir`, `child_bw_class` in `ms.it`) are
+    on the *parent's local scale*. Software at any level uses the same 0–255
+    range regardless of depth.
+
+  - Telescoping (§4.5.2) operates within this framework: the parent grants the
+    child a slice expressed on the parent's local 0–255 scale; hardware translates
+    this to a global pre-flattened value for arbitration using
+    `floor(parent_stored × child_bw_class / 256)`.
+
+  - Reconfiguration (§4.5.3) preserves local fractional views: hardware retains
+    the `child_bw_class` from the original `ms.it` call and recomputes stored
+    global values when a parent's allocation changes. Local readback values are
+    approximately preserved through reconfiguration (exactly preserved when the
+    fraction is representable without rounding).
+
+  The hardware mechanics (multi-tier arbitration §4.5.4, dithering §4.5.5, cap
+  rule §4.5.6, round-down rounding) are unchanged from v0.21.
+
+  Propagation to ch00 (architectural philosophy), ch09 (MSE chapter), ch10
+  (usage examples), ch13 (CSR semantics), Sail-A (one-line patch in
+  `read_CSR(0xFD3)`) follows in subsequent commits.
+
+- **v0.21.** Cluster D resolution: MSE telescoping with
   per-delegation precision, multi-tier slot arbitration, and dithered slot
   scheduling become normative. All content placed in new §4.5 (MSE Telescoping
   and Arbitration Policy) using Approach A (§5 already exists for Delegation).
@@ -1104,4 +1233,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.21.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.22.*
