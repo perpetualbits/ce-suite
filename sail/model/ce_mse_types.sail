@@ -44,3 +44,17 @@ let MSE_Contract_default : MSE_Contract = struct {
   precision  = 0x0,
   valid      = false
 }
+
+/* ------------------------------------------------------------------ */
+/* MSE error codes (ch09 §9.5–§9.6, ch15)                            */
+/* ------------------------------------------------------------------ */
+
+type mse_error_t = bits(8)
+
+let MSE_OK                       : mse_error_t = 0x00
+let MSE_ERR_ADMISSION_DENIED     : mse_error_t = 0x10  /* cap exceeded or axiom denied */
+let MSE_ERR_NO_CONTRACT          : mse_error_t = 0x11  /* no live Contract for target ECID */
+let MSE_ERR_INVALID_ECID         : mse_error_t = 0x12  /* unallocated or invalid ECID */
+let MSE_ERR_DESCRIPTOR_RESERVED  : mse_error_t = 0x13  /* reserved bits set or pointer form */
+
+function mse_err_to_xlenbits(e : mse_error_t) -> xlenbits = zero_extend(e)

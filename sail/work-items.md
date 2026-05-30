@@ -686,7 +686,13 @@ scale (§9.4.1). Admission checks `bw_class + mse_bw_sum ≤ mse_bw_cap`.
 
 **Depends on:** S29a
 
-**Status:** ☐
+**Status:** ✓ Done — Sail-B session. `ce_mse_execute.sail` adds `val admit_mse_contract`
+axiom (abstract), `mse_ret_err`/`mse_ret_ok` helpers, and execute clauses for
+`CE_MSIR` and `CE_MSOR`. Cap check (`mse_bw_cap == 0 || sum + bw ≤ cap`) inline.
+Error codes defined in `ce_mse_types.sail`: MSE_ERR_ADMISSION_DENIED (0x10),
+MSE_ERR_NO_CONTRACT (0x11), MSE_ERR_INVALID_ECID (0x12), MSE_ERR_DESCRIPTOR_RESERVED
+(0x13). MSIR/MSOR stubs removed from `ce_mse_decode.sail`. Both checks pass.
+Commit: (hash to be filled).
 
 ---
 
@@ -743,7 +749,12 @@ updates `mse_bw_sum`; ms.or revokes and restores `mse_bw_sum`. Check
 
 **Depends on:** S29b
 
-**Status:** ☐
+**Status:** ✓ Done — Sail-B session. `ce_mse_test_s29f.sail` (`$[test]` function
+`test_mse_ir_or_roundtrip`): ms.ir with bw_class=64/lat_class=2 → Contract active,
+mse_bw_sum=0x40, mse_status=MSE_OK, rd=0; ms.or → Contract gone, mse_bw_sum=0x00.
+Compiles with both checks. Note: `$[test]` functions are type-checked but not executed
+by `make check`; actual simulation requires a Sail simulator target (not in scope for
+Sail v1 type-check-only builds). Commit: (hash to be filled).
 
 ---
 

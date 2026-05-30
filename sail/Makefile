@@ -17,6 +17,7 @@ CE_SOURCES = \
   model/ce_cme_execute.sail \
   model/ce_cpe_decode.sail \
   model/ce_mse_decode.sail \
+  model/ce_mse_execute.sail \
   model/ce_qos_decode.sail \
   model/ce_cme_test_s7.sail \
   model/ce_cme_test_s8.sail \
@@ -30,7 +31,8 @@ CE_SOURCES = \
   model/ce_cme_test_s22.sail \
   model/ce_cme_test_s23.sail \
   model/ce_cme_test_s24.sail \
-  model/ce_cme_test_s25.sail
+  model/ce_cme_test_s25.sail \
+  model/ce_mse_test_s29f.sail
 
 # Standalone check: prepend the prelude that stubs sail-riscv types
 CE_STANDALONE_SOURCES = \
