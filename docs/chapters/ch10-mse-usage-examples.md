@@ -23,9 +23,15 @@ All examples assume:
   `x0` is used for `rd` to discard the result where the fast path is expected
   to succeed.
 - Inline `rs2` values use the encoding defined in Chapter 9 §9.5:
-  - For `ms.ir`: bits 3:0 = `bw_class`, bits 7:4 = `lat_class`, bit `[XLEN-1]` = 0.
-  - For `ms.it`: bits 15:0 = `child_ecid`, bits 19:16 = `child_bw_class`,
-    bits 23:20 = `child_lat_class`, bit `[XLEN-1]` = 0.
+  - For `ms.ir`: bits 7:0 = `bw_class` (8 bits, 0–255 pre-flattened absolute scale),
+    bits 15:8 = `lat_class` (8 bits), bit `[XLEN-1]` = 0 (inline form).
+  - For `ms.it`: bits 15:0 = `child_ecid`, bits 23:16 = `child_bw_class` (8 bits,
+    on parent's precision scale), bits 31:24 = `child_lat_class` (on RV32: bits 30:24,
+    7 bits; values 128–255 require pointer form), bits 35:32 = `child_precision` (RV64
+    inline only; 1–8 bits, or 0 = use parent's precision unchanged), bit `[XLEN-1]` = 0
+    (inline form).
+  - The `bw_class` and `lat_class` field widths shown are architectural maxima;
+    implementations decode 4–8 bits as advertised in `mse_caps` (Chapter 13).
 
 ---
 
@@ -72,11 +78,11 @@ minimum memory bandwidth and bounded latency. The ECID is not currently running.
 
 ```asm
     # Build inline ms.ir descriptor:
-    #   bits 3:0  = bw_class  (e.g. 4 = bandwidth class 4)
-    #   bits 7:4  = lat_class (e.g. 2 = latency class 2, lower = higher priority)
+    #   bits 7:0  = bw_class  (e.g. 64 ≈ 25% of total system bandwidth)
+    #   bits 15:8 = lat_class (e.g. 2 = moderate priority; lower = higher priority)
     #   bit [XLEN-1] = 0 (inline form)
 
-    li    a2, ((2 << 4) | 4)     # lat_class=2, bw_class=4 → 0x24
+    li    a2, ((2 << 8) | 64)    # lat_class=2, bw_class=64 → 0x0240
     ms.ir a0, rt_ecid, a2        # assign Contract; a0 = 0 on success
     bnez  a0, .mse_assign_error
 
@@ -89,7 +95,7 @@ minimum memory bandwidth and bounded latency. The ECID is not currently running.
 ```asm
     # If rt_ecid is currently running on this hart, the Contract takes effect
     # immediately at the next CN slot boundary — no ec.ob needed.
-    li    a2, ((2 << 4) | 4)
+    li    a2, ((2 << 8) | 64)
     ms.ir a0, current_ecid_val, a2
     bnez  a0, .mse_assign_error
     # Memory controller registers updated; new class active at next slot.
@@ -155,8 +161,8 @@ context switches.
     li    a2, 0x030F             # l1_way_mask=0x0F, l2_way_mask=0x03
     cp.ir x0, rt_ecid, a2
 
-    # Assign MSE Contract: bw_class=4, lat_class=1.
-    li    a2, ((1 << 4) | 4)    # lat_class=1, bw_class=4 → 0x14
+    # Assign MSE Contract: bw_class=64, lat_class=1.
+    li    a2, ((1 << 8) | 64)   # lat_class=1, bw_class=64 → 0x0140
     ms.ir x0, rt_ecid, a2
 ```
 
@@ -188,22 +194,24 @@ context switches.
 
 ### Scenario
 
-A hypervisor (`hyp_ecid`, L=1) holds an MSE Contract with `bw_class=8`,
-`lat_class=1`. It delegates portions to two vCPUs so each guest gets a
-guaranteed memory bandwidth share.
+A hypervisor (`hyp_ecid`, L=1) holds an MSE Contract with `bw_class=76`
+(pre-flattened, ≈30% of total system bandwidth), `lat_class=2`. It delegates
+portions to two vCPUs so each guest gets a guaranteed memory bandwidth share.
 
 ### Delegate to first vCPU
 
 > `ms.it` = memory scheduling into tenant (`ms` = MSE, `i` = into/delegate, `t` = tenant/child ECID)
 
 ```asm
-    # Inline ms.it descriptor: child_ecid=vcpu0_ecid, bw_class=3, lat_class=2.
+    # Inline ms.it descriptor: child_ecid=vcpu0_ecid, child_bw_class=128, child_lat_class=2.
+    # child_bw_class=128 on parent's 8-bit precision scale = 50% of parent's slice.
+    # Hardware computes pre-flattened: floor(76 × 128/256) = 38.
     #   bits 15:0  = vcpu0_ecid
-    #   bits 19:16 = child_bw_class = 3
-    #   bits 23:20 = child_lat_class = 2
+    #   bits 23:16 = child_bw_class = 128
+    #   bits 31:24 = child_lat_class = 2
 
-    li    t0, ((2 << 20) | (3 << 16))  # child_lat_class=2, child_bw_class=3
-    or    t0, t0, vcpu0_ecid            # insert child_ecid in bits 15:0
+    li    t0, ((2 << 24) | (128 << 16))  # child_lat_class=2, child_bw_class=128
+    or    t0, t0, vcpu0_ecid              # insert child_ecid in bits 15:0
     ms.it a0, hyp_ecid, t0
     bnez  a0, .mse_delegate_error
 ```
@@ -211,20 +219,25 @@ guaranteed memory bandwidth share.
 ### Delegate to second vCPU
 
 ```asm
-    li    t0, ((2 << 20) | (3 << 16))
+    # Delegate 25% of parent's slice to vcpu1: child_bw_class=64, child_lat_class=4.
+    # Hardware computes pre-flattened: floor(76 × 64/256) = 19.
+    li    t0, ((4 << 24) | (64 << 16))   # child_lat_class=4, child_bw_class=64
     or    t0, t0, vcpu1_ecid
     ms.it a0, hyp_ecid, t0
     bnez  a0, .mse_delegate_error
-    # hyp_ecid has now delegated 6 of its 8 bw_class units; 2 remain.
+    # hyp_ecid has now delegated pre-flattened 38+19=57 of its 76 bw_class units; 19 remain.
+    # (child_bw_class=128 → pre-flattened 38; child_bw_class=64 → pre-flattened 19)
 ```
 
 ### Notes
 
-- After both delegations, `hyp_ecid`'s effective `bw_class` is reduced by 6.
-  A third delegation of `bw_class=3` would fail with `MSE_ERR_CAP_EXCEEDED`.
+- After both delegations, `hyp_ecid`'s pre-flattened `bw_class` is partially
+  delegated (children sum = 57 out of 76). A third delegation of `child_bw_class=128`
+  (→ pre-flattened 38) would push the sum to 95 > 76 and fail with
+  `MSE_ERR_CAP_EXCEEDED`.
 - Setting `child_bw_class=0` and `child_lat_class=0` in the descriptor causes
-  the child to inherit the parent's full class. Use this when the parent wants
-  to hand off its entire Contract to one child.
+  the child to inherit the parent's full pre-flattened class. Use this when the
+  parent wants to hand off its entire Contract to one child.
 - The child's delegated Contract takes effect on the next `ec.ob` that restores
   the child's bank — or immediately if the child is currently running.
 - `ms.it` performs an atomic admission check: if the check fails, the parent's
@@ -263,7 +276,7 @@ as part of the destroy sequence.
 ```asm
     ms.ot  a0, vcpu0_ecid        # revoke vcpu0's delegated Contract
     bnez   a0, .mse_revoke_error
-    # vcpu0's bw_class=3 returned to hyp_ecid's headroom.
+    # vcpu0's pre-flattened bw_class returned to hyp_ecid's headroom.
     # If vcpu0 had further delegated to sub-vCPUs, those are revoked first
     # (recursive, bounded by D ≤ 3; always succeeds).
 ```
@@ -283,9 +296,10 @@ as part of the destroy sequence.
 ### `MSE_ERR_CAP_EXCEEDED` — group bandwidth cap
 
 ```asm
-    # hyp_ecid has bw_cap=8. vcpu0 and vcpu1 each hold bw_class=3 (total 6).
-    # Attempting to assign bw_class=4 to vcpu2 would exceed the cap.
-    li    t0, ((1 << 20) | (4 << 16))
+    # hyp_ecid has bw_cap=76 (pre-flattened). vcpu0 and vcpu1 have pre-flattened
+    # bw_class of 38 and 19 (total 57). Attempting child_bw_class=128 for vcpu2
+    # (→ pre-flattened 38) would push the sum to 95 > 76 — cap exceeded.
+    li    t0, ((1 << 24) | (128 << 16))  # child_lat_class=1, child_bw_class=128
     or    t0, t0, vcpu2_ecid
     ms.it a0, hyp_ecid, t0
     li    t1, 3                  # MSE_ERR_CAP_EXCEEDED = 3
@@ -296,7 +310,7 @@ as part of the destroy sequence.
 ### `MSE_ERR_SYSTEM_FULL` — global CN budget exhausted
 
 ```asm
-    li    a2, ((2 << 4) | 8)     # bw_class=8, lat_class=2
+    li    a2, ((2 << 8) | 8)     # bw_class=8, lat_class=2
     ms.ir a0, new_ecid, a2
     li    t1, 4                  # MSE_ERR_SYSTEM_FULL = 4
     beq   a0, t1, .handle_full
@@ -308,7 +322,7 @@ as part of the destroy sequence.
 
 ```asm
     # ms.it requires child_ecid to be a child of rs1 in the delegation tree.
-    li    t0, ((1 << 20) | (2 << 16))
+    li    t0, ((1 << 24) | (2 << 16))   # child_lat_class=1, child_bw_class=2
     or    t0, t0, unrelated_ecid  # not a child of hyp_ecid
     ms.it a0, hyp_ecid, t0
     li    t1, 2                  # MSE_ERR_NOT_CHILD = 2
@@ -362,10 +376,189 @@ does not receive its guaranteed CN slots in a scheduling window.
 
 ---
 
-## 10.10 Where to go next
+## 10.10 Reading Pre-Flattened Bandwidth
+
+### Scenario
+
+A kernel module wants to know how much bandwidth the currently running EC has been
+allocated — the post-telescoping reality after any delegation chain has been applied.
+
+### Code
+
+```asm
+    # Read the running EC's pre-flattened bandwidth (Chapter 9 §9.4.5).
+    # Returns 0–255, where 255 = 100% of total system bandwidth.
+    csrr   t0, mse_absolute_bw   # full CSR specification in Chapter 13
+
+    # Convert to approximate percentage for logging:
+    #   percentage ≈ (t0 × 100) / 256
+    li     t1, 100
+    mul    t2, t0, t1
+    srli   t2, t2, 8             # t2 = percentage (0–100), approximate
+
+    # Example: bw_class=76 → t0=76, t2 = (76×100)>>8 = 29 (≈29% of total).
+```
+
+### Notes
+
+- `mse_absolute_bw` returns the pre-flattened `bw_class` value used by the memory
+  controller in arbitration. This is the true effective bandwidth after all
+  telescoping round-downs in the delegation chain.
+- The value may differ from what the parent originally assigned. If the hypervisor
+  delegated "50% of its slice" but the pre-flattened math rounded down, the guest
+  sees the post-rounding value. Reading `mse_absolute_bw` gives the correct number.
+- With `CN_FRAC = 128` (50/50 split), a pre-flattened `bw_class = 64` corresponds
+  to 64 guaranteed CN slots per 256-slot window = 25% of total bus bandwidth.
+- Read `mse_bw_sum` before calling `ms.ir` to check how much global CN budget is
+  still available for new Contracts.
+
+---
+
+## 10.11 Telescoping Delegation
+
+### Scenario
+
+A hypervisor (`hyp_ecid`, L=1) holds `bw_class = 76` (pre-flattened, ≈30% of total
+system bandwidth). It needs to grant 50% of its share to a busy guest VM at high
+priority. This example walks through the descriptor construction, shows how the
+hardware computes the child's pre-flattened value, and demonstrates verifying the
+result via `mse_absolute_bw`.
+
+### Step 1 — Hypervisor claims its bandwidth
+
+```asm
+    # bw_class = 76, lat_class = 2 (moderate priority; lower value = higher priority)
+    li    a2, ((2 << 8) | 76)    # bits 15:8 = lat_class=2, bits 7:0 = bw_class=76
+    ms.ir a0, hyp_ecid, a2
+    bnez  a0, .mse_assign_error
+```
+
+### Step 2 — Delegate 50% of the slice to a guest VM
+
+The parent's precision scale is 8 bits (range 0–255). To express 50%:
+`child_bw_class = 128` (= 50% × 256 = 128).
+
+Hardware computes: `floor(76 × 128 / 256) = floor(38.0) = 38`. No rounding loss here.
+
+```asm
+    # Inline ms.it descriptor on RV64:
+    #   bits 15:0  = guest_ecid
+    #   bits 23:16 = child_bw_class = 128 (50% of parent's 256-range)
+    #   bits 31:24 = child_lat_class = 1 (high priority)
+    #   child_precision = 0 (omitted; use parent's 8-bit precision unchanged)
+
+    li    t0, ((1 << 24) | (128 << 16))  # child_lat_class=1, child_bw_class=128
+    or    t0, t0, guest_ecid
+    ms.it a0, hyp_ecid, t0
+    bnez  a0, .mse_delegate_error
+    # Guest's leaf Contract: pre-flattened bw_class = 38 (≈14.8% of total).
+```
+
+### Step 3 — Verify via CSR (optional)
+
+When the guest's context is loaded, `mse_absolute_bw` reflects its allocation:
+
+```asm
+    ec.ob  x0, guest_ecid, FULL_MASK  # load guest context
+    csrr   t0, mse_absolute_bw        # t0 = 38
+    # t0 = 38: guest has 38/256 ≈ 14.8% of total bandwidth, not 50%.
+    # The 50% is 50% of the *parent's* 29.7% share, which is 14.8% of total.
+```
+
+### Over-budget bandwidth in practice
+
+Once the guest consumes its 38 guaranteed CN slots in a window, it enters the
+over-budget tier (Chapter 9 §9.7.1 tier 2). If other Contract holders are not using
+their slots, the guest competes for idle CN time using its `lat_class = 1` priority.
+The guaranteed minimum is protected; over-budget bandwidth is a bonus, not a promise.
+
+### Notes
+
+- The `child_bw_class` value in `ms.it` is on the *parent's* precision scale, not the
+  absolute 0–255 scale. If the parent has 8-bit precision, 128 means 50%. If the
+  parent has 4-bit precision (range 0–15), 8 means 50%.
+- Rounding loss only occurs when the math is non-integer. For example, 76 × 33% =
+  25.08, which rounds to 25. The round-down is intentional — it guarantees the sum of
+  children never exceeds the parent's budget.
+- `ms.it` admission is atomic: if the check fails, the parent's allocation is
+  unchanged.
+
+---
+
+## 10.12 Reduced-Precision Delegation for Nested Virtualization
+
+### Scenario
+
+A nested virtualization stack uses three delegation levels. The L=1 hypervisor holds
+`bw_class = 76` (≈30% of total). It wants to give 25% of its slice to an L=2 nested
+hypervisor, but that L=2 system is simple — it only needs to express its
+sub-allocations in 4 coarse steps, not 256. Using `child_precision = 4` reduces the
+L=2 system's local precision to 4 bits (16 steps), making its sub-delegation math
+simpler.
+
+### Delegation from L=1 to L=2 with reduced precision (RV64)
+
+Target fraction = 25%: `child_bw_class = 64` (25% × 256 = 64 on the 8-bit scale).
+
+Pre-flattened value for L=2: `floor(76 × 64 / 256) = floor(19.0) = 19`.
+
+```asm
+    # Inline ms.it on RV64: child_bw_class=64, child_lat_class=3, child_precision=4.
+    #   bits 15:0  = l2_hyp_ecid
+    #   bits 23:16 = child_bw_class = 64 (25% of parent's 256-range)
+    #   bits 31:24 = child_lat_class = 3
+    #   bits 35:32 = child_precision = 4 (L=2 uses 4-bit local precision; range 0-15)
+
+    li    t0, ((3 << 24) | (64 << 16))  # child_lat_class=3, child_bw_class=64
+    or    t0, t0, l2_hyp_ecid
+    li    t1, 4
+    slli  t1, t1, 32                    # child_precision=4 in bits 35:32 (RV64 only)
+    or    t0, t0, t1
+    ms.it a0, l1_hyp_ecid, t0
+    bnez  a0, .mse_delegate_error
+    # L=2 leaf Contract: pre-flattened bw_class=19, local precision=4 bits.
+```
+
+On RV32, use the pointer form (`MSE_Delegation_Params`) to specify `child_precision`.
+
+### L=2 delegates to an L=3 guest using its 4-bit scale
+
+L=2's local precision is 4 bits, so its parent_scale = 16. To delegate 50%:
+`child_bw_class = 8` (50% × 16 = 8).
+
+Pre-flattened for L=3: `floor(19 × 8 / 16) = floor(9.5) = 9`.
+
+```asm
+    # L=2 delegates to L=3 guest at 50% on L=2's 4-bit scale.
+    li    t0, ((1 << 24) | (8 << 16))  # child_lat_class=1, child_bw_class=8
+    or    t0, t0, l3_guest_ecid
+    ms.it a0, l2_hyp_ecid, t0
+    bnez  a0, .mse_delegate_error
+    # L=3 leaf Contract: pre-flattened bw_class=9 (≈3.5% of total bandwidth).
+```
+
+### Notes
+
+- `child_precision = 0` (the default when using inline form on RV32, or when the
+  field is omitted) means "use parent's precision unchanged." Most delegations use
+  the default.
+- Reducing precision limits the granularity of sub-allocations within the child's
+  slice — a 4-bit scale gives 16 distinct steps. For a small L=2 system managing
+  2–4 guests, 16 steps is ample and avoids complex 8-bit arithmetic.
+- Precision reduction propagates downward: if L=2's precision is 4 bits, L=2's
+  own `ms.it` calls specify `child_bw_class` on the 4-bit scale (0–15). L=3 cannot
+  have higher precision than L=2.
+- On RV64, bits 35:32 carry `child_precision` in inline form. On RV32, these bits
+  don't exist in a register operand; use the pointer form (`MSE_Delegation_Params`
+  struct with the `child_precision` field).
+
+---
+
+## 10.13 Where to go next
 
 **Chapter 9** is the normative MSE reference: slot scheme, Contract parameters,
-arbitration rules, CSRs, and error codes.
+telescoping and pre-flattening semantics, multi-tier slot arbitration, CSRs, and
+error codes.
 
 **Chapter 7** covers CPE (cache partitioning), which composes with MSE for
 end-to-end bounded memory latency (see §10.5 above).
