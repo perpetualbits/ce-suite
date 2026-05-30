@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.20
+**Version:** 0.21
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -383,6 +383,171 @@ Chapter 7.
 
 A context switch between two ECIDs whose state is already in Banks does
 not touch ECS at all.
+
+### 4.5 MSE Telescoping and Arbitration Policy
+
+This section fixes the normative rules for MSE Contract precision, delegation
+telescoping, pre-flattening, multi-tier slot arbitration, dithered slot scheduling,
+and the group bandwidth cap. These rules are MSE-specific. The Contract axioms in
+§4.3 (ownership, splitting, atomic admission, dissolution, delegation depth, and
+per-extension delegation instructions) apply to all three Contract types; the rules
+here refine those axioms for MSE.
+
+#### §4.5.1 — Contract precision and the 0–255 absolute scale
+
+An MSE Contract carries two fields that the memory controller evaluates each
+arbitration cycle:
+
+- `bw_class`: the Contract holder's guaranteed bandwidth as an integer count of
+  CN slots per arbitration window.
+- `lat_class`: the priority for tie-breaking within a CN slot.
+  Lower value = higher priority.
+
+Both fields have a maximum architectural width of 8 bits per field. Implementations
+may decode fewer bits and advertise the decoded width via the `mse_caps` CSR
+(specified in Chapter 13). The minimum supported decoded width is 4 bits per field
+for meaningful MSE support.
+
+When telescoping (§4.5.2) reduces precision at delegation, the stored Contract value
+is normalized to a common 0–255 scale that represents fraction-of-total-system-
+bandwidth. The hardware computes this value once at delegation time and stores it
+pre-flattened in the leaf Contract; subsequent arbitration reads the value directly.
+
+**Worked example.** Suppose the system has 256-slot windows and
+`mse_slot_ratio.CN_FRAC = 192` (75% CN, 25% BE). A root Contract holding
+`bw_class = 64` (on the 0–255 scale) is guaranteed 64 CN slots per window, which is
+64/192 ≈ 33% of available CN time and 64/256 = 25% of total window time. A child
+Contract telescoped to 50% of the parent receives a pre-flattened `bw_class = 32`
+(rounded down from 32.0, which happens to be exact here). The child is guaranteed 32
+CN slots per window = 12.5% of total window time.
+
+#### §4.5.2 — Telescoping at delegation
+
+When a Contract is delegated from a parent ECID to a child ECID via `ms.it`, the
+parent specifies the child's bandwidth share as a value on the parent's local
+precision scale, and optionally the child's local precision (1–8 bits).
+
+The hardware computes the child's pre-flattened bandwidth as the parent's
+pre-flattened value times the child's local fraction, **rounded down** to the nearest
+representable value on the 0–255 scale.
+
+A child may further reduce precision when delegating to a grandchild. Implementations
+support delegation depth up to D (§5.1); recursive telescoping at each level uses
+this same mechanism.
+
+**Worked example.** Root holds 256 (= 100% of total). L=0 delegates 30% to L=1
+hypervisor: 0.30 × 256 = 76.8, rounded down to 76. L=1's pre-flattened value is
+76 (= 29.7% of total). L=1 then delegates 50% of its slice to L=2 VM:
+0.50 × 76 = 38.0, exact. L=2's pre-flattened value is 38 (= 14.8% of total). L=2
+delegates 33% to L=3 guest: 0.33 × 38 = 12.54, rounded down to 12. L=3's
+pre-flattened value is 12 (= 4.7% of total). Each level loses a small amount of
+precision to round-down; the lost capacity is not wasted — it returns to the
+parent's available bandwidth pool for further delegation or over-budget overflow
+(§4.5.4).
+
+#### §4.5.3 — Pre-flattening and reconfiguration completion
+
+The hardware maintains the pre-flattened bandwidth value in the leaf Contract.
+Arbitration reads this value in O(1).
+
+When a parent Contract is reconfigured (its bandwidth value changes via a privileged
+operation), all descendant Contracts in its subtree are recomputed. The recomputation
+must complete before the next arbitration cycle that involves any affected Contract
+holder. Implementations may briefly stall arbitration on affected harts during
+recomputation; non-affected harts continue unaffected.
+
+A pre-flattened bandwidth readback CSR (`mse_absolute_bw` or similar; final name and
+address in Chapter 13) allows software to read the running EC's effective bandwidth
+value as stored in the leaf Contract.
+
+**Worked example.** A hypervisor at L=1 holds pre-flattened 76 (29.7% of total). It
+has 3 child Contracts: L=2-A (38, = 50% of L=1's slice), L=2-B (19, = 25% of
+L=1's slice), L=2-C (12, ≈ 16% of L=1's slice). Each L=2 has its own children.
+The hypervisor decides to reduce its allocation to 25% of total (= pre-flattened 64).
+After the privileged re-allocation, the hardware recomputes: L=2-A becomes 32
+(= 50% of 64), L=2-B becomes 16 (= 25% of 64), L=2-C becomes 10 (≈ 16% of 64).
+All descendants of L=2-A, L=2-B, L=2-C are similarly recomputed. The next
+arbitration involving any of these harts uses the new values.
+
+#### §4.5.4 — Multi-tier slot arbitration
+
+Within a CN slot, the memory controller selects the winning Contract holder by this
+priority order:
+
+1. **First tier — Contract holders within their budget.** Among Contract holders who
+   have not yet consumed their `bw_class` slots in the current window, the holder
+   with the lowest `lat_class` wins. Ties broken by round-robin across harts (each
+   hart's most-recent grant time is tracked; the least-recently-served wins).
+
+2. **Second tier — Contract holders over budget.** If no first-tier holder requests
+   memory in this slot, Contract holders who have consumed their budget but still
+   want memory compete by `lat_class`. Ties resolved as in tier 1.
+
+3. **Third tier — Best-effort fallthrough.** If no Contract holder of any tier
+   requests memory in this CN slot, the slot becomes available for best-effort
+   traffic. Best-effort harts compete by a fair scheme (round-robin or equivalent).
+
+A best-effort slot (the alternation pattern from `mse_slot_ratio`) is always
+available to best-effort traffic independently of the CN slot policy.
+
+**Worked example.** Window = 256 slots. `CN_FRAC = 128` (50/50 split). Slot pattern
+dithered (§4.5.5) so CN and BE slots interleave. Active Contracts: EC-A
+(`bw_class = 8`, `lat_class = 1`), EC-B (`bw_class = 4`, `lat_class = 3`), EC-C
+(`bw_class = 16`, `lat_class = 5`). 50% of slots are BE = 128 slots/window; the
+other 128 are CN.
+
+In CN slots 1–8: EC-A wants memory, is within budget, `lat_class = 1` wins all 8
+slots. EC-A is now at budget. In CN slots 9–12: EC-B wants memory, is within budget,
+`lat_class = 3` wins all 4. EC-B is now at budget. In CN slots 13–28: EC-C wants
+memory, is within budget, `lat_class = 5` wins all 16. EC-C is now at budget.
+
+In CN slots 29–128: no Contract holder is within budget. EC-A continues to request
+memory (over-budget); it wins by `lat_class`. EC-A consumes the rest of the CN slots
+that window via the over-budget tier. If EC-A also has no demand, the slot falls
+through to BE.
+
+#### §4.5.5 — Dithered slot scheduling with bounded gap
+
+The slot pattern within a window must satisfy `mse_slot_ratio.CN_FRAC` over the
+window's slot count. In addition, the maximum gap between consecutive CN slots is
+bounded by ⌈256 / CN_FRAC⌉ slots, and the maximum gap between consecutive BE slots
+is similarly bounded.
+
+This guarantees that a Contract holder waiting for its next CN slot waits at most one
+bounded gap, regardless of `CN_FRAC` value. Best-effort traffic similarly has bounded
+wait for its next BE slot.
+
+Implementations satisfy this property by any mechanism. The spec specifies the
+guarantee (bounded gap), not the mechanism.
+
+**Worked example.** With `CN_FRAC = 192` (75% CN, 25% BE), the maximum gap between
+consecutive CN slots is ⌈256/192⌉ = 2. The pattern CCCBCCCBCCCB... satisfies this:
+every 4 slots contains exactly 3 CN and 1 BE, and the longest gap between two CN
+slots is 1 (one BE slot between them). A Contract holder waiting for the next CN
+slot waits at most 1 slot period.
+
+By contrast, a naïve contiguous-block scheduler might place all 192 CN slots first
+followed by 64 BE slots, creating a 64-slot worst-case wait — 64 times worse.
+Dithering preserves the worst-case latency guarantee that the rest of MSE relies on:
+the (K+1) × slot_size_ns bound for CN latency under interrupt nesting (Chapter 9
+§9.3).
+
+#### §4.5.6 — Cap rule on pre-flattened values
+
+The group bandwidth cap (§4.3.2) is enforced on the pre-flattened absolute values.
+The sum of all children's pre-flattened `bw_class` values must not exceed the
+parent's pre-flattened `bw_class`.
+
+Because telescoping uses round-down (§4.5.2), a parent that delegates all of its
+bandwidth to children loses a small amount of total capacity to rounding. This is
+intentional: the round-down guarantees no child can exceed what the parent promised,
+even by 1/256 of total bandwidth. The lost capacity is not wasted — §4.5.4 routes
+it to over-budget or BE traffic.
+
+**Worked example.** Parent at pre-flattened 76. Three children at 38, 19, 12 (sum
+= 69). 76 − 69 = 7 units of parent capacity unaccounted for; this becomes available
+for over-budget overflow to any descendant who wants more, or to BE if no descendant
+wants it.
 
 ---
 
@@ -774,11 +939,60 @@ the rest of the spec.
    that framing into the §1 qualification, develop it as its own work
    item, or defer further.
 
+10. **D7.1 — Priority inversion and bandwidth donation.** The multi-tier slot
+    arbitration adopted in v0.21 (§4.5.4) routes over-budget Contract bandwidth
+    and unused BE slots to waiting ECs, addressing the common case where idle
+    bandwidth flows usefully. A separate formal priority-inversion or bandwidth-
+    donation mechanism — e.g., priority inheritance across hart boundaries, or
+    explicit donation of a Contract slice by one EC to another — remains an open
+    question for ratification-stage refinement with real implementer input.
+    D-pools (the salvage-analysis mechanism that served a similar purpose) are
+    explicitly dropped as an architectural concept and are not revived by this
+    item.
+
 ---
 
 ## Changelog
 
-- **v0.20 (this version).** §1 area-overhead claim refined: the "5–15%"
+- **v0.21 (this version).** Cluster D resolution: MSE telescoping with
+  per-delegation precision, multi-tier slot arbitration, and dithered slot
+  scheduling become normative. All content placed in new §4.5 (MSE Telescoping
+  and Arbitration Policy) using Approach A (§5 already exists for Delegation).
+  - **Telescoping (§4.5.1, §4.5.2).** Contract delegation may reduce precision at
+    each step. Pre-flattened absolute bandwidth is computed on a 0–255 scale and
+    stored in the leaf Contract for O(1) arbitration. Recursive delegation to depth
+    D is supported. Round-down rounding preserves the "child receives at most
+    parent's promise" guarantee.
+  - **Field widths (§4.5.1).** `bw_class` and `lat_class` are 8 bits architectural
+    maximum, implementation-defined decoded width (minimum 4 bits). Discoverable via
+    `mse_caps` (specified in Chapter 13).
+  - **Pre-flattening (§4.5.3).** Hardware pre-computes absolute bandwidth at
+    delegation; arbitration is O(1). Reconfiguration completes recomputation before
+    the next affected arbitration cycle. A pre-flattened bandwidth readback CSR
+    (`mse_absolute_bw` or similar; final name and address in Chapter 13) is
+    mentioned for software readability of the running EC's effective bandwidth.
+  - **Multi-tier slot arbitration (§4.5.4).** Within CN slots: within-budget
+    Contract holders by `lat_class` → over-budget Contract holders by `lat_class`
+    → BE fallthrough. Round-robin tie-break on `lat_class`. The multi-tier rule
+    guarantees bandwidth is never wasted while preserving Contract minimums.
+  - **Dithered slot scheduling (§4.5.5).** Slot pattern must satisfy `CN_FRAC`
+    over each window and bound the maximum gap between consecutive CN slots to
+    ⌈256/CN_FRAC⌉. Implementation mechanism unspecified. Preserves the
+    (K+1) × slot_size_ns worst-case CN latency under interrupt nesting.
+  - **Cap rule reformulation (§4.5.6).** Group bandwidth cap is enforced on
+    pre-flattened absolute values. Round-down rounding creates small unused
+    capacity which flows via over-budget overflow or BE fallthrough.
+  - **§8 update:** added item 10 (D7.1 — priority inversion handling and formal
+    bandwidth donation as a separate mechanism beyond slot-overflow); pending
+    ratification-stage refinement with implementer input.
+  - **Dropped:** D-pools (the salvage analysis's collective bandwidth-sharing
+    mechanism). The slot-overflow policy in §4.5.4 subsumes the pool concept's
+    main value. No §8 entry for D-pools.
+  - Propagation to ch09 (significant rewrite of §9.3 and §9.4), ch10 (new
+    examples), ch13 (new `mse_absolute_bw` CSR and possibly `mse_caps`
+    additions), and Sail MSE phase follows in subsequent commits.
+
+- **v0.20.** §1 area-overhead claim refined: the "5–15%"
   per-core range is retained as the digestible summary, with an inline
   cross-reference to Appendix C §C.4 for stratification by deployment class
   (CE-MinimalRT, CE-RT, CE-Full) and against specific public baselines
@@ -890,4 +1104,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.15.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.21.*
