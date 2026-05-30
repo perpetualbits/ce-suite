@@ -587,6 +587,56 @@ in the chat, partly in the repo. The architect is the only participant
 who reliably bridges across sessions; the orientation discipline exists
 specifically so neither Claude has to.
 
+### V.9 Generated artifacts
+
+Some files in the repo are produced by tooling from upstream
+sources rather than written by hand. These are *generated
+artifacts*. The rule is simple: do not edit generated
+artifacts directly. Edits go to the upstream source; the
+generated artifact is refreshed by running the tool that
+produces it.
+
+The canonical example is AsciiDoc. The Markdown sources in
+`docs/charter/`, `docs/chapters/`, `docs/submission/`, and
+elsewhere are the upstream. The matching files under
+`docs/adoc/` are generated from those Markdown sources by
+the `make adoc` target in the repo root Makefile. The
+Markdown is the source of truth; the AsciiDoc is the build
+product.
+
+This rule has two practical consequences for prompt-and-code
+work:
+
+First, when web-Claude proposes a code-prompt that needs to
+update some content, the target is the Markdown source —
+never the AsciiDoc mirror. A code-prompt that edits a
+`.adoc` file directly is wrong, even if the diff would land
+cleanly: the next `make adoc` run would silently overwrite
+the edit, reintroducing the staleness.
+
+Second, the propagation check at the end of every code-prompt
+should distinguish between Markdown sources (which are
+candidates for edit-as-target) and AsciiDoc mirrors (which
+are correctly stale until regenerated). Mirror hits should
+be classified as "regenerated later by `make adoc`" rather
+than "deferred to a follow-up edit". After a chain of
+Markdown source edits commits, a single closing prompt-and-
+code runs `make adoc` and commits the resulting mirror
+diffs — that one session is the only place mirror files
+appear in `git diff --staged`.
+
+The same principle extends to other generated artifacts that
+may emerge: HTML builds, generated CSVs from calculators,
+future tooling outputs. If a file is built from another
+file, edit the upstream. If the tool is wrong, fix the tool.
+The generated artifact is never the right place to edit.
+
+A useful diagnostic: if web-Claude finds itself drafting a
+code-prompt that targets a file under `docs/adoc/` or any
+other apparent build-output directory, that is the signal
+to stop and check whether the file is generated. The answer
+is usually yes.
+
 ---
 
 *End of Working Notes for Authors.*
