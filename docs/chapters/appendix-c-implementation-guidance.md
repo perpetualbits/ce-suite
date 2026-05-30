@@ -31,7 +31,7 @@ This appendix addresses three audiences:
    The area-cost estimates and industry analogues in §C.1 and §C.3 answer
    this question directly.
 3. **Architects** exploring more ambitious variants (distributed banks,
-   unit-local storage). §C.5 sketches these directions as speculative
+   unit-local storage). §C.7 sketches these directions as speculative
    starting points, not finished designs.
 
 No part of this appendix is normative. An implementation that disagrees with
@@ -264,7 +264,63 @@ handling, hypervisor scheduling) benefit most.
 
 ---
 
-## C.6 Distributed Bank Variations
+## C.6 On-chip context compression in the DMA path
+
+The DMA spill/fill operations `ec.im` and `ec.om` (Chapter 4 §4.10) move
+Bank contents between on-chip SRAM and main memory via the implementation's
+DMA engine. The volume of data moved per operation is fixed by the Bank's
+architectural size — 1 KB for an NV Bank on RV64, up to several KB for a VMT
+Bank depending on vector width. For a system with many active ECs and frequent
+spill/fill traffic, this DMA bandwidth is a measurable cost on the memory
+system and on power consumption.
+
+An implementation may transparently compress Bank contents in the DMA path.
+The opportunity is significant because Bank contents commonly contain large
+repeated zero patterns:
+
+- A scalar-only context has its FPR group filled with stale or zero data that
+  never changes (mstatus.FS = Off).
+- An integer-only context similarly has its VMT group zeroed or unused.
+- A freshly-allocated ECID's Bank may be entirely zero before first use.
+- Even within a live group, register subsets may be predictably zero
+  (callee-saved registers in a leaf function, upper bytes of a small integer
+  value, etc.).
+
+A modest compression block in the DMA engine — for instance, a run-length
+encoder targeting repeated zero bytes, or a simple dictionary-style scheme
+keyed on byte values — could reduce typical Bank DMA traffic substantially in
+workloads that do not fully populate every register class. The compression
+block sits between the DMA engine's source register and the memory interface;
+decompression sits between the memory interface and the DMA destination
+register. The transformation is invisible to software, which observes only the
+standard spill/fill behaviour of `ec.im` and `ec.om`.
+
+The cost is hardware area for the compression/decompression logic. For
+run-length encoding the cost is small — a few hundred gates plus a small state
+machine. For dictionary-based schemes the cost grows with dictionary depth but
+offers better compression ratios for non-zero-dominated patterns. The choice
+of scheme is entirely an implementation decision; the spec is silent.
+
+This is a transparent optimisation that reduces DMA bandwidth and energy
+without changing observable behaviour. An implementation that does not use
+compression is also correct — the spec does not require compression at any
+point in the DMA path. The compressed encoding in transit (or in DRAM during
+the spill window) is also implementation-defined; an implementation may use
+any encoding it wishes provided decompression preserves the Bank contents
+bit-for-bit on restore.
+
+A more aggressive variant would compress the *stored* Bank contents in main
+memory — that is, the spilled representation in the ECS region is compressed
+rather than plaintext, freeing memory capacity. This adds complexity because
+the ECS region's layout becomes implementation-defined in a software-visible
+way: a kernel or debugger that wants to inspect a banked context directly would
+need to know the compression scheme. This appendix recommends confining
+compression to the on-chip-to-memory transit only, keeping the spilled
+representation in the format software expects per Chapter 0 §0.6.
+
+---
+
+## C.7 Distributed Bank Variations
 
 The Bank model in Chapter 4 treats each Bank as a logically unified store.
 Nothing in Chapter 4 requires this store to be physically monolithic — an
@@ -273,7 +329,7 @@ use it. This section sketches three variations. All are more speculative than
 the S/R staging model in §C.2–§C.3; further architectural work is needed
 before any could be recommended for production.
 
-### C.6.1 VULM — Vector Unit-Local Memory
+### C.7.1 VULM — Vector Unit-Local Memory
 
 In an implementation with a dedicated vector execution unit (or vector lane
 array), the vector portion of a Bank — holding the VMT register file — can be
@@ -302,7 +358,7 @@ pursuing VULM would need to specify the number of VULM slots, the eviction
 policy, and the interaction with `ec.im`/`ec.om` (the DMA path in
 Chapter 4 §4.10). These are non-trivial design decisions not resolved here.
 
-### C.6.2 IULM — Interrupt Unit-Local Memory
+### C.7.2 IULM — Interrupt Unit-Local Memory
 
 An interrupt controller handling frequent interrupts repeatedly saves and
 restores the same small set of interrupt-handler ECIDs. Placing a small number
@@ -323,7 +379,7 @@ hardware. Chapter 18 (CLIC Integration) covers the software protocol for
 managing interrupt-handler ECIDs; IULM is a hardware optimisation below that
 protocol layer, not a change to it.
 
-### C.6.3 Distributed bank slices for out-of-order cores
+### C.7.3 Distributed bank slices for out-of-order cores
 
 An OoO core typically has several physical register files — one per issue port
 cluster, or one per register class (integer, floating-point, vector). The Bank
@@ -346,7 +402,7 @@ coherence protocol, which is out of scope for this appendix.
 
 ---
 
-## C.7 What This Appendix Does Not Cover
+## C.8 What This Appendix Does Not Cover
 
 This appendix deliberately stops short of the following:
 

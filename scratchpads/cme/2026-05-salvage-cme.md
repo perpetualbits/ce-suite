@@ -239,5 +239,22 @@ The ideas that translate cleanly into RTL starting points are:
   buses, mask-gated segments, area estimates (§C.4), and the speculative R-preload
   optimization (§C.5) are now captured there as non-normative implementation guidance.
 - **Cluster B — CME distributed-bank variations (Ideas E and F: VULM, IULM, distributed
-  slices for OoO cores):** → Also promoted to Appendix C §C.6 alongside cluster A.
+  slices for OoO cores):** → Also promoted to Appendix C §C.7 alongside cluster A.
   Framed as speculative directions requiring further architectural work.
+- **Cluster C item 1 — Per-group dirty tracking on saves:** → Already resolved as E3
+  (docs/work-items.md). The architect's earlier E-series work added the dirty-group
+  bitmap to EC[e] (ch00 §0.3 normative paragraph) and the rs1=x0 dirty-save mode to
+  `ec.ib` (ch03 §3.1 "Dirty-Save Mode" subsection). Sail test S8 validates the
+  behavior. The salvage discussion rediscovered work that was already complete in the
+  repo.
+- **Cluster C item 2 — On-chip context compression in the DMA path:** → Promoted to
+  `docs/chapters/appendix-c-implementation-guidance.md` §C.6. Framed as a non-normative
+  implementation optimisation that reduces DMA bandwidth and energy without changing
+  observable behavior.
+- **Cluster C item 3 — Per-context power gating:** → Already resolved as E6
+  (docs/work-items.md). The architect's earlier E-series work added ch04 §4.14 "Power
+  Gating Protocol" with four normative invariants: spill resident Banks via `ec.im`
+  before gating, fill via `ec.om` on wake before the first `ec.ob`, no skip on error,
+  bank bookkeeping survives the gate. The salvage's "per-context" framing was
+  architecturally adjacent; E6's "per-hart with explicit spill" is the
+  architecturally correct version. Same problem space, resolved as E6.
