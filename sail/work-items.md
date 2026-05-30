@@ -671,7 +671,7 @@ Illegal_Instruction).
 
 **Status:** ✓ Done — Sail-A session. New file `sail/model/ce_mse_types.sail`;
 updates to `ce_state.sail`, `ce_csr.sail`, `sail/Makefile`. Both `make check`
-and `make check-riscv` pass. Commit: (hash to be filled after this session's commit).
+and `make check-riscv` pass. Commit: 8572aa0.
 
 ---
 
