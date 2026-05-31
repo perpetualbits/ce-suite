@@ -1,0 +1,97 @@
+config,node,ce_total_mm2,baseline_name,baseline_process,baseline_area_mm2,ce_pct_of_core
+Minimum viable (CE-MinimalRT),28nm,0.01487,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),28nm,0.01487,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),28nm,0.01487,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),28nm,0.01487,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),16/12nm,0.00743,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),16/12nm,0.00743,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),16/12nm,0.00743,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),16/12nm,0.00743,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),7nm,0.00502,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),7nm,0.00502,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),7nm,0.00502,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),7nm,0.00502,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),5nm,0.0039,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),5nm,0.0039,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),5nm,0.0039,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),5nm,0.0039,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),3nm-E,0.0039,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),3nm-E,0.0039,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),3nm-E,0.0039,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),3nm-E,0.0039,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),3nm-B,0.0037,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),3nm-B,0.0037,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),3nm-B,0.0037,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),3nm-B,0.0037,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),Intel-4,0.00446,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),Intel-4,0.00446,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),Intel-4,0.00446,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),Intel-4,0.00446,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Minimum viable (CE-MinimalRT),Intel-7,0.0058,"SiFive U84 (single core, no L2)",7nm,0.28,1.792
+Minimum viable (CE-MinimalRT),Intel-7,0.0058,SiFive U74-class in-order (estimated),28nm,0.6,2.478
+Minimum viable (CE-MinimalRT),Intel-7,0.0058,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,1.568
+Minimum viable (CE-MinimalRT),Intel-7,0.0058,SiFive P670-class OoO with vector (estimated),5nm,0.85,0.459
+Fast-path rich (CE-RT),28nm,0.04768,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),28nm,0.04768,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),28nm,0.04768,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),28nm,0.04768,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),16/12nm,0.02384,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),16/12nm,0.02384,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),16/12nm,0.02384,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),16/12nm,0.02384,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),7nm,0.01609,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),7nm,0.01609,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),7nm,0.01609,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),7nm,0.01609,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),5nm,0.01252,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),5nm,0.01252,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),5nm,0.01252,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),5nm,0.01252,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),3nm-E,0.01252,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),3nm-E,0.01252,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),3nm-E,0.01252,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),3nm-E,0.01252,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),3nm-B,0.01186,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),3nm-B,0.01186,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),3nm-B,0.01186,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),3nm-B,0.01186,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),Intel-4,0.0143,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),Intel-4,0.0143,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),Intel-4,0.0143,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),Intel-4,0.0143,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Fast-path rich (CE-RT),Intel-7,0.0186,"SiFive U84 (single core, no L2)",7nm,0.28,5.747
+Fast-path rich (CE-RT),Intel-7,0.0186,SiFive U74-class in-order (estimated),28nm,0.6,7.947
+Fast-path rich (CE-RT),Intel-7,0.0186,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,5.029
+Fast-path rich (CE-RT),Intel-7,0.0186,SiFive P670-class OoO with vector (estimated),5nm,0.85,1.472
+Server-class (CE-Full),28nm,0.12231,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),28nm,0.12231,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),28nm,0.12231,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),28nm,0.12231,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),16/12nm,0.06116,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),16/12nm,0.06116,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),16/12nm,0.06116,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),16/12nm,0.06116,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),7nm,0.04128,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),7nm,0.04128,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),7nm,0.04128,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),7nm,0.04128,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),5nm,0.03211,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),5nm,0.03211,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),5nm,0.03211,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),5nm,0.03211,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),3nm-E,0.03211,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),3nm-E,0.03211,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),3nm-E,0.03211,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),3nm-E,0.03211,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),3nm-B,0.03043,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),3nm-B,0.03043,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),3nm-B,0.03043,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),3nm-B,0.03043,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),Intel-4,0.03669,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),Intel-4,0.03669,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),Intel-4,0.03669,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),Intel-4,0.03669,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
+Server-class (CE-Full),Intel-7,0.0477,"SiFive U84 (single core, no L2)",7nm,0.28,14.743
+Server-class (CE-Full),Intel-7,0.0477,SiFive U74-class in-order (estimated),28nm,0.6,20.385
+Server-class (CE-Full),Intel-7,0.0477,"ARM Cortex-A55 (single core, no L2)",7nm,0.32,12.9
+Server-class (CE-Full),Intel-7,0.0477,SiFive P670-class OoO with vector (estimated),5nm,0.85,3.777
