@@ -7,7 +7,7 @@
 >
 > **SETTLED THIS ROUND:**
 > - **Criterion 4 complete.** The stress battery (Parts J, K, L) runs clean over
->   the frozen core: CME, CPE, MSE, plus invariants D.1–D.20. QoS I/O-fabric is
+>   the frozen core: CME, CPE, MSE, plus invariants D.1–D.21. QoS I/O-fabric is
 >   scoped out on the same basis as the round-one-close decision (Part L.5), which
 >   is reaffirmed: it is self-contained downstream work that does not gate the loop.
 > - **QoS scoped OUT of the design loop** (reaffirmed; see Part L.5). The v0.25
@@ -23,7 +23,7 @@
 > - Criteria 1–3: complete.
 > - Criterion 4: **complete** (scoped core; QoS-fabric deferred per Part L.5).
 > - Criterion 5: **in progress** — *Pass one (2026-06-01): red-teamed Part C +
->   D.1–D.20. Findings: (1) tenet 10 mislabeled bandwidth contracts as
+>   D.1–D.20 (completeness pass extended to D.1–D.21). Findings: (1) tenet 10 mislabeled bandwidth contracts as
 >   "hart-local" — corrected; (2) D.19 "decided chip-wide" over-generalizes
 >   (cache is core-local) — corrected to "atomic at the arbiter's scope"; (3)
 >   D.11–D.13 positive operational forms were deferred — added; (4) D.11
@@ -35,15 +35,18 @@
 >   mask/pending bits; corrected to scope Q.2 to interrupt routes with a general
 >   resolve-before-free rule for the others; (6) tenet 6 "acyclic" was unqualified
 >   — loose against the root self-loop (tenet 7 / D.7); tightened to name the
->   sentinel exception. All deliberate dated changes; see Part C and Part D.
+>   sentinel exception; (7) D.20 absent from Part D despite being cited as
+>   load-bearing — folded in (executing Part P.2 promotion); (8) vault
+>   confidentiality uncaptured — added as D.21. Invariant list is now genuinely
+>   D.1–D.21. All deliberate dated changes; see Part C and Part D.
 >   Zero-change streak remains zero. Next step: a fresh red-team pass over the
->   corrected set.* Both former
+>   completed list.* Both former
 >   criterion-5 blockers were resolved in round two: generations (Part Q) and
 >   allocator policy F.4(a) (Part P.1).
 >
 > **ROUND FOUR PICKS UP AT:**
 > 1. **Begin criterion 5:** a full red-team pass over tenets (Part C) + invariants
->    (D.1–D.20); zero changes = pass one. A second clean pass = converged → freeze
+>    (D.1–D.21); zero changes = pass one. A second clean pass = converged → freeze
 >    is then a deliberate architect decision with a version bump.
 > 2. If a pass produces changes, resolve them and re-run.
 >
@@ -449,6 +452,30 @@ be done.) Consistent with ch00 §0.8.
     to "atomic at the arbiter's scope (chip-wide for bandwidth, core-local for
     cache)." Symmetric correction to tenet 10 (which over-narrowed in the other
     direction). Architect accepted the finding.]*
+
+**Rebasing, local view, and vault**
+20. **(rebasing / local view)** Every delegation level observes its delegated
+    resources — ECID ranges, VMT banks, non-VMT banks, and contract scales —
+    rebased into its own local namespace beginning at a local base, and cannot
+    observe the parent/physical numbering. The realizing mechanism may differ per
+    resource (up-pointers, per-Group slot rebasing, MSE stored-global Formula-2
+    readback) but the property is uniform. (This is the positive operational form
+    of D.11 for the numbering channel.)
+21. **(sealed-Bank confidentiality)** A Bank sealed by `ec.iv` holds its contents
+    only as ciphertext at rest; the plaintext is observable solely via an M-mode
+    `ec.ov` unseal. No non-M-mode operation exposes sealed plaintext: `ec.ob`
+    refuses to restore a sealed Bank (it must be unsealed first), and spill/fill
+    (`ec.im`/`ec.om`) move only the sealed ciphertext. (Key derivation, rotation,
+    and attestation are out of scope — deferred per charter §8; this invariant
+    covers only the confidentiality property.)
+
+    *[D.20 and D.21 added 2026-06-01, round three, criterion-5 completeness/
+    coverage pass. D.20 executes the fold-in that Part L.0 marked as "Candidate
+    invariant (to fold into Part D next pass)" and that Part P.2 promoted to
+    load-bearing; it was cited throughout the capture but absent from the numbered
+    list. D.21 captures the sealed-Bank confidentiality property enforced by
+    `ec.iv`/`ec.ov`/`ec.ob` — uncaptured in any prior invariant or tenet. The
+    invariant list is now genuinely D.1–D.21. Architect confirmed both gaps.]*
 
 **Scope boundary on resource sufficiency (not an invariant CE enforces).**
 CE does not guarantee that any actor retains a *workable* amount of resource
