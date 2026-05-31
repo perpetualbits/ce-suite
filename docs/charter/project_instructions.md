@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.23
+**Version:** 0.24
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -682,11 +682,15 @@ instruction (`ec.oe`).
    may fail to make forward progress or to meet WCET bounds. A hypervisor at
    `L = 1`, like any non-leaf EC, must retain its own resources to continue
    making allocation decisions for its children.
-4. **CME enforcement is architectural.** The CME Bank case is enforced
-   structurally by the bank-0-unnamed rule (§6.9): an EC cannot delegate its
-   last non-VMT Bank, because that Bank is not nameable as a delegation target.
-   No runtime check and no error code are involved; the operation is
-   inexpressible.
+4. **CME enforcement combines a structural rule and a trap.** The CME Bank
+   case is enforced by the mechanisms in §6.9: `ec.it` takes a count of Banks
+   to delegate (not a Bank name) and delegates from the highest-numbered local
+   non-VMT Banks downward, so local Bank 0 is never an individual delegation
+   target; and a count that would require reaching Bank 0 — a count equal to or
+   greater than the EC's non-VMT Bank count `K` — is an out-of-range operand
+   and traps as a programming error. An EC therefore cannot delegate its last
+   non-VMT Bank: ordinary delegation cannot reach Bank 0, and an explicit
+   over-range count is refused by trap rather than silently completing.
 5. **MSE, CPE, and QoS carry no architectural floor.** The architecture places
    no minimum-retention floor on MSE Contracts, CPE Contracts, or QoS
    Contracts. Software at each level is responsible for retaining sufficient
@@ -923,12 +927,17 @@ qualifications, is in ch03 once propagated.
    the EC holds. This local-view numbering is the CME analog of the local-view
    property established for MSE telescoping (§4.5.0): software at any delegation
    level observes the same numbering scheme regardless of depth.
-2. **Bank 0 is structurally retained.** Local Bank 0 — the EC's first non-VMT
-   Bank — is not nameable as a delegation target. An EC therefore cannot
-   delegate its last non-VMT Bank; the attempt is architecturally inexpressible
-   rather than refused at runtime. This is the enforcement mechanism for the
-   CME case of the Self-Preservation Invariant (§5.4), and it holds at every
-   level including `L = 0`.
+2. **Bank 0 is structurally retained, and over-range counts trap.** Local
+   Bank 0 — the EC's first non-VMT Bank — is never an individual `ec.it`
+   delegation target: `ec.it` takes a count, not a Bank name (point 3), and
+   delegates from the highest-numbered local non-VMT Banks downward, so a valid
+   delegation never reaches Bank 0. A count equal to or greater than the EC's
+   non-VMT Bank count `K` would require reaching Bank 0; such a count is
+   out-of-range and traps (point 6). Together these enforce the CME case of the
+   Self-Preservation Invariant (§5.4) at every level including `L = 0`: an EC
+   cannot delegate its last non-VMT Bank, whether through ordinary delegation
+   (which cannot reach Bank 0) or through an explicit over-range count (which
+   traps).
 3. **`ec.it` operand semantics.** `ec.it` (delegate Banks to a child tenant)
    takes `rs1` as the **count** of non-VMT Banks to delegate in the call, not a
    Bank specifier. Hardware delegates the highest-numbered local non-VMT
@@ -943,13 +952,13 @@ qualifications, is in ch03 once propagated.
    non-VMT Bank 0.
 6. **Error handling is by trap, not by error code.** Because `rd` carries a
    success-path value (Banks remaining), `ec.it` does not return an error code
-   in `rd`. Delegation-rule violations — for example `L = D` (§5.1), an invalid
-   or stale child ECID, or a Group-ownership violation — raise a trap. `ec.it`
-   thus belongs to the success-path-`rd` family alongside `ec.ib` and `ec.oe`
-   (§6.6): it either succeeds, with `rd` = Banks remaining, or it traps. The
-   high-frequency self-preservation error ("delegate my last Bank") is not a
-   trap case at all; it is inexpressible (point 2). The enumerated trap causes
-   are specified in Chapter 3 (§3.4).
+   in `rd`. Delegation-rule violations raise a trap — for example: a delegation
+   count equal to or greater than the EC's non-VMT Bank count `K` (the
+   over-range / self-preservation case, point 2); `L = D` (§5.1); an invalid or
+   stale child ECID; or a Group-ownership violation. `ec.it` thus belongs to
+   the success-path-`rd` family alongside `ec.ib` and `ec.oe` (§6.6): it either
+   succeeds, with `rd` = Banks remaining, or it traps. The enumerated trap
+   causes are specified in Chapter 3 (§3.4).
 7. **Breaking change.** This repurposing of `rs1` from a Bank specifier to a
    count is a breaking change to `ec.it`'s operand semantics; chapters and
    models using the earlier Bank-specifier encoding are obsolete on this point
@@ -1117,7 +1126,31 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.23 (this version).** Self-Preservation Invariant added as a normative
+- **v0.24 (this version).** Self-Preservation CME-enforcement wording
+  reconciled with the `ec.it` over-range trap.
+
+  v0.23 described the CME Bank case as enforced purely structurally ("no
+  runtime check", "inexpressible rather than refused at runtime") — wording
+  carried over from the earlier Bank-specifier model. Under the v0.23 count
+  model, a delegation count equal to or greater than the EC's non-VMT Bank
+  count `K` is representable and is a programming error; it traps. This version
+  reconciles the enforcement description accordingly.
+
+  - **§5.4 point 4** and **§6.9 point 2** reworded: enforcement is now stated
+    as a structural rule (Bank 0 is never an individual `ec.it` target;
+    delegation runs highest-numbered-downward and cannot reach Bank 0) **plus**
+    an over-range trap (a count ≥ `K` traps). Both uphold the invariant; no
+    `ec.it` can leave an EC with zero non-VMT Banks.
+  - **§6.9 point 6**: the `count ≥ K` over-range case added to the enumerated
+    trap causes; the v0.23 statement that the last-Bank case "is inexpressible,
+    not a trap" is removed.
+
+  No semantic change to the count model, the no-op rule, VMT exemption, or the
+  MSE/CPE/QoS Option-Beta position. Chapter propagation (ch03 §3.4, ch15 trap
+  table, ch00, ch02) implements this v0.24 wording directly; no chapter was
+  written against the superseded v0.23 phrasing.
+
+- **v0.23.** Self-Preservation Invariant added as a normative
   principle.
 
   Establishes that a non-leaf EC must retain enough of each resource type to
@@ -1343,4 +1376,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.23.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.24.*
