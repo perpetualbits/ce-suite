@@ -38,9 +38,11 @@
 >   sentinel exception; (7) D.20 absent from Part D despite being cited as
 >   load-bearing — folded in (executing Part P.2 promotion); (8) vault
 >   confidentiality uncaptured — added as D.21. Invariant list is now genuinely
->   D.1–D.21. All deliberate dated changes; see Part C and Part D.
->   Zero-change streak remains zero. Next step: a fresh red-team pass over the
->   completed list.* Both former
+>   D.1–D.21; (9) divisibility principle elevated to tenet 12 (architect's
+>   pre-freeze choice, not a defect — existed only at D.9/D.19 and tenet 4's
+>   passing mention). All deliberate dated changes; see Part C and Part D.
+>   Two-clean-pass streak reset to zero. Next step: two fresh consecutive
+>   red-team passes over the twelve-tenet / D.1–D.21 set.* Both former
 >   criterion-5 blockers were resolved in round two: generations (Part Q) and
 >   allocator policy F.4(a) (Part P.1).
 >
@@ -288,6 +290,21 @@ The non-negotiable referent for the lab document. Frozen in session.
     Architect accepted the finding.]*
 11. The fast path never scans; slow paths may, within the bounded ceiling
     (O(1)/O(D_fixed) fast; `≤ O(N log N)` slow).
+12. A resource is either **exclusive** or **divisible**. An exclusive resource (a
+    Bank, a child ECID) is owned whole by exactly one Group. A divisible resource
+    (memory bandwidth, cache, I/O bandwidth) is shared by carving it into Contracts —
+    separate, non-overlapping slices, each exclusively owned by its holder, the
+    slices never summing to more than the parent held. This exclusive-vs-divisible
+    split is fundamental to how CME, CPE, MSE, and QoS all work. (Operationalized by
+    D.9 and D.19.)
+
+    *[Deliberate tenet addition 2026-06-01, round three: architect's pre-freeze
+    choice, prompted by the criterion-5 second-pass observation that the
+    divisibility principle existed only at the invariant level (D.9/D.19) and in
+    tenet 4's passing mention of Contracts. Tenet 12 elevates it to tenet level;
+    it introduces no new requirement. Not a red-team defect; structural completion
+    of the tenet layer. Two-clean-pass streak reset to zero; re-run begins over
+    the twelve-tenet / D.1–D.21 set.]*
 
 **Scope boundary (kept separate from the tenets — states what CE is *not*):**
 Migration — cross-hart, cross-hypervisor, cross-level — is an OS operation
