@@ -33,9 +33,11 @@
 >   D.13 positive form applied interrupt-specific Q.2 order (mask → pending →
 >   routing → free) to all routed resources — QoS and timer routes have no
 >   mask/pending bits; corrected to scope Q.2 to interrupt routes with a general
->   resolve-before-free rule for the others. All deliberate dated changes; see
->   Part C and Part D. Zero-change streak remains zero. Next step: a fresh
->   red-team pass over the corrected set.* Both former
+>   resolve-before-free rule for the others; (6) tenet 6 "acyclic" was unqualified
+>   — loose against the root self-loop (tenet 7 / D.7); tightened to name the
+>   sentinel exception. All deliberate dated changes; see Part C and Part D.
+>   Zero-change streak remains zero. Next step: a fresh red-team pass over the
+>   corrected set.* Both former
 >   criterion-5 blockers were resolved in round two: generations (Part Q) and
 >   allocator policy F.4(a) (Part P.1).
 >
@@ -246,7 +248,18 @@ The non-negotiable referent for the lab document. Frozen in session.
 5. Ownership is represented upward; up-pointers are truth. Downward member lists
    are derived accelerators, never canonical, and a disagreeing derived index is
    architecturally impossible to act on (the up-pointer wins).
-6. The delegation tree is the transitive closure of up-pointers, and is acyclic.
+6. The delegation tree is the transitive closure of up-pointers, and is acyclic
+   apart from the root's `parent(root) = root` self-loop — a termination sentinel
+   (tenet 7, D.7), not a delegation edge. No ECID other than the root is its own
+   ancestor.
+
+   *[Deliberate tenet change 2026-06-01, round three, criterion-5 red-team
+   finding. The unqualified "acyclic" sat in tension with the root self-loop that
+   tenet 7 / D.7 establish and rely on as an ancestry-walk termination sentinel.
+   Tenet 6 now names the sentinel exception explicitly, aligning it with the
+   precise machinery already in tenet 7 and D.7. No model change. Architect
+   accepted the finding.]*
+
 7. There is exactly one root ECID per hart authority domain (L0, ECID 0), with
    `parent(root) = root` when CE is enabled in hardware. For every non-root ECID,
    parent is strictly higher in the tree; no non-root ECID is its own ancestor.
