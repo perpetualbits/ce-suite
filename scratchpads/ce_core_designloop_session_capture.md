@@ -1,5 +1,42 @@
 # CE Core Design-Loop — Session Capture
 
+> ## ▣ ROUND THREE — OPENED 2026-06-01 (repo at charter v0.25)
+>
+> One-glance orientation for round four. This stamp supersedes the ROUND TWO
+> stamp below (kept for history).
+>
+> **SETTLED THIS ROUND:**
+> - **Criterion 4 complete.** The stress battery (Parts J, K, L) runs clean over
+>   the frozen core: CME, CPE, MSE, plus invariants D.1–D.20. QoS I/O-fabric is
+>   scoped out on the same basis as the round-one-close decision (Part L.5), which
+>   is reaffirmed: it is self-contained downstream work that does not gate the loop.
+> - **QoS scoped OUT of the design loop** (reaffirmed; see Part L.5). The v0.25
+>   charter edit (§4.5.7, QoS local-view readback) stands and is correct; it is a
+>   head start on that downstream QoS work, not loop work. QoS chapter propagation
+>   (ch00 QoS bullet, ch11, ch13) remains pending as downstream work outside the
+>   loop.
+> - **Sequencing (architect's decision):** complete the loop (criterion 5) → freeze
+>   the core → rewrite the charter and ch00 from the frozen core → propagate to all
+>   chapters → fix the QoS chapters last.
+>
+> **STATE OF THE FIVE CRITERIA:**
+> - Criteria 1–3: complete.
+> - Criterion 4: **complete** (scoped core; QoS-fabric deferred per Part L.5).
+> - Criterion 5: **next** — two consecutive zero-change red-team passes over the
+>   frozen tenets (Part C) + invariants D.1–D.20. Both former criterion-5 blockers
+>   resolved in round two: generations (Part Q) and allocator policy F.4(a) (Part
+>   P.1). The path to freeze is now open.
+>
+> **ROUND FOUR PICKS UP AT:**
+> 1. **Begin criterion 5:** a full red-team pass over tenets (Part C) + invariants
+>    (D.1–D.20); zero changes = pass one. A second clean pass = converged → freeze
+>    is then a deliberate architect decision with a version bump.
+> 2. If a pass produces changes, resolve them and re-run.
+>
+> **DO FIRST in round four (process):** re-fetch the current repo before asserting
+> any repo state — this capture reflects the repo as read 2026-06-01 (charter
+> v0.25) and Claude has no memory across sessions.
+
 > ## ▣ ROUND TWO — CLOSED 2026-05-31 (repo at charter v0.24)
 >
 > One-glance orientation for round three. This stamp supersedes the ROUND ONE
@@ -39,6 +76,8 @@
 >   its one real choice (borrow MSE storage format, v1 single-level). Awaits a
 >   charter session to make normative (charter + ch00 lines ~502/506 + ch11 + ch13).
 >   This is the last design-loop blocker on criterion 4 / the freeze.
+>   *(Superseded round three: QoS scoped out of loop; criterion 4 complete —
+>   see Part L.5 and Round Three stamp above.)*
 > - **Generations removal propagation** — decided (Part Q); enacting it is a
 >   charter session + per-chapter sessions across ch00, ch03, ch07/09/11, ch05,
 >   Appendix A (the F.1 propagation surface).
@@ -52,6 +91,8 @@
 > 1. Confirm whether the architect has run the Cluster F charter session. If yes,
 >    re-run the criterion-4 cluster scenario (Part L.3) against the now-normative
 >    QoS local-view → attempt to close criterion 4.
+>    *(Superseded round three: criterion 4 confirmed complete on scope-out basis —
+>    see Part L.5 and Round Three stamp above; criterion 5 is next.)*
 > 2. If criterion 4 closes, **begin criterion 5**: a full red-team pass over tenets
 >    (Part C) + invariants (D.1–D.20); zero changes = pass one. A second clean pass
 >    = converged → freeze is then a deliberate architect decision with a version bump.
@@ -577,8 +618,8 @@ eventual rewrite as new ch00 material. The invariant list (Part D, D.1–D.20, D
 tightened, D.20 added) is confirmed complete for criterion 2. Criterion 3 is
 complete and verified against the full repo (Part I). Criterion 4 is **complete
 for the scoped core** (Parts J/K/L stress slices all survived; QoS I/O-fabric
-explicitly scoped out per Part M). The `.md` tree is confirmed authoritative
-(Part M.1).
+explicitly scoped out per Part L.5). The `.md` tree is confirmed authoritative
+(Part L.5.1).
 
 Criterion 5 (two zero-change passes → freeze) is pending two in-scope
 resolutions, both for next round:
@@ -587,7 +628,7 @@ resolutions, both for next round:
 2. **Allocator policy F.4(a)** — hardware vs software slot selection; minor.
 
 Deferred out of the core entirely (post-rewrite): QoS I/O-fabric / Cluster F
-(Part M.2). Still parked: SMT detail (architect deferred for later discussion).
+(Part L.5.2). Still parked: SMT detail (architect deferred for later discussion).
 
 ---
 
@@ -853,13 +894,20 @@ the resolved resource classes (CME, CPE, MSE). The cluster scenario is **blocked
 from full closure** on the open Cluster F charter item (QoS I/O fabric). Criterion
 4 cannot be declared complete — and therefore criterion 5 (two zero-change passes →
 freeze) cannot begin — until Cluster F is resolved or an explicit decision is made
-to scope QoS-fabric out of the core freeze.
+to scope QoS-fabric out of the core freeze. *(Resolved — see Part L.5 immediately
+below. The scope-out decision was made; criterion 4 is complete. Reaffirmed round
+three.)*
 
 ---
 
-## Part M — Scoping decision: QoS I/O-fabric deferred out of the core freeze
+## Part L.5 — Round-one-close scoping decision: QoS I/O-fabric deferred out of the core freeze (reaffirmed round three)
 
-### M.1 Authoritative tree (resolves L.4)
+*This section records the round-one-close decision, reaffirmed by the architect
+in round three. The v0.25 charter edit (§4.5.7, QoS local-view readback) stands
+and is correct; it is a head start on the downstream QoS work captured here, not
+part of the design loop.*
+
+### L.5.1 Authoritative tree (resolves L.4)
 
 The architect confirms: **`docs/chapters/*.md` (chapters + appendices) are
 leading.** The `docs/adoc/` tree is *generated* from the `.md` files via a
@@ -868,7 +916,7 @@ design loop and the eventual rewrite operate on the `.md` chapters/appendices
 only; generated trees are never edited directly and need no separate
 reconciliation. L.4's dual-tree flag is closed.
 
-### M.2 QoS I/O-fabric scoped OUT of the core freeze (architect decision)
+### L.5.2 QoS I/O-fabric scoped OUT of the core freeze (architect decision)
 
 The architect decides to **explicitly scope the QoS I/O-fabric semantics out of
 the core design-loop freeze.** Rationale and sequencing:
@@ -886,7 +934,7 @@ the core design-loop freeze.** Rationale and sequencing:
   rewrite the charter; (3) *then* resolve QoS I/O-fabric (Cluster F) against the
   rewritten charter. QoS fabric is therefore a post-rewrite activity.
 
-### M.3 Effect on the exit criteria
+### L.5.3 Effect on the exit criteria
 
 This unblocks criterion 4. Restated core scope for criteria 4–5:
 
@@ -910,7 +958,7 @@ clean:
 2. **Allocator policy F.4(a)** — hardware vs software slot selection; minor, but
    touches Appendix A's allocator and the namespace realization.
 
-### M.4 Path to freeze (criterion 5)
+### L.5.4 Path to freeze (criterion 5)
 
 Criterion 5 (two consecutive red-team passes with zero changes to tenets/
 invariants → architect declares freeze with a version bump) can begin once the two
@@ -989,7 +1037,7 @@ Reconciliation:
   allocation philosophy.
 - **Lab edit:** correct Part I's `ec.it` line to the count model.
 
-### M.3 Cluster F — STILL the blocker; round-one Part L.3 stands.
+### M.3 Cluster F — STILL the blocker; round-one Part L.3 stands. *(Superseded round three — see Part L.5 and Round Three stamp above.)*
 
 ch00 lines 502/506 are **unchanged** ("the cluster F resolution will formalize
 this for QoS"; "when cluster F resolves, QoS will apply the same local-view
@@ -1022,7 +1070,9 @@ the repo independently validated the reachability instinct (§5.4), confirmed th
 hardware-picks-banks philosophy (`ec.it` count model), and shipped the exact MSE
 local-view mechanism that templates the Cluster F fix. Three lab edits implied
 (M.1 retire/promote, M.2 `ec.it` correction; both lab-doc, not charter). The
-blocker is unchanged: **Cluster F**. Round two proceeds there.
+blocker is unchanged: **Cluster F**. Round two proceeds there. *(Superseded
+round three: criterion 4 complete on scope-out basis; v0.25 charter §4.5.7 is a
+downstream head-start, not loop work; criterion 5 is next.)*
 
 ---
 
