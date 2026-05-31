@@ -23,11 +23,14 @@
 > - Criteria 1–3: complete.
 > - Criterion 4: **complete** (scoped core; QoS-fabric deferred per Part L.5).
 > - Criterion 5: **in progress** — *Pass one (2026-06-01): red-teamed Part C +
->   D.1–D.20. One finding: tenet 10 mislabeled bandwidth contracts as
->   "hart-local" (contradicted D.18 and Part L.2); corrected (deliberate dated
->   change, see Part C). Zero-change streak reset to zero. Next step: a fresh
->   pass one.* Both former criterion-5 blockers were resolved in round two:
->   generations (Part Q) and allocator policy F.4(a) (Part P.1).
+>   D.1–D.20. Findings: (1) tenet 10 mislabeled bandwidth contracts as
+>   "hart-local" — corrected; (2) D.19 "decided chip-wide" over-generalizes
+>   (cache is core-local) — corrected to "atomic at the arbiter's scope"; (3)
+>   D.11–D.13 positive operational forms were deferred — added. All deliberate
+>   dated changes; see Part C and Part D. Zero-change streak remains zero. Next
+>   step: a fresh red-team pass over the corrected set.* Both former
+>   criterion-5 blockers were resolved in round two: generations (Part Q) and
+>   allocator policy F.4(a) (Part P.1).
 >
 > **ROUND FOUR PICKS UP AT:**
 > 1. **Begin criterion 5:** a full red-team pass over tenets (Part C) + invariants
@@ -279,9 +282,10 @@ cross-level migration in CE to permit or forbid.
 ## Part D — Candidate invariants
 
 Properties every algorithm must preserve and every profile must satisfy. The
-security invariants (D.11–D.13) are stated as prohibitions; converting each to a
-positive operational form (what the hardware does so the prohibition holds) is
-deferred to a red-team pass.
+security invariants (D.11–D.13) are stated as prohibitions; each now carries a
+positive operational form (what the hardware does so the prohibition holds), added
+round three (2026-06-01) during the criterion-5 red-team pass. The deferral is
+closed.
 
 **Identity & structure**
 1. Each hart (hardware execution thread, including each SMT sibling) has exactly
@@ -318,13 +322,40 @@ deferred to a red-team pass.
 11. A child cannot observe or infer host, sibling, or global topology, including
     via allocation results or operand values; partial inference is not
     escalatable into authority.
+
+    *Positive form:* every operand, allocation result, and CSR readback visible
+    to a child is a function only of the child's own subtree state, rebased to
+    its local base (D.3, D.20); local-view readbacks (Formula 2) present
+    fraction-of-own-slice only, never absolute global values; allocation returns
+    a local index/count (hardware-picks, Part P.1), never a global slot number.
+    No global quantity is exposed for inference.
+
 12. A context can name only resources within its own group/subtree entitlement;
     it cannot name self-as-deletable, parent, or siblings.
+
+    *Positive form:* operands are interpreted in the caller's local
+    group/subtree namespace; names outside it are not representable in that
+    namespace and an out-of-range name traps rather than resolving elsewhere;
+    "self" is the reserved local base ("self = 0") and is structurally
+    non-nameable as a delegation or deletion target.
 
 **Lifecycle**
 13. A slot returns to FREE only after complete synchronous teardown: all child
     ECIDs, Banks, Contracts, and inbound routes (interrupt/QoS/timer) resolved.
     No lazy reuse.
+
+    *Positive form:* routed resources are torn down in the fixed order mask →
+    pending → routing → free (Part Q.2), and `ec.oe` performs forced reclaim by
+    reverse-walking up-pointers — revoking Contracts, freeing Banks, marking the
+    subtree FREE — before the slot can be reallocated; with the D.14 scrub, no
+    successor observes predecessor state. (This is the mechanism that closed the
+    generations ABA window, Part Q.)
+
+    *[Positive forms for D.11–D.13 added 2026-06-01, round three, criterion-5
+    red-team pass. Deferral in the preamble above is closed. Each form falls
+    directly from mechanisms already in the set: D.3/D.20 and Formula 2 for
+    D.11; namespace and trap mechanics for D.12; Part Q.2 teardown order and
+    D.14 scrub for D.13.]*
 14. On free or before reallocation, resource content is scrubbed (by whatever
     bulk hardware mechanism applies — cache-line invalidate, way-flush, zeroing
     engine — not bit-by-bit); no successor owner observes a predecessor's
@@ -363,8 +394,16 @@ be done.) Consistent with ch00 §0.8.
 19. A divisible resource (Contract) may be split among child contexts. Each
     child's share is a strict subset of the parent's, and the children's shares
     never sum to more than the parent held. Granting or splitting is all-or-
-    nothing and decided chip-wide: it either fully succeeds or leaves everything
+    nothing and atomic at the arbiter's scope (chip-wide for bandwidth,
+    core-local for cache): it either fully succeeds or leaves everything
     unchanged.
+
+    *[Deliberate invariant change 2026-06-01, round three, criterion-5 red-team
+    finding. "decided chip-wide" over-generalizes: MSE/QoS bandwidth is
+    chip-global but CPE cache is per-hart/core-local (D.9, Part L.2). Corrected
+    to "atomic at the arbiter's scope (chip-wide for bandwidth, core-local for
+    cache)." Symmetric correction to tenet 10 (which over-narrowed in the other
+    direction). Architect accepted the finding.]*
 
 **Scope boundary on resource sufficiency (not an invariant CE enforces).**
 CE does not guarantee that any actor retains a *workable* amount of resource
