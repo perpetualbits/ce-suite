@@ -22,10 +22,12 @@
 > **STATE OF THE FIVE CRITERIA:**
 > - Criteria 1–3: complete.
 > - Criterion 4: **complete** (scoped core; QoS-fabric deferred per Part L.5).
-> - Criterion 5: **next** — two consecutive zero-change red-team passes over the
->   frozen tenets (Part C) + invariants D.1–D.20. Both former criterion-5 blockers
->   resolved in round two: generations (Part Q) and allocator policy F.4(a) (Part
->   P.1). The path to freeze is now open.
+> - Criterion 5: **in progress** — *Pass one (2026-06-01): red-teamed Part C +
+>   D.1–D.20. One finding: tenet 10 mislabeled bandwidth contracts as
+>   "hart-local" (contradicted D.18 and Part L.2); corrected (deliberate dated
+>   change, see Part C). Zero-change streak reset to zero. Next step: a fresh
+>   pass one.* Both former criterion-5 blockers were resolved in round two:
+>   generations (Part Q) and allocator policy F.4(a) (Part P.1).
 >
 > **ROUND FOUR PICKS UP AT:**
 > 1. **Begin criterion 5:** a full red-team pass over tenets (Part C) + invariants
@@ -245,9 +247,19 @@ The non-negotiable referent for the lab document. Frozen in session.
 9. Authority over a resource cannot be acquired by guessing, writing, or
    replaying an ID — only by delegation from a holder.
 10. CE defines a serialization surface: Bank state has architectural
-    save/restore via spill/fill; live hart-local bindings (cache/QoS contracts,
-    interrupt routing, timers) have none. State without a serialization cannot be
-    moved without loss.
+    save/restore via spill/fill; live bindings to shared hardware (cache
+    reservations, bandwidth contracts, interrupt routing, timers) — whether
+    hart-local or chip-global — have none. State without a serialization cannot
+    be moved without loss.
+
+    *[Deliberate tenet change 2026-06-01, round three, criterion-5 pass-1
+    red-team finding. Original read "live hart-local bindings (cache/QoS
+    contracts, …)" — the "hart-local" qualifier is wrong: MSE and QoS bandwidth
+    contracts are chip-global / fabric-wide (see Part L.2, D.18). "QoS
+    contracts" as the example also leaned on a frozen extension; replaced with
+    the generic "bandwidth contracts." Now aligned with D.18, which already used
+    "live arrangements with shared hardware" without the hart-local qualifier.
+    Architect accepted the finding.]*
 11. The fast path never scans; slow paths may, within the bounded ceiling
     (O(1)/O(D_fixed) fast; `≤ O(N log N)` slow).
 
@@ -1299,7 +1311,10 @@ D.20 here.)
 Cluster F's QoS half (criterion-4 cluster scenario, Part L.3), which is now in the
 architect's hands via the recommendation. Once Cluster F is made normative and the
 generations microarch question is answered, criterion 4 closes and the two
-zero-change passes of criterion 5 can begin.
+zero-change passes of criterion 5 can begin. *(Superseded round three: criterion 4
+is complete on the scope-out basis — QoS scoped out of the loop per Part L.5,
+generations resolved per Part Q; criterion 5 is in progress. See the Round Three
+stamp above.)*
 
 ---
 
