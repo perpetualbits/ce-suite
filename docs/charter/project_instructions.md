@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.24
+**Version:** 0.25
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -635,6 +635,28 @@ it to over-budget or BE traffic.
 for over-budget overflow to any descendant who wants more, or to BE if no descendant
 wants it.
 
+#### §4.5.7 — QoS local-view readback (Cluster F)
+
+QoS realizes the §4.5.0 local-view principle for I/O fabric bandwidth using the
+same two-tier storage model as MSE (framing F3–F6). The stored-global accounting
+CSRs (`qos_bw_cap`, `qos_bw_sum`) are already present; they are joined by a
+**QoS local-view readback CSR** — the I/O-fabric analog of `mse_absolute_bw` —
+that presents the running EC's I/O-bandwidth guarantee on the same 0–255
+pre-flattened scale defined in §4.5.1. The readback is computed at read time by
+Formula 2 (§4.5.3): `r(e) = floor( s(e) × 256 / s(p(e)) )`. QoS `bw_class` is
+4 bits (Chapter 11 §11.5.1); the pre-flattened storage and readback are on the
+same 0–255 scale as MSE, with the 4-bit precision implying coarser granularity.
+No new hardware mechanism is introduced.
+
+**Single-level in v1.** Per framing F2, QoS telescoping applies only when VMs hold
+direct hardware I/O (IOMMU/passthrough), narrower than MSE's universal
+applicability. The v1 QoS local-view readback presents fraction-of-own-slice at
+the running level without composing a multi-level delegation chain. At `L = 0` the
+readback equals fraction-of-total directly, exactly as MSE behaves at `L = 0`
+(§4.5.1). Multi-level telescoping for QoS is deferred to a post-v1 revision.
+
+The QoS local-view readback CSR address is assigned in Chapter 13.
+
 ---
 
 ## 5. Delegation
@@ -1126,7 +1148,28 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.24 (this version).** Self-Preservation CME-enforcement wording
+- **v0.25 (this version).** QoS local-view made normative (Cluster F).
+
+  QoS now realizes the §4.5.0 local-view principle for I/O fabric bandwidth:
+  a QoS local-view readback CSR (I/O-fabric analog of `mse_absolute_bw`)
+  computed by Formula 2 on the 0–255 pre-flattened scale (§4.5.3), single-level
+  in v1 per framing F2 (no telescoping). No new hardware mechanism; applies the
+  MSE two-tier storage template (framing F3–F6) to the QoS domain. CSR address
+  assigned in ch13.
+
+  - **§4.5.7** added: QoS two-tier storage model (stored-global
+    `qos_bw_cap`/`qos_bw_sum` already present + new QoS local-view readback CSR);
+    Formula-2 readback on 0–255 scale; 4-bit QoS `bw_class` feeds same
+    pre-flattened storage as MSE; single-level restriction per F2; CSR address
+    deferred to ch13.
+
+  Propagation: ch00 (replace "when cluster F resolves" QoS deferral ~line 506;
+  bring ch00 into lockstep with charter per §7.4), ch11 (local-view readback
+  subsection), ch13 (new §6.x QoS local-view CSR entry with Formula-2 semantics
+  and assigned address), `docs/work-items.md` (flip Cluster F from "charter
+  session pending" to resolved).
+
+- **v0.24.** Self-Preservation CME-enforcement wording
   reconciled with the `ec.it` over-range trap.
 
   v0.23 described the CME Bank case as enforced purely structurally ("no
@@ -1376,4 +1419,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.24.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.25.*
