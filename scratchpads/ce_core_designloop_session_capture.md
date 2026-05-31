@@ -26,9 +26,12 @@
 >   D.1–D.20. Findings: (1) tenet 10 mislabeled bandwidth contracts as
 >   "hart-local" — corrected; (2) D.19 "decided chip-wide" over-generalizes
 >   (cache is core-local) — corrected to "atomic at the arbiter's scope"; (3)
->   D.11–D.13 positive operational forms were deferred — added. All deliberate
->   dated changes; see Part C and Part D. Zero-change streak remains zero. Next
->   step: a fresh red-team pass over the corrected set.* Both former
+>   D.11–D.13 positive operational forms were deferred — added; (4) D.11
+>   positive form described Formula-2 readback as "function only of child's
+>   subtree" — inaccurate (denominator s(p(e)) is the parent's stored value,
+>   outside the child's subtree); corrected; privacy guarantee preserved. All
+>   deliberate dated changes; see Part C and Part D. Zero-change streak remains
+>   zero. Next step: a fresh red-team pass over the corrected set.* Both former
 >   criterion-5 blockers were resolved in round two: generations (Part Q) and
 >   allocator policy F.4(a) (Part P.1).
 >
@@ -323,12 +326,23 @@ closed.
     via allocation results or operand values; partial inference is not
     escalatable into authority.
 
-    *Positive form:* every operand, allocation result, and CSR readback visible
-    to a child is a function only of the child's own subtree state, rebased to
-    its local base (D.3, D.20); local-view readbacks (Formula 2) present
-    fraction-of-own-slice only, never absolute global values; allocation returns
-    a local index/count (hardware-picks, Part P.1), never a global slot number.
-    No global quantity is exposed for inference.
+    *Positive form:* a child observes its resources only in its own local view,
+    and no global quantity is exposed for inference. Operands it supplies and
+    allocation results returned to it are local-namespace values — a local index
+    or count (hardware-picks, Part P.1), rebased to the child's local base (D.3,
+    D.20), never a global slot number. Local-view CSR readbacks (Formula 2)
+    present the child's share as a fraction relative to its parent; hardware
+    computes this from stored-global values — the child's own and its parent's —
+    that the child never sees, so the child observes only the resulting fraction
+    and cannot recover those inputs or any global total.
+
+    *[D.11 positive form corrected 2026-06-01, round three, criterion-5 red-team
+    finding. Prior wording described the Formula-2 readback as "a function only
+    of the child's own subtree state" — inaccurate: Formula 2 is
+    r(e) = floor(s(e) × 256 / s(p(e))), where s(p(e)) is the parent's
+    stored-global value, which is outside the child's subtree. The privacy
+    guarantee is preserved: the child sees only the resulting fraction, never the
+    stored-global inputs. Architect accepted the finding.]*
 
 12. A context can name only resources within its own group/subtree entitlement;
     it cannot name self-as-deletable, parent, or siblings.
@@ -355,7 +369,8 @@ closed.
     red-team pass. Deferral in the preamble above is closed. Each form falls
     directly from mechanisms already in the set: D.3/D.20 and Formula 2 for
     D.11; namespace and trap mechanics for D.12; Part Q.2 teardown order and
-    D.14 scrub for D.13.]*
+    D.14 scrub for D.13. D.11's positive form was subsequently tightened
+    (same date, same pass) — see the inline note at D.11 above.]*
 14. On free or before reallocation, resource content is scrubbed (by whatever
     bulk hardware mechanism applies — cache-line invalidate, way-flush, zeroing
     engine — not bit-by-bit); no successor owner observes a predecessor's
