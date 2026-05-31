@@ -29,9 +29,13 @@
 >   D.11–D.13 positive operational forms were deferred — added; (4) D.11
 >   positive form described Formula-2 readback as "function only of child's
 >   subtree" — inaccurate (denominator s(p(e)) is the parent's stored value,
->   outside the child's subtree); corrected; privacy guarantee preserved. All
->   deliberate dated changes; see Part C and Part D. Zero-change streak remains
->   zero. Next step: a fresh red-team pass over the corrected set.* Both former
+>   outside the child's subtree); corrected; privacy guarantee preserved; (5)
+>   D.13 positive form applied interrupt-specific Q.2 order (mask → pending →
+>   routing → free) to all routed resources — QoS and timer routes have no
+>   mask/pending bits; corrected to scope Q.2 to interrupt routes with a general
+>   resolve-before-free rule for the others. All deliberate dated changes; see
+>   Part C and Part D. Zero-change streak remains zero. Next step: a fresh
+>   red-team pass over the corrected set.* Both former
 >   criterion-5 blockers were resolved in round two: generations (Part Q) and
 >   allocator policy F.4(a) (Part P.1).
 >
@@ -358,19 +362,32 @@ closed.
     ECIDs, Banks, Contracts, and inbound routes (interrupt/QoS/timer) resolved.
     No lazy reuse.
 
-    *Positive form:* routed resources are torn down in the fixed order mask →
-    pending → routing → free (Part Q.2), and `ec.oe` performs forced reclaim by
+    *Positive form:* every inbound route is fully cleared before the slot frees.
+    Interrupt routes follow the fixed order mask → pending → routing → free (Part
+    Q.2, which discards any latched interrupt). QoS routes (DMA channel bindings)
+    and timer routes follow the same resolve-before-free discipline but with their
+    own steps — they have no mask/pending bits. `ec.oe` performs forced reclaim by
     reverse-walking up-pointers — revoking Contracts, freeing Banks, marking the
     subtree FREE — before the slot can be reallocated; with the D.14 scrub, no
-    successor observes predecessor state. (This is the mechanism that closed the
-    generations ABA window, Part Q.)
+    successor observes predecessor state. (This closed the generations ABA window,
+    Part Q.)
+
+    *[D.13 positive form corrected 2026-06-01, round three, criterion-5 red-team
+    finding. Prior wording applied the interrupt-specific Q.2 order (mask →
+    pending → routing → free) to all routed resources; QoS routes (DMA channel
+    bindings) and timer routes have no mask/pending bits, so the interrupt order
+    does not generalize. Q.2 is now scoped to interrupt routes; the general
+    resolve-before-free rule covers QoS and timer routes. Architect accepted the
+    finding.]*
 
     *[Positive forms for D.11–D.13 added 2026-06-01, round three, criterion-5
     red-team pass. Deferral in the preamble above is closed. Each form falls
     directly from mechanisms already in the set: D.3/D.20 and Formula 2 for
     D.11; namespace and trap mechanics for D.12; Part Q.2 teardown order and
-    D.14 scrub for D.13. D.11's positive form was subsequently tightened
-    (same date, same pass) — see the inline note at D.11 above.]*
+    D.14 scrub for D.13. D.11's positive form was subsequently tightened (same
+    date, same pass) — see the inline note at D.11 above. D.13's positive form
+    was also tightened (same date, same pass) — see the inline note at D.13
+    above.]*
 14. On free or before reallocation, resource content is scrubbed (by whatever
     bulk hardware mechanism applies — cache-line invalidate, way-flush, zeroing
     engine — not bit-by-bit); no successor owner observes a predecessor's
