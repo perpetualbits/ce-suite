@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.26
+**Version:** 0.27
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -309,11 +309,15 @@ non-delegable), so authority over a subtree can always be reached from above.
 > *"I am my ECID number in hardware, and I become useful via a pointer to
 > my structures in memory."*
 
+*This section operationalizes the Foundation's identity and delegation-tree
+tenets and invariants: §F.1 tenets 1–3, 6–7; §F.2 D.1, D.7.*
+
 ### 3.1 ECID properties
 
-1. **Hart-local.** ECIDs are unique per hart at a given moment. The
-   system-wide identity of a running EC is the tuple `(hart_id, ECID)`.
-   No hardware mechanism ever uses a global ECID namespace.
+1. **Hart-local** (§F.1 tenets 1 and 3; §F.2 D.1). ECIDs index the
+   per-hart EC table and are never used globally. The system-wide
+   identity of a running EC is the tuple `(hart_id, ECID)`. No
+   hardware mechanism ever uses a global ECID namespace.
 2. **Opaque to software running as that EC.** A process cannot read or write
    its own ECID. The OS may know it, but a CE-managed EC cannot forge or
    change its own identity.
@@ -322,10 +326,11 @@ non-delegable), so authority over a subtree can always be reached from above.
    enabled at boot, M-mode firmware creates the first ECID and hands it
    to the kernel; thereafter the kernel (and any delegated hypervisor)
    owns ECID creation. CE may also be disabled or ignored; see §3.7.
-4. **No migration of ECIDs across harts.** When an EC moves between harts,
-   the kernel unbinds the source-hart ECID and allocates a fresh ECID on
-   the destination hart, reusing the same ECS. Migration is therefore
-   "rebinding," never literal ECID movement.
+4. **No migration of ECIDs across harts** (Foundation §F.1 migration scope
+   boundary). When an EC moves between harts, the kernel unbinds the
+   source-hart ECID and allocates a fresh ECID on the destination hart,
+   reusing the same ECS. Migration is therefore "rebinding," never literal
+   ECID movement.
 5. **Reuse requires generation-counter increment.** When an ECID slot is
    freed and later reallocated, its generation counter must be incremented.
    Any reference held by software to a `(hart_id, ECID, generation)` triple
@@ -334,7 +339,8 @@ non-delegable), so authority over a subtree can always be reached from above.
 ### 3.2 The `EC[e]` array
 
 Each hart has a conceptual array `EC[0..E_max]` indexed by ECID number.
-`EC[e]` is the canonical descriptor of ECID `e` on that hart. At minimum:
+`EC[e]` is the canonical descriptor of ECID `e` on that hart — the
+per-hart identity table that realizes §F.1 tenet 3 / §F.2 D.1. At minimum:
 
 ```c
 struct EC_entry {
@@ -373,6 +379,9 @@ table otherwise. CME's fast path (`ec.ib`, `ec.ob`) touches only SRAM-resident
 state; the DMA path (`ec.im`, `ec.om`) may walk the RAM-resident table.
 
 ### 3.5 ECID allocation: radix tree
+
+The kernel-side radix tree is the allocation backing store for the
+delegation tree established by §F.1 tenets 6–7 and §F.2 D.7.
 
 ECID numbers are allocated by the privileged actor that owns the parent
 ECID, using a **radix tree** keyed by ECID number (treated as
@@ -1350,7 +1359,18 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.26 (this version).** Frozen Logical Core v1.0 inserted as the charter's
+- **v0.27 (this version).** §3 reconciled to the Foundation (charter-rewrite
+  loop, session 2/N).
+
+  §3.1 item 1 ("Hart-local") now references §F.1 tenets 1 and 3 / §F.2 D.1
+  and keeps the operational `(hart_id, ECID)` tuple. §3.1 item 4 gains a
+  pointer to the Foundation migration scope boundary. §3.2 opening paragraph
+  notes the per-hart EC array as the realization of §F.1 tenet 3 / §F.2 D.1.
+  §3.5 gains a one-line reference to §F.1 tenets 6–7 / §F.2 D.7 as the tree
+  the radix-tree allocator backs. §3 head gains a one-line operationalizing
+  note. §3.3, §3.4, §3.6, §3.7 unchanged. No operational detail removed.
+
+- **v0.26.** Frozen Logical Core v1.0 inserted as the charter's
   normative foundation (charter-rewrite loop, session 1/N).
 
   Adds the Foundation section between §2 (Glossary) and §3 (ECID identity),
@@ -1635,4 +1655,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.26.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.27.*
