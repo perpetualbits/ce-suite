@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.28
+**Version:** 0.29
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -616,11 +616,15 @@ and the group bandwidth cap. These rules are MSE-specific. The Contract axioms i
 per-extension delegation instructions) apply to all three Contract types; the rules
 here refine those axioms for MSE.
 
+*§4.5 operationalizes the Foundation's local-view and divisibility tenets/invariants
+(§F.1 tenet 8; §F.2 D.9, D.19, D.20) for MSE bandwidth allocation.*
+
 #### §4.5.0 — Software transparency at any delegation level
 
-**Principle: software runs unchanged at any delegation level.**
+**MSE realizes the Foundation's local-view principle (§F.1 tenet 8 / §F.2 D.20)
+for bandwidth allocation: software runs unchanged at any delegation level.**
 
-This is the foundational principle of CE Suite delegation. An operating system,
+This section defines how MSE operationalizes that invariant. An operating system,
 hypervisor, application, or workload is unaware of its level in the delegation
 tree by default. The MSE bandwidth-class fields it reads from CSRs, the descriptor
 values it writes via `ms.ir` and `ms.it`, and the resources it observes via
@@ -704,10 +708,11 @@ specified.
 The hardware computes the child's pre-flattened storage value as the parent's
 pre-flattened value times the child's local fraction, **rounded down**:
 `child_stored = floor(parent_stored × child_bw_class / 256)`. When the child reads
-`mse_absolute_bw`, hardware converts back to local view:
+`mse_absolute_bw`, hardware converts back to local view (§F.2 D.20):
 `child_local = floor(child_stored × 256 / parent_stored)`. Round-down at delegation
 may cause the returned local value to differ from the original `child_bw_class` by
-a small amount; lost capacity flows to over-budget or BE traffic (§4.5.4).
+a small amount (§F.2 D.19 — children's sum never exceeds the parent); lost capacity
+flows to over-budget or BE traffic (§4.5.4).
 
 A child may further delegate to a grandchild using this same mechanism, applying its
 own stored value as the new parent. Implementations support delegation depth up to
@@ -745,10 +750,10 @@ involves any affected Contract holder. Implementations may briefly stall arbitra
 on affected harts during recomputation; non-affected harts continue unaffected.
 
 The `mse_absolute_bw` CSR (Chapter 13) returns the running EC's bandwidth in
-**local view**: hardware converts the stored pre-flattened global value to the local
-0–255 scale using `floor(stored_global × 256 / parent_stored_global)`. Software at
-any delegation level reads the same scale — fraction of its own slice — consistent
-with §4.5.0.
+**local view** (§F.2 D.20 — Formula 2 local-view readback): hardware converts the
+stored pre-flattened global value to the local 0–255 scale using
+`floor(stored_global × 256 / parent_stored_global)`. Software at any delegation
+level reads the same scale — fraction of its own slice — consistent with §4.5.0.
 
 **Worked example.** The root (L=0) holds stored global = 192. It has delegated to an
 L=1 hypervisor: stored global = 96, local readback = `floor(96 × 256 / 192) = 128`
@@ -781,7 +786,7 @@ involving any affected hart uses the new stored values.
 #### §4.5.4 — Multi-tier slot arbitration
 
 Within a CN slot, the memory controller selects the winning Contract holder by this
-priority order:
+priority order (arbitration at the chip-wide arbiter scope, per §F.2 D.19):
 
 1. **First tier — Contract holders within their budget.** Among Contract holders who
    have not yet consumed their `bw_class` slots in the current window, the holder
@@ -843,9 +848,10 @@ the (K+1) × slot_size_ns bound for CN latency under interrupt nesting (Chapter 
 
 #### §4.5.6 — Cap rule on pre-flattened values
 
-The group bandwidth cap (§4.3.2) is enforced on the pre-flattened absolute values.
-The sum of all children's pre-flattened `bw_class` values must not exceed the
-parent's pre-flattened `bw_class`.
+The group bandwidth cap (§4.3.2) is enforced on the pre-flattened absolute values
+(§F.2 D.9, D.19 — children's sum never exceeds the parent). The sum of all
+children's pre-flattened `bw_class` values must not exceed the parent's
+pre-flattened `bw_class`.
 
 Because telescoping uses round-down (§4.5.2), a parent that delegates all of its
 bandwidth to children loses a small amount of total capacity to rounding. This is
@@ -860,8 +866,9 @@ wants it.
 
 #### §4.5.7 — QoS local-view readback (Cluster F)
 
-QoS realizes the §4.5.0 local-view principle for I/O fabric bandwidth using the
-same two-tier storage model as MSE (framing F3–F6). The stored-global accounting
+QoS realizes the Foundation's local-view principle (§F.1 tenet 8 / §F.2 D.20)
+for I/O fabric bandwidth, using the same two-tier storage model as MSE (framing
+F3–F6; see §4.5.0 for the MSE realization). The stored-global accounting
 CSRs (`qos_bw_cap`, `qos_bw_sum`) are already present; they are joined by a
 **QoS local-view readback CSR** — the I/O-fabric analog of `mse_absolute_bw` —
 that presents the running EC's I/O-bandwidth guarantee on the same 0–255
@@ -1371,7 +1378,21 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.28 (this version).** §4.1–§4.4 reconciled to the Foundation
+- **v0.29 (this version).** §4.5 reconciled to the Foundation (charter-rewrite
+  loop, session 3b/N).
+
+  §4.5.0 reframed: opens with "MSE realizes the Foundation's local-view principle
+  (§F.1 tenet 8 / §F.2 D.20)" replacing "This is the foundational principle of
+  CE Suite delegation"; deployment rationale and all MSE detail kept verbatim.
+  §4.5.2 gains §F.2 D.20 (local-view readback) and D.19 (round-down / sum ≤
+  parent) references. §4.5.3 gains a light §F.2 D.20 reference on Formula 2.
+  §4.5.4 gains a light §F.2 D.19 reference on chip-wide arbitration scope.
+  §4.5.6 references §F.2 D.9, D.19 on the cap rule. §4.5.7 redirects its
+  local-view reference from §4.5.0 to §F.1 tenet 8 / §F.2 D.20. §4.5 head
+  gains an operationalizing note. All formulas, worked examples, arbitration
+  tiers, QoS framing, and deployment rationale kept intact. §4.1–§4.4 untouched.
+
+- **v0.28.** §4.1–§4.4 reconciled to the Foundation
   (charter-rewrite loop, session 3a/N).
 
   §4 head gains an operationalizing note. §4.1 items 1–3 reference §F.1
@@ -1680,4 +1701,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.28.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.29.*
