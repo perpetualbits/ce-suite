@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.31
+**Version:** 1.0
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -47,7 +47,10 @@ The five extensions are:
    as MSE, applied to the NoC, DMA, and peripheral interconnect.
 5. **The ECID and Group/Contract substrate.** The identity and ownership layer
    that all four extensions hang off. Not a separately-numbered extension; it
-   is the shared foundation defined in Chapter 0.
+   is the shared foundation defined in Chapter 0. The normative principles of
+   this substrate are the charter's **Foundation** (§F.1 tenets 1–12, §F.2
+   invariants D.1–D.21, Frozen Logical Core v1.0), operationalized in §3–§6
+   and detailed in Chapter 0.
 
 The target outcome: provable Worst-Case Execution Time, certifiability for
 ASIL D / FDA Class III / DO-178C, 1–2 cycle context switches, and bounded
@@ -64,17 +67,20 @@ introduce synonyms or redefine them.
 | Term | Definition |
 |---|---|
 | **EC** | *Execution Context.* Any schedulable unit: thread, process, vCPU, container task, interrupt handler, secure enclave. The unit the OS scheduler dispatches. |
-| **ECID** | *Execution Context Identifier.* A hart-local, hardware-managed identity token denoting one EC currently bound to that hart. Opaque to software running as that EC. |
+| **ECID** | *Execution Context Identifier.* A hart-local, hardware-managed identity token denoting one EC currently bound to that hart. Opaque to software running as that EC. (§F.1 tenets 1, 3) |
 | **`current_ecid`** | The ECID of the EC currently executing on a hart. Held in a CSR. |
 | **`EC[e]`** | The architectural per-hart ECID entry indexed by ECID number `e`. See §3.2. |
 | **ECS** | *Execution Context Structure.* A memory-resident structure describing the saved/saveable state of one EC. Reachable via `EC[e].ecs_ptr`. |
-| **Group** | An ECID's inventory of resources (banks, contracts, child ECIDs). Every ECID has exactly one Group; GroupID = ECID number. |
-| **Bank** | A hardware register-state container (non-VMT or VMT) owned by exactly one Group. |
-| **Contract** | A slice of a global, multiplexed resource (memory bandwidth/latency for MSE, I/O bandwidth/latency for QoS) bound to an ECID's Group. |
-| **Delegation level (L)** | An ECID's depth in the delegation tree, 0 ≤ L ≤ D. `L < D` permits delegation; `L = D` does not. |
-| **Generation counter** | A small counter per `EC[e]` slot, incremented on every reuse of the slot, used to detect stale references (ABA safety). |
+| **Group** | An ECID's inventory of resources (banks, contracts, child ECIDs). Every ECID has exactly one Group; GroupID = ECID number. (§F.2 D.4) |
+| **Bank** | A hardware register-state container (non-VMT or VMT) owned by exactly one Group. An exclusive resource (§F.1 tenet 12). |
+| **Contract** | A slice of a global, multiplexed resource (memory bandwidth/latency for MSE, I/O bandwidth/latency for QoS) bound to an ECID's Group. A divisible resource (§F.1 tenet 12 / §F.2 D.9). |
+| **Delegation level (L)** | An ECID's depth in the delegation tree, 0 ≤ L ≤ D. `L < D` permits delegation; `L = D` does not. (§F.2 D.8) |
+| **Generation counter** | A small counter per `EC[e]` slot, incremented on every reuse of the slot, used to detect stale references (ABA safety). (§F.2 D.14) |
 | **Hart** | Standard RISC-V hardware thread. CE state is per-hart. |
-| **Privileged actor** | M-mode firmware, S-mode kernel, or HS-mode hypervisor. The only actors permitted to create or destroy ECIDs. |
+| **Privileged actor** | M-mode firmware, S-mode kernel, or HS-mode hypervisor. The only actors permitted to create or destroy ECIDs. (§F.1 tenet 9 / §F.2 D.10 — authority only by delegation) |
+| **Foundation** | The charter's frozen normative core: §F.1 (tenets 1–12) and §F.2 (invariants D.1–D.21), frozen as Frozen Logical Core v1.0 on 2026-06-01. Prevails over §1–§8 of this charter. Changing any frozen tenet or invariant requires a deliberate un-freeze with a new version bump. |
+| **Tenet** | A non-negotiable architectural principle in §F.1. There are twelve tenets (1–12). Frozen; changing one requires a deliberate un-freeze with a new version bump. |
+| **Invariant** | A property that every CE algorithm must preserve and every profile must satisfy (§F.2). There are twenty-one invariants (D.1–D.21). Frozen; changing one requires a deliberate un-freeze with a new version bump. |
 
 ### 2.1 Retired terms
 
@@ -1253,10 +1259,15 @@ qualifications, is in ch03 once propagated.
 
 ### 7.1 Conflict resolution
 
-1. If a chapter conflicts with this charter or Chapter 0, the chapter
-   is wrong; refactor the chapter.
-2. Do not amend axioms casually. Changes to the model are made here and
-   in Chapter 0 first, with a version bump and a changelog entry.
+1. **Precedence chain.** The Foundation (§F.1/§F.2) prevails over all other
+   sections (§1–§8) of this charter. This charter prevails over Chapter 0.
+   Chapter 0 prevails over the chapters. If a chapter conflicts with this
+   charter or Chapter 0, the chapter is wrong; refactor the chapter.
+2. Do not amend axioms casually. Changes to the model are made here and in
+   Chapter 0 first, with a version bump and a changelog entry. Changing a
+   frozen tenet or invariant (§F.1/§F.2) requires a deliberate un-freeze
+   decision by the architect, with a new version bump for the Frozen Logical
+   Core.
 
 ### 7.2 ECID language requirement
 
@@ -1268,7 +1279,9 @@ Any mechanism described in the spec must be expressible in terms of:
 - ECS reached via `EC[e].ecs_ptr`
 
 Mechanisms that fundamentally depend on raw pointers, PIDs, or thread
-IDs without an ECID mapping are incomplete and not architectural.
+IDs without an ECID mapping are incomplete and not architectural. This
+expressibility requirement realizes §F.2 D.3 (no raw physical slot numbers;
+software sees only virtualized-per-group numbers).
 
 ### 7.3 Chapter-by-chapter alignment
 
@@ -1306,7 +1319,10 @@ IDs without an ECID mapping are incomplete and not architectural.
 This charter has a version number on the first line. Every substantive
 change increments it and adds a changelog entry at the bottom. Chapter 0
 is versioned in lockstep with this charter — if Chapter 0's model
-changes, this charter changes, and vice versa.
+changes, this charter changes, and vice versa. The Foundation (§F.1/§F.2)
+carries its own frozen-core version (Frozen Logical Core v1.0) that is
+independent of the charter version; the charter version reflects operational
+changes while the frozen-core version reflects un-freeze events.
 
 ---
 
@@ -1406,7 +1422,26 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.31 (this version).** §6 reconciled to the Foundation (charter-rewrite
+- **v1.0 (this version).** Charter rewrite loop complete. Framing sections
+  §1, §2, §7 aligned to the Foundation; charter now at v1.0.
+
+  §1 item 5 gains a Foundation pointer (§F.1 tenets 1–12, §F.2 D.1–D.21,
+  Frozen Logical Core v1.0). §2 glossary gains three new entries (Foundation,
+  Tenet, Invariant) and Foundation cross-references on ECID, Group, Bank,
+  Contract, Delegation level, Generation counter, and Privileged actor. §7.1
+  gains an explicit precedence chain (Foundation → charter → Chapter 0 →
+  chapters) and an un-freeze requirement for frozen tenets/invariants. §7.2
+  gains a D.3 note. §7.4 gains a note that the Foundation carries its own
+  frozen-core version independent of the charter version.
+
+  This completes the charter-rewrite loop begun at v0.26 (sessions 1–6):
+  Foundation inserted (v0.26), §3 reconciled (v0.27), §4.1–4.4 (v0.28),
+  §4.5 (v0.29), §5 (v0.30), §6 (v0.31), §1/§2/§7 (v1.0). The frozen core
+  (§F.1 tenets 1–12, §F.2 invariants D.1–D.21, Frozen Logical Core v1.0) is
+  now the charter's explicit normative foundation. **Next:** `ch00` must be
+  reconciled to the Foundation in lockstep (§7.4).
+
+- **v0.31.** §6 reconciled to the Foundation (charter-rewrite
   loop, session 5/N).
 
   §6 head gains an operationalizing note. §6.2 item 1 references §F.1 tenet 1
@@ -1753,4 +1788,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.31.*
+*End of CE Suite Project Instructions and Axiom Charter, v1.0.*
