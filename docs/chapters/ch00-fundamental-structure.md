@@ -343,8 +343,8 @@ migrated by byte-copy; migration requires cooperative re-establishment by softwa
 ## 0.8 Delegation
 
 *§0.8–§0.9 operationalize the Foundation's delegation, lifecycle, and addressing
-tenets/invariants (Foundation §F.1 tenets 6–9; §F.2 D.3, D.7, D.8, D.10, D.13,
-D.14, D.15).*
+tenets/invariants (Foundation §F.1 tenets 6–9; §F.2 D.3, D.7, D.8, D.10, D.12,
+D.13, D.14, D.15).*
 
 Every ECID has a **delegation level** `L`, stored in `EC[e].delegation_L`
 (Foundation §F.2 D.8). The implementation exposes a read-only cap `D` via a
@@ -355,9 +355,11 @@ CSR, where **D ≤ 3**:
 - **`L = D`**: this ECID may bind resources for its own use but may not
   delegate further.
 
-Root ECIDs (created by firmware or the kernel) have `L = 0`. Each delegation
-step increments `L` by 1 in the child. The cap D ≤ 3 matches the realistic
-depth of nested virtualization:
+There is exactly one root ECID per hart authority domain: **L0, ECID 0**, created
+by firmware or the kernel when CE is enabled. The root's parent is itself —
+`parent(root) = root` — a **termination sentinel**, not a delegation edge (Foundation
+§F.1 tenet 7 / §F.2 D.7). Each delegation step increments `L` by 1 in the child.
+The cap D ≤ 3 matches the realistic depth of nested virtualization:
 
 ```
 L0 — host kernel
@@ -369,10 +371,20 @@ L3 — guest
 Implementations may expose a smaller cap (D = 0, 1, 2, or 3); D > 3 is not
 permitted.
 
-**Parent/child relationship** (Foundation §F.1 tenets 6–7 / §F.2 D.7 — acyclic
-delegation tree; §F.1 tenet 9 / §F.2 D.10 — authority only by delegation).
-Every non-root ECID has a parent ECID stored in `EC[e].parent_ecid`. Only the
-parent or a privileged ancestor may revoke or destroy a child.
+**Parent/child relationship** (Foundation §F.1 tenets 6–7 / §F.2 D.7). Every
+non-root ECID has a parent ECID strictly higher in the tree, stored in
+`EC[e].parent_ecid`; no non-root ECID is its own ancestor; ancestry walks terminate
+at the root self-loop. Only the parent or a privileged ancestor may revoke or
+destroy a child (§F.1 tenet 9 / §F.2 D.10 — authority only by delegation).
+
+**Self-non-nameable and self-preservation** (Foundation §F.2 D.12). Operands
+are interpreted in the caller's local group/subtree namespace; a name outside it
+is not representable in that namespace and **traps** rather than resolving
+elsewhere. "Self" is the reserved local base ("self = 0") and is structurally
+non-nameable as a delegation or deletion target. Consequently, no EC can
+un-resource itself — the **Self-Preservation Invariant** ensures no EC may
+delegate all of any resource type to its children; the CME Bank realization is
+the bank-0-unnamed rule. Operational detail in charter §5.4 / §6.9.
 
 **Forced destruction** (Foundation §F.2 D.13 — forced destruction always
 resolves). Destroying an ECID and its entire subtree must always succeed. The
