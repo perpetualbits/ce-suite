@@ -15,9 +15,20 @@ chapter.
 This chapter is normative. When a later chapter conflicts with this
 chapter, this chapter takes precedence.
 
+_Lockstep note (charter §7.4): ch00 has been reconciled to Frozen
+Logical Core v1.0 in lockstep with charter v1.0. The normative
+principles in §0.2–§0.11 derive from the charter Foundation (§F.1 tenets
+1–12, §F.2 invariants D.1–D.21); ch00 retains the long-form operational
+elaboration._
+
 '''''
 
 === 0.2 Execution Context Identifier (ECID)
+
+_§0.2–§0.5 operationalize the Foundation’s identity, ownership, and tree
+tenets/invariants (Foundation §F.1 tenets 1, 3–9; §F.2 D.1, D.4, D.6,
+D.7, D.10, D.14, D.20). Full principles are in the charter Foundation;
+this section gives their operational form._
 
 An *Execution Context Identifier (ECID)* is a 16-bit, hart-local,
 hardware-managed token denoting one Execution Context (EC) currently
@@ -29,31 +40,37 @@ and RV64 alike. The 16-bit number is treated as an opaque integer by
 hardware; the `prefix ++||++ index` decomposition used by the kernel’s
 radix-tree allocator is a software convention.
 
-*Hart-local.* An ECID has meaning only on the hart that issued it. The
-system-wide identity of a running EC is the tuple `(hart_id, ECID)`,
-but no hardware mechanism uses that tuple as a key.
+*Hart-local* (Foundation §F.1 tenets 1, 3 / §F.2 D.1). An ECID has
+meaning only on the hart that issued it. The system-wide identity of a
+running EC is the tuple `(hart_id, ECID)`, but no hardware mechanism
+uses that tuple as a key.
 
-*Opaque to user code.* A process cannot read or write its own ECID. The
-OS may know it; the EC running as that ECID cannot. Opacity is the
-mechanism that makes the ECID an unforgeable capability.
+*Opaque to user code* (Foundation §F.1 tenet 1 — ECID is architectural
+identity). A process cannot read or write its own ECID. The OS may know
+it; the EC running as that ECID cannot. Opacity is the mechanism that
+makes the ECID an unforgeable capability.
 
-*Privileged creation only.* Only M-mode firmware, S-mode kernel, or
-HS-mode hypervisor may create or destroy ECIDs. User mode may not.
+*Privileged creation only* (Foundation §F.1 tenet 9 / §F.2 D.10 —
+authority only by delegation from a holder). Only M-mode firmware,
+S-mode kernel, or HS-mode hypervisor may create or destroy ECIDs. User
+mode may not.
 
-*No migration across harts.* When the scheduler moves an EC from one
-hart to another, the kernel unbinds the source ECID and allocates a
-fresh ECID on the destination hart, reusing the same in-memory ECS.
-Migration is rebinding, not literal ECID transfer.
+*No migration across harts* (Foundation §F.1 migration scope boundary).
+When the scheduler moves an EC from one hart to another, the kernel
+unbinds the source ECID and allocates a fresh ECID on the destination
+hart, reusing the same in-memory ECS. Migration is rebinding, not
+literal ECID transfer.
 
-*Generation counters.* Each `EC[e]` slot holds a generation
-counter incremented on every slot reuse. A software reference to a
-`(hart_id, ECID, generation)` triple is stale when the counter in
-`EC[e]` no longer matches. This prevents ABA hazards when a slot
-is freed and reallocated.
+*Generation counters* (Foundation §F.2 D.14 — ABA safety on reuse). Each
+`EC[e]` slot holds a generation counter incremented on every
+slot reuse. A software reference to a `(hart_id, ECID, generation)`
+triple is stale when the counter in `EC[e]` no longer matches.
+This prevents ABA hazards when a slot is freed and reallocated.
 
-*ECID allocation — radix tree.* ECIDs are allocated by the kernel from a
-radix tree organized as `prefix ++||++ index`. Each subtree is owned by
-one tenant or privileged context; allocations within a prefix require no
+*ECID allocation — radix tree* (Foundation §F.1 tenets 6–7 / §F.2 D.7 —
+acyclic delegation tree). ECIDs are allocated by the kernel from a radix
+tree organized as `prefix ++||++ index`. Each subtree is owned by one
+tenant or privileged context; allocations within a prefix require no
 global coordination. Privileged actors may set per-prefix quotas on
 resourced ECIDs (those holding Banks or Contracts). Destroying an ECID
 destroys its entire subtree and reclaims all resources. The radix tree
@@ -74,7 +91,8 @@ to all five extensions: CME, CPE, MSE, QoS, and the ECID substrate.
 === 0.3 The EC[e] Array
 
 Each hart has a conceptual array `EC[0..E_max]` indexed by
-ECID number. The architectural structure of each entry is:
+ECID number — the per-hart identity table that realizes Foundation §F.2
+D.1. The architectural structure of each entry is:
 
 [source,c]
 ----
@@ -153,16 +171,18 @@ migration, and for OS-level bookkeeping.
 
 === 0.5 Group
 
-Every ECID `e` has exactly one *Group*. The Group’s identifier equals
-the ECID number: *GroupID = ECID = `e`*.
+Every ECID `e` has exactly one *Group* (Foundation §F.1 tenet 4 / §F.2
+D.4). The Group’s identifier equals the ECID number: *GroupID = ECID =
+`e`*.
 
 The Group is the ECID’s inventory of resources — the Banks, Contracts,
 and child ECIDs that belong to it.
 
-*Up-pointers (the reversal trick).* Groups do not maintain explicit
-downward membership lists. Instead, each Bank and Contract carries an
-*up-pointer* to the Group that owns it. Ownership is checked at the
-resource:
+*Up-pointers (the reversal trick)* (Foundation §F.1 tenet 5 / §F.2 D.6 —
+ownership is represented upward; up-pointers are truth). Groups do not
+maintain explicit downward membership lists. Instead, each Bank and
+Contract carries an *up-pointer* to the Group that owns it. Ownership is
+checked at the resource:
 
 [source,text]
 ----
@@ -177,20 +197,26 @@ child receives its own Group. From the child’s perspective, its Group
 appears as Group 0. The child cannot observe parent-level GroupIDs. This
 is the same isolation that Linux namespaces apply to PIDs in containers:
 each delegation level renumbers its world to start at zero. This is the
-CME instance of CE Suite’s foundational local-view principle (§0.11);
-MSE realizes the same property for bandwidth allocation (charter §4.5.0,
-Chapter 9 §9.4.6), and the principle is uniform across all CE Suite
+CME realization of Foundation §F.1 tenet 8 / §F.2 D.20 (local-view
+rebasing); the MSE realization is in charter §4.5.0 and Chapter 9 §9.4.6
+(see also §0.11), and the principle is uniform across all CE Suite
 extensions.
 
 '''''
 
 === 0.6 Banks
 
+_§0.6–§0.7 operationalize the Foundation’s resource-ownership and
+divisibility tenets/invariants (Foundation §F.1 tenets 4, 5, 12; §F.2
+D.4, D.5, D.8, D.9, D.15, D.19)._
+
 A *Bank* is a hardware register-state container owned by exactly one
-Group. Banks are never shared between ECIDs simultaneously. A Bank
-stores the GroupID of its owning Group (equivalently, the ECID number of
-its owner). Implementations may additionally cache delegation level,
-dirty flags, or other state in implementation-defined fields.
+Group (Foundation §F.1 tenet 12 — Banks are an exclusive resource; §F.1
+tenet 4 / §F.2 D.4 — one owner Group per ECID). Banks are never shared
+between ECIDs simultaneously. A Bank stores the GroupID of its owning
+Group (equivalently, the ECID number of its owner). Implementations may
+additionally cache delegation level, dirty flags, or other state in
+implementation-defined fields.
 
 ==== Non-VMT banks
 
@@ -263,7 +289,8 @@ separately from non-VMT banks.
 
 *Definition.* A Contract is a privileged-actor-created binding of a
 slice of a global multiplexed resource to one owning ECID’s Group,
-tracked by hardware for the duration of the binding.
+tracked by hardware for the duration of the binding. Contracts are the
+realization of Foundation §F.1 tenet 12’s divisible-resource principle.
 
 *Identity.* A Contract is identified by the tuple
 `(owning_ECID, resource_class)`:
@@ -306,7 +333,8 @@ parameter encodings.
 
 ==== §0.7.1 — Definition and resource classes
 
-A *Contract* is a slice of a global, multiplexed resource:
+A *Contract* is a slice of a global, multiplexed resource (Foundation
+§F.1 tenet 12 — divisible resource):
 
 * *MSE Contracts* — memory bandwidth and latency guarantees.
 * *QoS Contracts* — I/O and NoC bandwidth and latency guarantees.
@@ -314,33 +342,40 @@ A *Contract* is a slice of a global, multiplexed resource:
 
 ==== §0.7.2 — Single ownership
 
-A Contract has exactly one owning Group at any moment. Ownership can be
-transferred but not duplicated.
+A Contract has exactly one owning Group at any moment (Foundation §F.2
+D.4 / D.5). Ownership can be transferred but not duplicated.
 
 ==== §0.7.3 — Hierarchical splitting
 
-A privileged actor may split a Contract into child Contracts. Each child
-is a strict subset of its parent; the sum of all children’s allocations
-never exceeds the parent’s.
+A privileged actor may split a Contract into child Contracts (Foundation
+§F.1 tenet 12 / §F.2 D.9, D.19). Each child is a strict subset of its
+parent; the sum of all children’s allocations never exceeds the
+parent’s.
 
 ==== §0.7.4 — Atomic admission
 
 Splitting or binding a Contract requires chip-global arbitration that
-succeeds or fails atomically. On failure, no state changes.
+succeeds or fails atomically (Foundation §F.2 D.19). On failure, no
+state changes.
 
 ==== §0.7.5 — Dissolution
 
 When the owning Group is destroyed, the Contract dissolves and its
-resources return to the parent Contract. Contract trees are bounded by
-the same delegation depth D as ECID trees.
+resources return to the parent Contract (Foundation §F.2 D.15). Contract
+trees are bounded by the same delegation depth D as ECID trees
+(Foundation §F.2 D.8).
 
 '''''
 
 === 0.8 Delegation
 
+_§0.8–§0.9 operationalize the Foundation’s delegation, lifecycle, and
+addressing tenets/invariants (Foundation §F.1 tenets 6–9; §F.2 D.3, D.7,
+D.8, D.10, D.13, D.14, D.15, D.16)._
+
 Every ECID has a *delegation level* `L`, stored in
-`EC[e].delegation_L`. The implementation exposes a read-only
-cap `D` via a CSR, where *D ≤ 3*:
+`EC[e].delegation_L` (Foundation §F.2 D.8). The
+implementation exposes a read-only cap `D` via a CSR, where *D ≤ 3*:
 
 * *`L ++<++ D`*: this ECID may create child ECIDs and delegate Banks and
 Contracts to them.
@@ -361,15 +396,19 @@ L3 — guest
 Implementations may expose a smaller cap (D = 0, 1, 2, or 3); D ++>++ 3
 is not permitted.
 
-*Parent/child relationship.* Every non-root ECID has a parent ECID
-stored in `EC[e].parent_ecid`. Only the parent or a
-privileged ancestor may revoke or destroy a child.
+*Parent/child relationship* (Foundation §F.1 tenets 6–7 / §F.2 D.7 —
+acyclic delegation tree; §F.1 tenet 9 / §F.2 D.10 — authority only by
+delegation). Every non-root ECID has a parent ECID stored in
+`EC[e].parent_ecid`. Only the parent or a privileged
+ancestor may revoke or destroy a child.
 
-*Forced destruction.* Destroying an ECID and its entire subtree must
-always succeed. The instruction `ec.oe` (§0.9) revokes all Contracts,
-frees all Banks, marks the radix-tree subtree as free, and increments
-the generation counter for every freed `EC[e]` slot. A destroyed
-EC cannot stall its own reclamation.
+*Forced destruction* (Foundation §F.2 D.13 — forced destruction always
+resolves). Destroying an ECID and its entire subtree must always
+succeed. The instruction `ec.oe` (§0.9) revokes all Contracts, frees all
+Banks (Foundation §F.2 D.15 — resources return to the parent), marks the
+radix-tree subtree as free, and increments the generation counter for
+every freed `EC[e]` slot (Foundation §F.2 D.14 — ABA safety). A
+destroyed EC cannot stall its own reclamation.
 
 '''''
 
@@ -417,9 +456,10 @@ destroy is `ec.oe`. Within CPE, MSE, and QoS: all four combinations
 `++{++i,o}++{++r,t}` are valid. Full definitions are in Chapter 3 (CME),
 Chapter 7 (CPE), Chapter 9 (MSE), and Chapter 11 (QoS).
 
-*ECID-first operands.* Any instruction that targets a context other than
-the currently running one takes an ECID number as its primary operand —
-never a raw pointer, never a bank ID:
+*ECID-first operands* (Foundation §F.2 D.3 — ECID is architectural
+identity; no raw slot numbers). Any instruction that targets a context
+other than the currently running one takes an ECID number as its primary
+operand — never a raw pointer, never a bank ID:
 
 [source,text]
 ----
@@ -445,7 +485,8 @@ code: `ec.ib` (bank slot index written) and `ec.oe` (ECIDs freed count).
 Both trap on error; use `x0` to discard. Any instruction referencing an
 unallocated slot, a stale generation, or a privilege violation must
 raise a defined trap or return a documented failure code in `rd`. Silent
-ignore is prohibited.
+ignore is prohibited (Foundation §F.2 D.16 — all operation outcomes must
+be defined, not silently discarded).
 
 *CME instruction summary:*
 
@@ -473,7 +514,7 @@ per bank)
 |`ec.ir` |ECID into resource |Allocate a new child ECID
 
 |`ec.oe` |ECID out of existence |Forced destroy of ECID and subtree
-(always succeeds)
+(always succeeds; Foundation §F.2 D.13)
 
 |`ec.iv` |ECID into vault |Seal Bank under hardware encryption
 
@@ -531,23 +572,24 @@ selection (bits 0–6) works identically on RV32 and RV64.
 
 === 0.11 Architectural Principle: Software Runs Unchanged at Any Delegation Level
 
-A foundational property of CE Suite is that *software running at any
-delegation level operates on the same abstractions, with the same scales
-and semantics, regardless of where it sits in the delegation hierarchy.*
-A kernel running directly on bare metal at L=0 and the same kernel image
-running at L=1, L=2, or L=3 inside a virtualization hierarchy use
-identical code and interpret the same numerical values the same way. The
-delegation hierarchy is invisible to the running software by default;
-only software that explicitly queries `current_ecid_level`
-learns its depth.
+Foundation §F.1 tenet 8 / §F.2 D.20 establishes that *software running
+at any delegation level operates on the same abstractions, with the same
+scales and semantics, regardless of where it sits in the delegation
+hierarchy.* This section elaborates how that invariant manifests across
+the CE Suite extensions. A kernel running directly on bare metal at L=0
+and the same kernel image running at L=1, L=2, or L=3 inside a
+virtualization hierarchy use identical code and interpret the same
+numerical values the same way. The delegation hierarchy is invisible to
+the running software by default; only software that explicitly queries
+`current_ecid_level` learns its depth.
 
-This principle is foundational. It is what makes CE Suite deployable in
-real multi-tenant environments: a Linux distribution image runs
-unchanged whether installed on bare metal, in a VM under a hypervisor,
-in a nested VM inside another hypervisor, or in a deeper combination.
-Without this property, every OS image would need to be aware of its
-installation depth, multiplying the deployment matrix by the number of
-supported levels.
+This invariant (Foundation §F.1 tenet 8 / §F.2 D.20) is what makes CE
+Suite deployable in real multi-tenant environments: a Linux distribution
+image runs unchanged whether installed on bare metal, in a VM under a
+hypervisor, in a nested VM inside another hypervisor, or in a deeper
+combination. Without this property, every OS image would need to be
+aware of its installation depth, multiplying the deployment matrix by
+the number of supported levels.
 
 The principle manifests differently across CE Suite extensions according
 to the resource each governs:
@@ -575,9 +617,9 @@ same local-view principle for I/O fabric domains.
 The architectural mechanism that realizes the principle differs per
 extension (up-pointers for CME, stored-global pre-flattening with
 Formula 2 readback for MSE, etc.), but the _property_ is uniform:
-software runs unchanged at any level. Implementers should treat this as
-a hard invariant when designing CE Suite-compliant hardware and when
-writing OS code.
+software runs unchanged at any level. Because this is a hard Foundation
+invariant (§F.2 D.20), hardware designers and OS authors must preserve
+it.
 
 '''''
 
