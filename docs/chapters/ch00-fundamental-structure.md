@@ -181,11 +181,16 @@ is uniform across all CE Suite extensions.
 
 ## 0.6 Banks
 
-A **Bank** is a hardware register-state container owned by exactly one Group.
-Banks are never shared between ECIDs simultaneously. A Bank stores the GroupID
-of its owning Group (equivalently, the ECID number of its owner). Implementations
-may additionally cache delegation level, dirty flags, or other state in
-implementation-defined fields.
+*§0.6–§0.7 operationalize the Foundation's resource-ownership and divisibility
+tenets/invariants (Foundation §F.1 tenets 4, 5, 12; §F.2 D.4, D.5, D.8, D.9,
+D.15, D.19).*
+
+A **Bank** is a hardware register-state container owned by exactly one Group
+(Foundation §F.1 tenet 12 — Banks are an exclusive resource; §F.1 tenet 4 /
+§F.2 D.4 — one owner Group per ECID). Banks are never shared between ECIDs
+simultaneously. A Bank stores the GroupID of its owning Group (equivalently, the
+ECID number of its owner). Implementations may additionally cache delegation
+level, dirty flags, or other state in implementation-defined fields.
 
 ### Non-VMT banks
 
@@ -250,7 +255,8 @@ VMT banks are allocated and managed separately from non-VMT banks.
 
 **Definition.** A Contract is a privileged-actor-created binding of a slice of a
 global multiplexed resource to one owning ECID's Group, tracked by hardware for
-the duration of the binding.
+the duration of the binding. Contracts are the realization of Foundation §F.1
+tenet 12's divisible-resource principle.
 
 **Identity.** A Contract is identified by the tuple `(owning_ECID, resource_class)`:
 
@@ -286,7 +292,8 @@ is the resulting hardware binding. Chapter 7 §7.4, Chapter 9 §9.4, and Chapter
 
 ### §0.7.1 — Definition and resource classes
 
-A **Contract** is a slice of a global, multiplexed resource:
+A **Contract** is a slice of a global, multiplexed resource (Foundation §F.1
+tenet 12 — divisible resource):
 
 - **MSE Contracts** — memory bandwidth and latency guarantees.
 - **QoS Contracts** — I/O and NoC bandwidth and latency guarantees.
@@ -294,25 +301,25 @@ A **Contract** is a slice of a global, multiplexed resource:
 
 ### §0.7.2 — Single ownership
 
-A Contract has exactly one owning Group at any moment. Ownership can be
-transferred but not duplicated.
+A Contract has exactly one owning Group at any moment (Foundation §F.2 D.4 /
+D.5). Ownership can be transferred but not duplicated.
 
 ### §0.7.3 — Hierarchical splitting
 
-A privileged actor may split a Contract into child Contracts. Each child is a
-strict subset of its parent; the sum of all children's allocations never exceeds
-the parent's.
+A privileged actor may split a Contract into child Contracts (Foundation §F.1
+tenet 12 / §F.2 D.9, D.19). Each child is a strict subset of its parent; the
+sum of all children's allocations never exceeds the parent's.
 
 ### §0.7.4 — Atomic admission
 
 Splitting or binding a Contract requires chip-global arbitration that succeeds or
-fails atomically. On failure, no state changes.
+fails atomically (Foundation §F.2 D.19). On failure, no state changes.
 
 ### §0.7.5 — Dissolution
 
 When the owning Group is destroyed, the Contract dissolves and its resources
-return to the parent Contract. Contract trees are bounded by the same delegation
-depth D as ECID trees.
+return to the parent Contract (Foundation §F.2 D.15). Contract trees are bounded
+by the same delegation depth D as ECID trees (Foundation §F.2 D.8).
 
 ---
 
