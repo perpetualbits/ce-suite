@@ -300,11 +300,7 @@ is the resulting hardware binding. Chapter 7 §7.4, Chapter 9 §9.4, and Chapter
 ### §0.7.1 — Definition and resource classes
 
 A **Contract** is a slice of a global, multiplexed resource (Foundation §F.1
-tenet 12 — divisible resource):
-
-- **MSE Contracts** — memory bandwidth and latency guarantees.
-- **QoS Contracts** — I/O and NoC bandwidth and latency guarantees.
-- **CPE Contracts** — cache ways or a fraction of cache capacity.
+tenet 12 — divisible resource). For the resource-class enumeration see §0.7.0.
 
 ### §0.7.2 — Single ownership
 
@@ -326,9 +322,21 @@ failure, no state changes.
 
 ### §0.7.5 — Dissolution
 
-When the owning Group is destroyed, the Contract dissolves and its resources
-return to the parent Contract (Foundation §F.2 D.15). Contract trees are bounded
-by the same delegation depth D as ECID trees (Foundation §F.2 D.8).
+A Contract dissolves and its resources return to the parent Contract (Foundation
+§F.2 D.15) when either: (a) the last member ECID releases it via the extension's
+`*.or`/`*.ot` (the voluntary path), or (b) the owning Group is destroyed. Contract
+trees are bounded by the same delegation depth D as ECID trees (Foundation §F.2
+D.8).
+
+### §0.7.6 — Contracts are not serializable ("pinned")
+
+Unlike Bank state — which spills and fills as bytes via `ec.im`/`ec.om` — a
+Contract and other live bindings to shared hardware (cache reservations, bandwidth
+guarantees, interrupt routing, timers) have **no serialization**: they cannot be
+saved as bytes and must be re-established on the destination, which may fail; CE
+alone cannot recreate them (Foundation §F.1 tenet 10 / §F.2 D.18). A context
+holding such an un-saveable arrangement is therefore **"pinned"** — it cannot be
+migrated by byte-copy; migration requires cooperative re-establishment by software.
 
 ---
 
@@ -453,6 +461,11 @@ code in `rd`. Silent ignore is prohibited (charter §6.6 — unified error/trap 
 | `ec.oe` | ECID out of existence | Forced destroy of ECID and subtree (always succeeds; Foundation §F.2 D.13) |
 | `ec.iv` | ECID into vault | Seal Bank under hardware encryption |
 | `ec.ov` | ECID out of vault | Unseal Bank for a secure enclave |
+
+**Sealed-Bank gist** (Foundation §F.2 D.21): a Bank sealed by `ec.iv` holds its
+contents only as ciphertext at rest; `ec.ob` refuses to restore a sealed Bank (it
+must be unsealed via M-mode `ec.ov` first). Full sealed-Bank semantics are in
+Chapter 3 §3.6.
 
 Full instruction definitions are in Chapter 3. CPE, MSE, and QoS instruction
 summaries are in Chapters 7, 9, and 11 respectively.
