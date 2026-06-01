@@ -28,6 +28,12 @@ proposed text — but mark anything the architect must settle at the planning st
 decision, not a fait accompli. The builder proposes a plan, the architect locks it,
 then the builder writes the file.}}
 
+*{{If this is a reconciliation or propagation change: include an explicit check against
+the project's decisions (the lab record of what was added, removed, changed, or scoped),
+not only the current core — end-state matching cannot catch a mechanism the core removed
+(it shows up as absence). State the check: "does this text describe a mechanism the core
+removed or refined?" (methodology.md §9).}}*
+
 ## Planning-stage decisions for the architect (if any)
 
 {{List anything that is the architect's call — wording, placement, an identifier or
@@ -57,3 +63,18 @@ it does not edit those files.}} This step is mandatory and is not optional.
 Before ending, report: {{what was changed and the exact lines}}; {{any planning-stage
 decision as resolved}}; the full side-effect-check result; the commit message; the
 commit hash; and confirmation that `git push` followed `git commit` in the same turn.
+
+*The report is a **claim to be verified**, not evidence. The planner verifies the commit
+against the actual file, not against the report's quoted text (see Verification below).*
+
+## Verification (read-back) — planner, after the commit
+
+*After the builder reports the commit, the planner does not accept it on the report. The
+planner fetches the affected file from the live repository as a raw website URL (default
+branch, no host API) and confirms each promised change is present — a **valid
+verification**: robust to line-wrapping, markdown, and whitespace; reading surrounding
+context; never matching against the report's quoted text. If the read-back does not show
+a change, the planner diagnoses three causes — stale cache, over-strict check, or
+genuinely-absent edit — before concluding, and escalates to the architect's
+version-control working tree as the designed backstop. (Full doctrine: `methodology.md`
+§6.)*
