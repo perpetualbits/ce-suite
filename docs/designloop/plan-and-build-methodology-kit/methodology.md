@@ -70,18 +70,63 @@ its own commit. The architect runs each in turn, reads each session-report, and
 decides whether to continue. A build-loop may pause indefinitely; partial loops are
 normal.
 
-## 6. Verification instead of memory
+## 6. Verification Protocol (default-deny)
 
-The AI treats its own recollection as unreliable:
+**Default-deny.** The planner asserts **nothing** about repository state unless it has
+verified it **this session** against **ground truth** through a **valid verification**.
+Any source that does not meet that bar is unverified by definition — whether or not it
+is named here. The rules are illustrations of the doctrine, not its limit; a new
+shortcut not listed here is still forbidden because it is not a valid verification.
 
-- Re-fetch the orientation chain at session start, and again whenever the repository
-  may have moved (for example, after a reported commit).
-- When making a factual claim about repository state, verify it first; if it cannot be
-  verified, say so.
-- The repository wins over any mirror. Believe the source, not the summary.
+**Ground truth** is the architect's version-control working tree (e.g. `git`) — the
+ultimate authority — and the live raw file *proven fresh* — the working proxy. Memory,
+any mirror (project knowledge, uploaded snapshots), chat history, a session-report
+(including its quoted "old → new" blocks), and an unconfirmed or possibly-cached fetch
+are **not** ground truth.
 
-This repeatedly matters: in practice it has caught summaries that claimed a file
-existed when it did not, and claimed a list was complete when an item was missing.
+- **Retrieve files as raw website URLs, default branch, no API.** Fetch repository files
+  as raw website URLs of the form
+  `https://<raw-host>/<owner>/<repo>/<branch>/<path>` — for GitHub:
+  `raw.githubusercontent.com`, default branch `main`. Do **not** use the host's API and
+  do not enumerate via it. If the planner does not know a file's exact path, it asks the
+  architect for the path or a directory listing — it never guesses a filename, and never
+  concludes a file is absent from a failed guess or an empty API response.
+
+- **Verify every commit by reading it back, validly.** After the builder reports a
+  commit, the planner fetches the affected raw file(s) and confirms each promised change
+  is present in the returned text — edit by edit. A **valid verification** is robust to
+  line-wrapping, markdown (`**bold**`, backticks), and whitespace — not one brittle
+  exact-string match. Read enough surrounding context. A session-report's quoted "old →
+  new" text is **not** the committed text and is **never** the object of verification;
+  verify against the fetched file or the architect's diff.
+
+- **Never trust caching; diagnose failures by three causes.** Treat a single raw fetch
+  as provisional; confirm it is current (expected new content present, or
+  version/changelog advanced) before relying on it. When a read-back **fails to show** a
+  change, do not read "not found" as "absent" — distinguish: (1) **stale cache** (tell:
+  unchanged byte count or version line; mitigation: re-fetch, optionally with a
+  cache-busting query parameter, or wait briefly); (2) **over-strict check** (the edit
+  is present but the check was too narrow — broaden it and read context); (3)
+  **genuinely absent edit**. Resolve by escalating to the architect's working tree
+  (`git show --stat <hash>`, full `git show <hash>`, or `grep` of the on-disk file).
+  This escalation is the **designed backstop, not a failure** — when the proxy (raw
+  file) is inconclusive, the ultimate authority (working tree) decides, per the
+  source-of-truth order below.
+
+- **Source-of-truth order.** In any conflict: (a) the architect's working tree over (b)
+  the live raw file proven fresh over (c) a session-report and its quoted text over (d)
+  the planner's memory or chat history over (e) any mirror or status table. Resolve
+  disagreements explicitly in this order, never by choosing the convenient source.
+
+- **Trust labels.** Every factual claim about repository state is tagged as one of:
+  *verified-this-session* (fetched and read this session), *unverified* (must fetch
+  before acting), or *architect-confirmed* (from the architect's working tree). No
+  unlabeled assertions.
+
+In practice, this catches summaries that claimed a file existed when it did not (for
+instance, a CE Suite scratchpad referenced in a code-prompt that was never committed),
+a list was complete when an item was missing, and a change had landed when the fetch
+returned a cached pre-edit copy.
 
 ## 7. The deictic rule
 
@@ -101,16 +146,26 @@ Every change-prompt (template provided) includes:
 - **Hard rules** — what the session will *not* do, even if related work looks
   convenient. This is the anti-sweep boundary.
 - **A session-report instruction** — what the builder must report before ending.
+- **For reconciliation or propagation change-prompts:** an explicit check against
+  the project's **decisions** (what was added, removed, changed, or scoped — the
+  lab record), not just the current core. End-state matching cannot catch a
+  *removed* mechanism (see §9).
 
 ## 9. Guard-rails (what the planner watches for)
 
-- Working from stale state → re-fetch.
+- Working from stale state → re-fetch (see §6 protocol).
 - Identifier/numbering errors → verify against the authoritative tracking doc.
 - Sweeps → decompose into per-file change-prompts.
 - Canon edits as a side effect → surface and defer to a dedicated session.
 - Resolving the architect's decisions → present options, let the architect pick.
 - Deictic references in produced documents.
 - Enacting without explicit approval.
+- **Reconciliation matching text only to the current core** → also check against
+  the project's **decisions** (the lab record of what was added, removed, changed,
+  or scoped). End-state matching cannot catch a mechanism the core *removed*,
+  because removal shows up as absence. Each reconciliation or propagation
+  change-prompt must carry an explicit check: "does this text describe a mechanism
+  the core removed or refined?"
 
 ## 10. When the project has a fragile core
 
