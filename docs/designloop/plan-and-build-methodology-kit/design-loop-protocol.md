@@ -47,7 +47,12 @@ must attack from a **different angle**. Useful angles, run as separate passes:
 - **Completeness** — does the model **rely on** any property that is not actually
   written down? (Check for rules cited as present but missing, and for operations that
   enforce a property no rule states. Consistency passes structurally cannot find this;
-  only a completeness pass can.)
+  only a completeness pass can.) Also check the **inverse**: does any artifact **still
+  describe a mechanism the core removed or refined**? Removal shows up as *absence* —
+  matching prose against the current core cannot detect a removed mechanism; only
+  checking against the design's **decisions** (the lab record of what was added,
+  removed, changed, or scoped) can. Both directions belong to completeness:
+  *missing-but-relied-on* and *removed-but-still-described*.
 - **Correspondence / independence** — is every principle backed by a rule and every
   rule grounded in a principle (no orphan either way)? Is any rule strictly derivable
   from others (not minimal)?
@@ -70,7 +75,12 @@ clean passes in a row, from different angles, means converged.
   working, not a failure. In the CE Suite run, the red-team caught a mislabeled scope,
   an over-generalized mechanism, an imprecise explanation, and — across angles — a
   load-bearing rule that had been cited as present but was never actually written
-  into the list. All were fixed before the freeze.
+  into the list. All were fixed before the freeze. A related risk also surfaced in that
+  run: a mechanism decided **removed** during the loop was later found still described in
+  already-reconciled downstream documents, because the reconciliation had matched the
+  current core — where the mechanism was correctly absent — rather than the decision to
+  remove it. The fix was to reconcile against the decision record. This is the
+  *removed-but-still-described* class the completeness angle now covers.
 
 ## The freeze
 
@@ -82,6 +92,16 @@ a version bump (e.g., "Frozen Core v1.0"). Record:
 - That changing any frozen item now requires a deliberate **un-freeze** with a new
   version bump.
 - What comes next: the build-loop that ports the frozen core into the canon.
+
+**Caution when the freeze includes any removal or refinement.** If the frozen core
+removed or refined a prior mechanism, the port/propagation is not simply "make the
+canon match the new core." Propagating change-prompts must **actively hunt the removed
+or refined mechanism across the canon** using the lab's decision record — end-state
+matching will silently preserve a removed mechanism because it will not appear in the
+new core to check against. Each propagation change-prompt carries an explicit check:
+"does this text describe a mechanism the core removed or refined?" (see `methodology.md`
+§9). The propagation surface for a removal should be enumerated from the decision record
+at freeze time.
 
 After the freeze, routine work no longer edits the core. New questions about it are
 handled as explicit un-freeze decisions, not drift.
