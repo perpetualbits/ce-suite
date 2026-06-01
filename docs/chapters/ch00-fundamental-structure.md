@@ -325,8 +325,13 @@ by the same delegation depth D as ECID trees (Foundation §F.2 D.8).
 
 ## 0.8 Delegation
 
-Every ECID has a **delegation level** `L`, stored in `EC[e].delegation_L`. The
-implementation exposes a read-only cap `D` via a CSR, where **D ≤ 3**:
+*§0.8–§0.9 operationalize the Foundation's delegation, lifecycle, and addressing
+tenets/invariants (Foundation §F.1 tenets 6–9; §F.2 D.3, D.7, D.8, D.10, D.13,
+D.14, D.15, D.16).*
+
+Every ECID has a **delegation level** `L`, stored in `EC[e].delegation_L`
+(Foundation §F.2 D.8). The implementation exposes a read-only cap `D` via a
+CSR, where **D ≤ 3**:
 
 - **`L < D`**: this ECID may create child ECIDs and delegate Banks and
   Contracts to them.
@@ -347,14 +352,18 @@ L3 — guest
 Implementations may expose a smaller cap (D = 0, 1, 2, or 3); D > 3 is not
 permitted.
 
-**Parent/child relationship.** Every non-root ECID has a parent ECID stored in
-`EC[e].parent_ecid`. Only the parent or a privileged ancestor may revoke or
-destroy a child.
+**Parent/child relationship** (Foundation §F.1 tenets 6–7 / §F.2 D.7 — acyclic
+delegation tree; §F.1 tenet 9 / §F.2 D.10 — authority only by delegation).
+Every non-root ECID has a parent ECID stored in `EC[e].parent_ecid`. Only the
+parent or a privileged ancestor may revoke or destroy a child.
 
-**Forced destruction.** Destroying an ECID and its entire subtree must always
-succeed. The instruction `ec.oe` (§0.9) revokes all Contracts, frees all Banks,
-marks the radix-tree subtree as free, and increments the generation counter for
-every freed `EC[e]` slot. A destroyed EC cannot stall its own reclamation.
+**Forced destruction** (Foundation §F.2 D.13 — forced destruction always
+resolves). Destroying an ECID and its entire subtree must always succeed. The
+instruction `ec.oe` (§0.9) revokes all Contracts, frees all Banks (Foundation
+§F.2 D.15 — resources return to the parent), marks the radix-tree subtree as
+free, and increments the generation counter for every freed `EC[e]` slot
+(Foundation §F.2 D.14 — ABA safety). A destroyed EC cannot stall its own
+reclamation.
 
 ---
 
@@ -390,7 +399,8 @@ Not every cross-product exists. Within CME: there is no `ec.or`; forced destroy
 is `ec.oe`. Within CPE, MSE, and QoS: all four combinations `{i,o}{r,t}` are valid. Full definitions are in Chapter 3 (CME),
 Chapter 7 (CPE), Chapter 9 (MSE), and Chapter 11 (QoS).
 
-**ECID-first operands.** Any instruction that targets a context other than the
+**ECID-first operands** (Foundation §F.2 D.3 — ECID is architectural identity;
+no raw slot numbers). Any instruction that targets a context other than the
 currently running one takes an ECID number as its primary operand — never a raw
 pointer, never a bank ID:
 
@@ -416,7 +426,8 @@ index written) and `ec.oe` (ECIDs freed count). Both trap on error; use `x0` to
 discard.
 Any instruction referencing an unallocated slot, a stale generation, or a
 privilege violation must raise a defined trap or return a documented failure
-code in `rd`. Silent ignore is prohibited.
+code in `rd`. Silent ignore is prohibited (Foundation §F.2 D.16 — all operation
+outcomes must be defined, not silently discarded).
 
 **CME instruction summary:**
 
@@ -431,7 +442,7 @@ code in `rd`. Silent ignore is prohibited.
 | `ec.it` | ECID into tenant | Delegate one Bank to a child ECID (call once per bank) |
 | `ec.ot` | ECID out of tenant | Revoke all resources from a child ECID |
 | `ec.ir` | ECID into resource | Allocate a new child ECID |
-| `ec.oe` | ECID out of existence | Forced destroy of ECID and subtree (always succeeds) |
+| `ec.oe` | ECID out of existence | Forced destroy of ECID and subtree (always succeeds; Foundation §F.2 D.13) |
 | `ec.iv` | ECID into vault | Seal Bank under hardware encryption |
 | `ec.ov` | ECID out of vault | Unseal Bank for a secure enclave |
 
