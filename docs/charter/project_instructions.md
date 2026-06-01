@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -75,7 +75,7 @@ introduce synonyms or redefine them.
 | **Bank** | A hardware register-state container (non-VMT or VMT) owned by exactly one Group. An exclusive resource (§F.1 tenet 12). |
 | **Contract** | A slice of a global, multiplexed resource (memory bandwidth/latency for MSE, I/O bandwidth/latency for QoS) bound to an ECID's Group. A divisible resource (§F.1 tenet 12 / §F.2 D.9). |
 | **Delegation level (L)** | An ECID's depth in the delegation tree, 0 ≤ L ≤ D. `L < D` permits delegation; `L = D` does not. (§F.2 D.8) |
-| **Generation counter** | A small counter per `EC[e]` slot, incremented on every reuse of the slot, used to detect stale references (ABA safety). (§F.2 D.14) |
+
 | **Hart** | Standard RISC-V hardware thread. CE state is per-hart. |
 | **Privileged actor** | M-mode firmware, S-mode kernel, or HS-mode hypervisor. The only actors permitted to create or destroy ECIDs. (§F.1 tenet 9 / §F.2 D.10 — authority only by delegation) |
 | **Foundation** | The charter's frozen normative core: §F.1 (tenets 1–12) and §F.2 (invariants D.1–D.21), frozen as Frozen Logical Core v1.0 on 2026-06-01. Prevails over §1–§8 of this charter. Changing any frozen tenet or invariant requires a deliberate un-freeze with a new version bump. |
@@ -94,7 +94,8 @@ refactor.
   ECIDs directly.
 - **EECID / EECIDG** — Earlier names for "ECID + hart_id" or
   "ECID + hart_id + generation" tuples. Replaced by saying "ECID" (hart-local)
-  and explicitly naming `hart_id` and the generation counter when needed.
+  and explicitly naming `hart_id` when needed. The reference triple collapses
+  to `(hart_id, ECID)`; generation counters are removed (see §3.1).
 - **CPE pool, CME pool** — Pooling was rejected for per-hart resources.
   Bank and cache-partition assignment is always explicit and kernel-driven.
 - **Resource-attached flag** — Replaced by the presence or absence of a
@@ -337,10 +338,12 @@ tenets and invariants: §F.1 tenets 1–3, 6–7; §F.2 D.1, D.7.*
    source-hart ECID and allocates a fresh ECID on the destination hart,
    reusing the same ECS. Migration is therefore "rebinding," never literal
    ECID movement.
-5. **Reuse requires generation-counter increment.** When an ECID slot is
-   freed and later reallocated, its generation counter must be incremented.
-   Any reference held by software to a `(hart_id, ECID, generation)` triple
-   becomes stale and must be detected as such.
+5. **Slot reuse is safe without generation counters.** Reallocation occurs only
+   after complete synchronous teardown (§F.2 D.13 — no lazy reuse). Software
+   never holds a raw slot reference — only ECID identity, which hardware
+   allocates (§F.2 D.3); there is therefore no stale handle to detect.
+   The live identity reference is `(hart_id, ECID)`; generation counters are
+   removed. (The ABA window they guarded is closed by D.3 + D.13.)
 
 ### 3.2 The `EC[e]` array
 
@@ -351,7 +354,6 @@ per-hart identity table that realizes §F.1 tenet 3 / §F.2 D.1. At minimum:
 ```c
 struct EC_entry {
     void    *ecs_ptr;        // canonical pointer to ECS in RAM (offset 0)
-    uint8_t  generation;     // incremented on slot reuse
     uint8_t  delegation_L;   // delegation level, 0..D
     uint16_t parent_ecid;    // parent in the delegation tree
     // implementation-defined: cached bank/contract refs, flags, etc.
@@ -1056,7 +1058,6 @@ When an instruction needs metadata about an ECID `e`:
 
 ```text
 ec_entry  = EC[e]                            # via cme_ec_table_base + stride * e
-generation_check(ec_entry, expected_gen)     # if applicable
 ecs_ptr   = ec_entry.ecs_ptr                 # offset 0
 group     = e                                # GroupID = ECID
 # further indirections via ECS or Group metadata
@@ -1098,9 +1099,8 @@ Semantics:
    to the parent's Group (§F.2 D.15 — teardown returns resources to the
    parent).
 3. Marks the radix-tree subtree as free.
-4. Increments the generation counter for each freed `EC[e]` slot (§F.2
-   D.14 — resource content is scrubbed before reallocation; generation
-   increment closes the ABA window).
+4. Scrubs freed `EC[e]` slot content before reallocation (§F.2 D.14 — no
+   successor observes predecessor state).
 5. **Always succeeds.** Forward progress is guaranteed; zombies cannot
    stall reclamation (§F.2 D.13 — forced destruction always resolves).
 6. **`rd` returns the total count of ECIDs freed**, including the target
@@ -1154,7 +1154,7 @@ on any error path. The `rd = x0` discard convention applies.
 #### Trap path
 
 If an instruction references an ECID for which `EC[e]` is invalid
-(slot unallocated, or generation mismatch), or the caller violates
+(slot unallocated), or the caller violates
 delegation rules or Group ownership, the implementation **must** either
 raise a defined trap or return a documented failure code in `rd` as
 above. Silent ignore is prohibited.
@@ -1422,7 +1422,33 @@ the rest of the spec.
 
 ## Changelog
 
-- **v1.0 (this version).** Charter rewrite loop complete. Framing sections
+- **v1.1 (this version).** Generation counters excised from operational text
+  to align with the frozen core (generations decided removed, capture Part Q).
+
+  Generation counters were removed from the design loop (Part Q: "DECISION 2 —
+  Generations removed"). The frozen core (§F.1/§F.2) never mentioned them; the
+  v0.26–v1.0 reconciliation inadvertently preserved — and in two places wrongly
+  cited — the removed mechanism. This version corrects the seven affected sites:
+
+  - **§2 glossary**: "Generation counter" row deleted.
+  - **§2.1 EECID/EECIDG**: triple updated to `(hart_id, ECID)`; generation
+    counter reference removed.
+  - **§3.1 item 5**: replaced "reuse requires generation-counter increment" with
+    an explanation that slot reuse is safe without counters because D.3 (no raw
+    operand) + D.13 (synchronous teardown) close the ABA window.
+  - **§3.2 `EC_entry` struct**: `uint8_t generation;` field removed.
+  - **§6.3 lookup pattern**: `generation_check(...)` line removed.
+  - **§6.5 item 4**: "increments the generation counter" replaced with the
+    correct D.14 scrub statement.
+  - **§6.6 trap path**: "or generation mismatch" removed.
+
+  Safety now rests on §F.2 D.3 (no raw slot operand) + §F.2 D.13 (synchronous
+  teardown gates reallocation) + §F.2 D.14 (slot scrub before reuse). The
+  Foundation was not modified; this is operational reconciliation, not an
+  un-freeze. Chapter propagation (ch00 §0.2/§0.3/§0.8, ch03, ch07/ch09/ch11
+  error tables, ch05, Appendix A) follows in subsequent per-file sessions.
+
+- **v1.0.** Charter rewrite loop complete. Framing sections
   §1, §2, §7 aligned to the Foundation; charter now at v1.0.
 
   §1 item 5 gains a Foundation pointer (§F.1 tenets 1–12, §F.2 D.1–D.21,
@@ -1788,4 +1814,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v1.0.*
+*End of CE Suite Project Instructions and Axiom Charter, v1.1.*
