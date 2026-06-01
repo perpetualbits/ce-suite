@@ -396,16 +396,84 @@ Before you start any CE work session, run through this list mentally:
 - [ ] Did I push after the last commit? (`git push` must follow every
       `git commit` in the same turn — web Claude reads from GitHub.)
 
+- [ ] Has web-Claude read the actual current file from `main` (raw URL, not
+      memory, mirror, or report) before drafting? (Part 7)
+- [ ] After the last commit, has web-Claude read the file back from `main` and
+      verified each promised change is present — edit by edit? (Part 7)
+
 If any answer is no, fix that before continuing. None of these checks
 are time-consuming; skipping them is what produced the previous mess.
 
 ---
 
-## Vocabulary for the chat-and-code workflow
+## Part 7 — Verification Protocol (web-Claude)
+
+This protocol exists because work-from-staleness errors — reconciling from
+memory, guessing paths, trusting a report, and trusting a stale cache read —
+occurred in this project and must never recur.
+
+1. **Read before drafting.** web-Claude does not draft any code-prompt, factual
+   claim, or plan that depends on file contents without first fetching the actual
+   current file from the repo in the same session. No drafting from memory, from
+   the claude.ai project-files mirror, from earlier-in-chat context, or from a
+   session-report.
+
+2. **GitHub is a website; `main`; raw files only.** web-Claude retrieves repo
+   files only as raw website URLs of the form
+   `https://raw.githubusercontent.com/perpetualbits/ce-suite/main/<path>`. It
+   does not use `api.github.com`, does not enumerate via the API, and does not
+   deal with branches — `main` is the only branch. If web-Claude does not know a
+   file's exact path, it asks the architect for the path or a `tree`; it never
+   guesses a filename, and never concludes a file is absent from a failed guess
+   or an empty API response.
+
+3. **Verify every commit by reading it back.** After code-Claude reports a
+   commit, web-Claude fetches the affected raw file(s) and confirms each promised
+   change is present in the returned text — edit by edit, not in aggregate —
+   before telling the architect anything landed. A session-report is a claim to
+   be checked, never evidence; web-Claude reports what the file says, not what
+   the report says.
+
+4. **Never trust caching; prove freshness.** A raw fetch immediately after a
+   push may return a stale copy. web-Claude treats a single fetch as provisional
+   and confirms it is current (the expected new content is present, or the
+   version/changelog advanced) before relying on it. If a fetch does not show the
+   promised change, web-Claude states the fetch is inconclusive (possible cache
+   lag) and asks the architect to confirm from the working tree (`git show --stat
+   <hash>` or `grep` of the on-disk file) — it does not declare failure.
+
+5. **Source-of-truth order.** In any conflict, precedence is: (a) the
+   architect's working tree (`git`) over (b) the live raw file over (c) a
+   session-report over (d) web-Claude's memory or chat history over (e) the
+   project-files mirror and the refamiliarize/work-items status tables.
+   web-Claude resolves disagreements explicitly in this order, never by choosing
+   the convenient source.
+
+6. **Reconcile against decisions, not just end-state.** Matching prose to the
+   current tenets/invariants cannot catch a *removed* mechanism (removal shows up
+   as absence). Any reconciliation or propagation code-prompt must check the
+   target text against the design loop's **decisions** (what was added, removed,
+   changed, or scoped — the capture's decision parts), not only against the
+   current frozen core. Each such prompt carries an explicit check: "does this
+   text describe a mechanism the frozen core removed or refined?"
+
+7. **Re-fetch on every boundary.** web-Claude re-fetches the orientation chain
+   at session start and re-fetches any target file immediately before drafting a
+   code-prompt against it and immediately after a reported commit — regardless of
+   what chat history appears to show. The repo moves; chat context goes stale.
+
+8. **Trust labels.** Every factual claim web-Claude makes about repo state is
+   tagged as one of: *verified-this-turn* (fetched and read this turn),
+   *unverified* (must fetch before acting), or *architect-confirmed* (from the
+   architect's git state). No unlabeled assertions about repo contents.
+
+---
+
+## Part 8 — Vocabulary for the chat-and-code workflow
 
 This section names the participants, artifacts, and patterns used when web-Claude
 (in claude.ai) and code-Claude (Claude Code) work together to produce changes
-in this repo. The rules in Parts 1–6 still apply; this section adds the vocabulary
+in this repo. The rules in Parts 1–7 still apply; this section adds the vocabulary
 that makes those rules easier to discuss and harder to forget.
 
 ### V.1 The vocabulary
@@ -499,9 +567,10 @@ starting other work. Partial loops are normal.
 
 Web-Claude:
 - Discusses, proposes, drafts.
-- Re-fetches the orientation chain at session start, and again when
-  context suggests the repo has moved (for example, after the architect
-  reports a recent commit from code-Claude).
+- Follows the Verification Protocol (Part 7): reads the actual current file
+  before drafting, retrieves only raw `main` website URLs (never the API),
+  reads back and verifies every code-Claude commit against the file, and never
+  trusts caching or a session-report as evidence.
 - Produces code-prompts only on the architect's explicit approval.
 - Asks for clarification rather than guessing on architectural calls.
 
@@ -511,6 +580,9 @@ Web-Claude does not:
 - Propose multi-file changes packaged as a single code-prompt; decomposition
   into per-file code-prompts is mandatory.
 - Use deictic words in produced documents.
+- Claim anything about repo state without a fetch this turn, or trust a
+  session-report, cache, mirror, or memory as a substitute for reading the
+  file (Part 7).
 
 ### V.6 What code-Claude does and does not do
 
