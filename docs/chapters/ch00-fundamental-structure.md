@@ -351,8 +351,8 @@ migrated by byte-copy; migration requires cooperative re-establishment by softwa
 ## 0.8 Delegation
 
 *§0.8–§0.9 operationalize the Foundation's delegation, lifecycle, and addressing
-tenets/invariants (Foundation §F.1 tenets 6–9; §F.2 D.3, D.7, D.8, D.10, D.12,
-D.13, D.14, D.15).*
+tenets/invariants (Foundation §F.1 tenets 6–9, 11; §F.2 D.3, D.7, D.8, D.10, D.12,
+D.13, D.14, D.15, D.16).*
 
 Every ECID has a **delegation level** `L`, stored in `EC[e].delegation_L`
 (Foundation §F.2 D.8). The implementation exposes a read-only cap `D` via a
@@ -487,6 +487,11 @@ contents only as ciphertext at rest; `ec.ob` refuses to restore a sealed Bank (i
 must be unsealed via M-mode `ec.ov` first). Full sealed-Bank semantics are in
 Chapter 3 §3.6.
 
+**Cost tier-classification gist** (Foundation §F.1 tenet 11 / §F.2 D.16): every CE
+operation is cost tier-classified — fast path O(1)/O(D_fixed), never scans; slow path
+bounded ≤ O(N log N), nothing unclassified. Per-operation cost tables are in
+**Chapter 4** (microarchitecture).
+
 Full instruction definitions are in Chapter 3. CPE, MSE, and QoS instruction
 summaries are in Chapters 7, 9, and 11 respectively.
 
@@ -582,6 +587,14 @@ The architectural mechanism that realizes the principle differs per extension
 etc.), but the *property* is uniform: software runs unchanged at any level.
 Because this is a hard Foundation invariant (§F.2 D.20), hardware designers and OS
 authors must preserve it.
+
+**Security complement gist** (Foundation §F.1 tenet 8 / §F.2 D.11): the same
+local-view rebasing also enforces that a child **cannot observe or infer** host,
+sibling, or global topology — including via allocation results or operand values —
+and partial inference is not escalatable into authority. *The full non-inference
+treatment is distributed across the CE instruction set chapters; no single dedicated
+security chapter exists in the current repo — architect to confirm forward-pointer
+when one is drafted.*
 
 ---
 
