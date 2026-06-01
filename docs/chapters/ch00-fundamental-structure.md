@@ -18,6 +18,11 @@ chapter, this chapter takes precedence.
 
 ## 0.2 Execution Context Identifier (ECID)
 
+*§0.2–§0.5 operationalize the Foundation's identity, ownership, and tree
+tenets/invariants (Foundation §F.1 tenets 1, 3–9; §F.2 D.1, D.4, D.6, D.7,
+D.10, D.14, D.20). Full principles are in the charter Foundation; this section
+gives their operational form.*
+
 An **Execution Context Identifier (ECID)** is a 16-bit, hart-local,
 hardware-managed token denoting one Execution Context (EC) currently bound to
 a hart. The EC may be a thread, process, vCPU, interrupt handler, secure
@@ -28,35 +33,38 @@ RV64 alike. The 16-bit number is treated as an opaque integer by hardware; the
 `prefix || index` decomposition used by the kernel's radix-tree allocator is a
 software convention.
 
-**Hart-local.** An ECID has meaning only on the hart that issued it. The
-system-wide identity of a running EC is the tuple `(hart_id, ECID)`, but no
-hardware mechanism uses that tuple as a key.
+**Hart-local** (Foundation §F.1 tenets 1, 3 / §F.2 D.1). An ECID has meaning
+only on the hart that issued it. The system-wide identity of a running EC is the
+tuple `(hart_id, ECID)`, but no hardware mechanism uses that tuple as a key.
 
-**Opaque to user code.** A process cannot read or write its own ECID. The OS
-may know it; the EC running as that ECID cannot. Opacity is the mechanism that
-makes the ECID an unforgeable capability.
+**Opaque to user code** (Foundation §F.1 tenet 1 — ECID is architectural
+identity). A process cannot read or write its own ECID. The OS may know it; the
+EC running as that ECID cannot. Opacity is the mechanism that makes the ECID an
+unforgeable capability.
 
-**Privileged creation only.** Only M-mode firmware, S-mode kernel, or HS-mode
-hypervisor may create or destroy ECIDs. User mode may not.
+**Privileged creation only** (Foundation §F.1 tenet 9 / §F.2 D.10 — authority
+only by delegation from a holder). Only M-mode firmware, S-mode kernel, or
+HS-mode hypervisor may create or destroy ECIDs. User mode may not.
 
-**No migration across harts.** When the scheduler moves an EC from one hart to
-another, the kernel unbinds the source ECID and allocates a fresh ECID on the
-destination hart, reusing the same in-memory ECS. Migration is rebinding, not
-literal ECID transfer.
+**No migration across harts** (Foundation §F.1 migration scope boundary). When
+the scheduler moves an EC from one hart to another, the kernel unbinds the
+source ECID and allocates a fresh ECID on the destination hart, reusing the
+same in-memory ECS. Migration is rebinding, not literal ECID transfer.
 
-**Generation counters.** Each `EC[e]` slot holds a generation counter
-incremented on every slot reuse. A software reference to a
-`(hart_id, ECID, generation)` triple is stale when the counter in `EC[e]` no
-longer matches. This prevents ABA hazards when a slot is freed and reallocated.
+**Generation counters** (Foundation §F.2 D.14 — ABA safety on reuse). Each
+`EC[e]` slot holds a generation counter incremented on every slot reuse. A
+software reference to a `(hart_id, ECID, generation)` triple is stale when the
+counter in `EC[e]` no longer matches. This prevents ABA hazards when a slot is
+freed and reallocated.
 
-**ECID allocation — radix tree.** ECIDs are allocated by the kernel from a
-radix tree organized as `prefix || index`. Each subtree is owned by one tenant
-or privileged context; allocations within a prefix require no global
-coordination. Privileged actors may set per-prefix quotas on resourced ECIDs
-(those holding Banks or Contracts). Destroying an ECID destroys its entire
-subtree and reclaims all resources. The radix tree is a kernel data structure;
-the architectural view is the `EC[e]` array (§0.3). Algorithms are in
-Appendix A.
+**ECID allocation — radix tree** (Foundation §F.1 tenets 6–7 / §F.2 D.7 —
+acyclic delegation tree). ECIDs are allocated by the kernel from a radix tree
+organized as `prefix || index`. Each subtree is owned by one tenant or
+privileged context; allocations within a prefix require no global coordination.
+Privileged actors may set per-prefix quotas on resourced ECIDs (those holding
+Banks or Contracts). Destroying an ECID destroys its entire subtree and reclaims
+all resources. The radix tree is a kernel data structure; the architectural view
+is the `EC[e]` array (§0.3). Algorithms are in Appendix A.
 
 **CE disable and ignore.** Firmware controls CE availability through the
 `ce_ctrl` CSR (0x7D0, M-mode RW; Chapter 13 §1.1). Each extension has an
@@ -71,8 +79,9 @@ the ECID substrate.
 
 ## 0.3 The EC[e] Array
 
-Each hart has a conceptual array `EC[0..E_max]` indexed by ECID number. The
-architectural structure of each entry is:
+Each hart has a conceptual array `EC[0..E_max]` indexed by ECID number — the
+per-hart identity table that realizes Foundation §F.2 D.1. The architectural
+structure of each entry is:
 
 ```c
 struct EC_entry {
@@ -141,15 +150,16 @@ for OS-level bookkeeping.
 
 ## 0.5 Group
 
-Every ECID `e` has exactly one **Group**. The Group's identifier equals the
-ECID number: **GroupID = ECID = `e`**.
+Every ECID `e` has exactly one **Group** (Foundation §F.1 tenet 4 / §F.2 D.4).
+The Group's identifier equals the ECID number: **GroupID = ECID = `e`**.
 
 The Group is the ECID's inventory of resources — the Banks, Contracts, and
 child ECIDs that belong to it.
 
-**Up-pointers (the reversal trick).** Groups do not maintain explicit downward
-membership lists. Instead, each Bank and Contract carries an **up-pointer** to
-the Group that owns it. Ownership is checked at the resource:
+**Up-pointers (the reversal trick)** (Foundation §F.1 tenet 5 / §F.2 D.6 —
+ownership is represented upward; up-pointers are truth). Groups do not maintain
+explicit downward membership lists. Instead, each Bank and Contract carries an
+**up-pointer** to the Group that owns it. Ownership is checked at the resource:
 
 ```text
 owns(current_ecid, bank) ≡ bank.group_id == current_ecid    // one load, one compare
@@ -162,10 +172,10 @@ resources a Group holds.
 receives its own Group. From the child's perspective, its Group appears as
 Group 0. The child cannot observe parent-level GroupIDs. This is the same
 isolation that Linux namespaces apply to PIDs in containers: each delegation
-level renumbers its world to start at zero. This is the CME instance of CE
-Suite's foundational local-view principle (§0.11); MSE realizes the same
-property for bandwidth allocation (charter §4.5.0, Chapter 9 §9.4.6), and
-the principle is uniform across all CE Suite extensions.
+level renumbers its world to start at zero. This is the CME realization of
+Foundation §F.1 tenet 8 / §F.2 D.20 (local-view rebasing); the MSE realization
+is in charter §4.5.0 and Chapter 9 §9.4.6 (see also §0.11), and the principle
+is uniform across all CE Suite extensions.
 
 ---
 
