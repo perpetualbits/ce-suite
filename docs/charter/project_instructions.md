@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 1.1
+**Version:** 1.2
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -545,8 +545,9 @@ MSE Contract, at most one CPE Contract, and one QoS Contract per `domain_id`.
 - **Admission-control state** — running sums, group caps, and the existence
   record of the binding live in implementation-defined per-controller or per-hart
   SRAM, keyed by ECID. The exact placement is not architectural; the
-  architectural requirement is that admission decisions are atomic and chip-global
-  (§4.3.3).
+  architectural requirement is that admission decisions are atomic and made at the
+  arbiter's scope for the resource class — chip-global for MSE/QoS bandwidth
+  Contracts, core-local for CPE cache Contracts (§F.2 D.19; §4.3.3).
 
 **Lifecycle.** A Contract is created by a privileged actor executing one of
 `ms.ir`, `qs.ir`, `cp.ir` (assignment from the privileged actor's own resources)
@@ -580,8 +581,10 @@ children's allocations must never exceed the parent's.
 
 #### §4.3.3 — Atomic admission
 
-Splitting or binding a Contract (§F.2 D.19) requires chip-global hardware
-arbitration that succeeds or fails atomically. On failure, no state is changed.
+Splitting or binding a Contract (§F.2 D.19) requires hardware arbitration at the
+arbiter's scope for the resource class — chip-global for bandwidth (MSE, QoS),
+core-local for cache (CPE) — that succeeds or fails atomically. On failure, no
+state is changed.
 
 #### §4.3.4 — Dissolution
 
@@ -1307,9 +1310,9 @@ software sees only virtualized-per-group numbers).
 - **Chapter 7 (CPE Instruction Set Reference).** Already mostly ECID-
   framed; verify the rs1 ECID field is 16 bits (per §3.6) and update
   mnemonics to `cp.*` per §6.1.
-- **Future chapters on MSE and QoS** (not yet drafted). Must use the
-  Contract model from §4.3; must not reintroduce Pools. Instruction
-  mnemonics use `ms.*` and `qs.*` per §6.1.
+- **MSE and QoS chapters (ch09, ch11).** Must use the Contract model from
+  §4.3; must not reintroduce Pools. Instruction mnemonics use `ms.*` and
+  `qs.*` per §6.1.
 - **Appendix A (ECID).** Convert from a resolved-issues scratchpad
   into a real appendix with the radix-tree data structure (C struct)
   and the allocation, delegation, and forced-destruction algorithms.
@@ -1328,7 +1331,7 @@ changes while the frozen-core version reflects un-freeze events.
 
 ## 8. Open items deferred to later versions
 
-These items are acknowledged but not resolved in v0.12. They do not block
+These items are acknowledged but not yet resolved. They do not block
 the rest of the spec.
 
 1. **NUMA-aware Contract assignment.** Multi-socket / NUMA semantics for
@@ -1422,7 +1425,26 @@ the rest of the spec.
 
 ## Changelog
 
-- **v1.1 (this version).** Generation counters excised from operational text
+- **v1.2 (this version).** Admission scope corrected per §F.2 D.19; minor
+  stale text cleared.
+
+  - **§4.3.0 and §4.3.3**: "chip-global" admission scope corrected to
+    per-resource-class arbiter scope: chip-global for MSE/QoS bandwidth
+    Contracts, core-local for CPE cache Contracts. Matches §F.2 D.19 ("atomic
+    at the arbiter's scope — chip-wide for bandwidth, core-local for cache").
+    Corrects Finding 2 of the charter comb, where the v0.28 reconciliation
+    preserved the over-general "chip-global." §4.5.4 (MSE-specific, chip-wide,
+    correct) is not changed.
+  - **§7.3**: "Future chapters on MSE and QoS (not yet drafted)" → "MSE and
+    QoS chapters (ch09, ch11)" — ch09 and ch11 exist.
+  - **§8 intro**: "not resolved in v0.12" → "not yet resolved" — removes the
+    stale v0.12 pin.
+
+  Foundation not modified (D.19 is already correct). Chapter propagation:
+  ch00 §0.7.4 ("Atomic admission") carries the same blanket "chip-global" and
+  needs the same correction in a subsequent ch00 session.
+
+- **v1.1.** Generation counters excised from operational text
   to align with the frozen core (generations decided removed, capture Part Q).
 
   Generation counters were removed from the design loop (Part Q: "DECISION 2 —
@@ -1814,4 +1836,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v1.1.*
+*End of CE Suite Project Instructions and Axiom Charter, v1.2.*
