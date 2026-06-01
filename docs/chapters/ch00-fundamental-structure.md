@@ -24,8 +24,8 @@ retains the long-form operational elaboration.*
 ## 0.2 Execution Context Identifier (ECID)
 
 *§0.2–§0.5 operationalize the Foundation's identity, ownership, and tree
-tenets/invariants (Foundation §F.1 tenets 1, 3–9; §F.2 D.1, D.4, D.6, D.7,
-D.10, D.14, D.20). Full principles are in the charter Foundation; this section
+tenets/invariants (Foundation §F.1 tenets 1, 3–9; §F.2 D.1, D.3, D.4, D.6, D.7,
+D.10, D.13, D.20). Full principles are in the charter Foundation; this section
 gives their operational form.*
 
 An **Execution Context Identifier (ECID)** is a 16-bit, hart-local,
@@ -336,7 +336,7 @@ by the same delegation depth D as ECID trees (Foundation §F.2 D.8).
 
 *§0.8–§0.9 operationalize the Foundation's delegation, lifecycle, and addressing
 tenets/invariants (Foundation §F.1 tenets 6–9; §F.2 D.3, D.7, D.8, D.10, D.13,
-D.14, D.15, D.16).*
+D.14, D.15).*
 
 Every ECID has a **delegation level** `L`, stored in `EC[e].delegation_L`
 (Foundation §F.2 D.8). The implementation exposes a read-only cap `D` via a
@@ -435,8 +435,7 @@ index written) and `ec.oe` (ECIDs freed count). Both trap on error; use `x0` to
 discard.
 Any instruction referencing an unallocated slot or a privilege violation must
 raise a defined trap or return a documented failure
-code in `rd`. Silent ignore is prohibited (Foundation §F.2 D.16 — all operation
-outcomes must be defined, not silently discarded).
+code in `rd`. Silent ignore is prohibited (charter §6.6 — unified error/trap policy).
 
 **CME instruction summary:**
 
