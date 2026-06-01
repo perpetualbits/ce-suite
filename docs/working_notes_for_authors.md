@@ -408,9 +408,21 @@ are time-consuming; skipping them is what produced the previous mess.
 
 ## Part 7 — Verification Protocol (web-Claude)
 
-This protocol exists because work-from-staleness errors — reconciling from
-memory, guessing paths, trusting a report, and trusting a stale cache read —
-occurred in this project and must never recur.
+**Default-deny doctrine.** web-Claude asserts nothing about repo state unless it
+has verified it this turn against ground truth through a valid verification. Any
+source that does not meet that bar is **unverified by definition** — whether or not
+it is named in the rules below. The enumerated rules are illustrations of the
+doctrine, not its limit; a new shortcut not listed here is still forbidden because
+it is not a valid verification.
+
+**Ground truth** is the architect's git working tree (ultimate authority) and the
+live raw file *proven fresh* (the working proxy). Memory, the project-files mirror,
+chat history, a session-report (including its quoted "old → new" blocks), and an
+unconfirmed or possibly-cached fetch are **not** ground truth.
+
+This protocol exists because work-from-staleness errors — reconciling from memory,
+guessing paths, trusting a report, trusting a stale cache, and an over-strict check
+reading a present edit as absent — occurred in this project and must never recur.
 
 1. **Read before drafting.** web-Claude does not draft any code-prompt, factual
    claim, or plan that depends on file contents without first fetching the actual
@@ -434,20 +446,47 @@ occurred in this project and must never recur.
    be checked, never evidence; web-Claude reports what the file says, not what
    the report says.
 
-4. **Never trust caching; prove freshness.** A raw fetch immediately after a
-   push may return a stale copy. web-Claude treats a single fetch as provisional
-   and confirms it is current (the expected new content is present, or the
-   version/changelog advanced) before relying on it. If a fetch does not show the
-   promised change, web-Claude states the fetch is inconclusive (possible cache
-   lag) and asks the architect to confirm from the working tree (`git show --stat
-   <hash>` or `grep` of the on-disk file) — it does not declare failure.
+   **Valid verification.** Verification must be *robust* to line-wrapping,
+   markdown (`**bold**`, backticks), and whitespace — not a single exact-string
+   match that a wrapped or bolded line would miss. Read enough surrounding context
+   to confirm the change, and prefer a loose or multi-pattern check over one
+   brittle string. A session-report's verbatim "old → new" quotation is **not**
+   the committed text and is **never** the object of verification; web-Claude
+   verifies against the fetched file (or the architect's git diff), not against
+   the report's quoted wording, which has been seen to diverge from what was
+   actually committed.
+
+4. **Never trust caching; prove freshness; diagnose failures.** A raw fetch
+   immediately after a push may return a stale copy. web-Claude treats a single
+   fetch as provisional and confirms it is current (the expected new content is
+   present, or the version/changelog advanced) before relying on it. When a
+   read-back **fails to show** a promised change, web-Claude must distinguish
+   three possible causes before drawing any conclusion — "check returned nothing"
+   is never read as "edit is absent":
+
+   1. **Stale cache** — the CDN served a pre-edit copy (tell: identical byte count
+      or unchanged version line). Mitigation: re-fetch (optionally with a
+      cache-busting query parameter), or wait briefly.
+   2. **Over-strict check** — the edit is present but the verification was too
+      narrow (line wrap, markdown, whitespace). Mitigation: broaden the check and
+      read surrounding context.
+   3. **Genuinely absent edit** — the commit did not write the change.
+
+   **Backstop.** When web-Claude's own tools cannot reach confident ground truth,
+   it escalates to the architect's git working tree (`git show --stat <hash>`,
+   full `git show <hash>`, or `grep` of the on-disk file). This escalation is the
+   designed backstop, not a failure — when the proxy (live raw file) is
+   inconclusive, the ultimate authority (git) decides, per the source-of-truth
+   order (rule 5).
 
 5. **Source-of-truth order.** In any conflict, precedence is: (a) the
    architect's working tree (`git`) over (b) the live raw file over (c) a
-   session-report over (d) web-Claude's memory or chat history over (e) the
-   project-files mirror and the refamiliarize/work-items status tables.
-   web-Claude resolves disagreements explicitly in this order, never by choosing
-   the convenient source.
+   session-report and its quoted text over (d) web-Claude's memory or chat history
+   over (e) the project-files mirror and the refamiliarize/work-items status
+   tables. web-Claude resolves disagreements explicitly in this order, never by
+   choosing the convenient source. A session-report's verbatim "old → new" blocks
+   rank with the report itself (below the live file) and are never treated as
+   evidence of the committed content.
 
 6. **Reconcile against decisions, not just end-state.** Matching prose to the
    current tenets/invariants cannot catch a *removed* mechanism (removal shows up
