@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.27
+**Version:** 0.28
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -476,17 +476,24 @@ extensions: CME, CPE, MSE, QoS, and the ECID substrate.
 Full byte-level layouts are in Chapter 0. This section fixes the
 **relationships** that all chapters must respect.
 
+*§4.1–§4.4 operationalize the Foundation's ownership and resource tenets/invariants:
+§F.1 tenets 4, 5, 8, 12; §F.2 D.2, D.4–D.6, D.8–D.9, D.15, D.19–D.20. §4.5
+addresses the MSE telescoping/arbitration policy.*
+
 ### 4.1 Group is inventory
 
-1. Every ECID `e` has exactly **one** Group, with **GroupID = ECID = e**.
-   The Group is the ECID's inventory of resources.
+1. Every ECID `e` has exactly **one** Group, with **GroupID = ECID = e**
+   (§F.1 tenet 4 / §F.2 D.4). The Group is the ECID's inventory of
+   resources.
 2. Resources (Banks, Contracts, child ECIDs) carry **up-pointers** into
-   their Group. Groups do not maintain explicit downward member lists.
-   This is the "reversal trick" that makes hardware enforcement O(1):
+   their Group (§F.1 tenet 5 / §F.2 D.6 — ownership is represented upward;
+   up-pointers are truth). Groups do not maintain explicit downward member
+   lists. This is the "reversal trick" that makes hardware enforcement O(1):
    any resource knows its owner; ownership is checked at the resource, not
    walked from the Group.
 3. A child Group is delegated to a child ECID and appears to the child
-   as that child's Group 0.
+   as that child's Group 0 (§F.1 tenet 8 / §F.2 D.20 — local-view
+   rebasing).
 
 ### 4.2 Banks
 
@@ -495,9 +502,10 @@ Full byte-level layouts are in Chapter 0. This section fixes the
    selected CSRs, SATP, and CP. Exact layout in Chapter 0.
 3. VMT banks hold vector/matrix/tensor register files. Size scales with
    the implementation's vector width.
-4. A Bank stores its owning Group ID (= owning ECID). Implementations may
-   additionally cache delegation level and dirty/lock flags.
-5. Banks are never shared between ECIDs simultaneously.
+4. A Bank stores its owning Group ID (= owning ECID; §F.1 tenet 4 / §F.2 D.4).
+   Implementations may additionally cache delegation level and dirty/lock flags.
+5. Banks are never shared between ECIDs simultaneously (§F.1 tenet 12 — Banks
+   are an exclusive resource, owned whole by exactly one Group).
 
 ### 4.3 Contracts
 
@@ -505,7 +513,9 @@ Full byte-level layouts are in Chapter 0. This section fixes the
 
 **Definition.** A Contract is a privileged-actor-created binding of a slice of a
 global multiplexed resource to one owning ECID's Group, tracked by hardware for
-the duration of the binding.
+the duration of the binding. Contracts are the realization of §F.1 tenet 12's
+divisible-resource principle — slices of shared bandwidth, cache, or I/O bandwidth
+carved among owner Groups.
 
 **Identity.** A Contract is identified by the tuple `(owning_ECID, resource_class)`,
 where `resource_class` is one of:
@@ -552,27 +562,28 @@ admission-control SRAM (implementation choice).
 
 #### §4.3.1 — Single ownership
 
-A Contract has exactly one owning ECID's Group at any moment.
+A Contract has exactly one owning ECID's Group at any moment (§F.2 D.4 / D.5).
 
 #### §4.3.2 — Hierarchical splitting
 
-A privileged actor may split a Contract into child Contracts. Each child is a
-strict subset of its parent; the sum of all children's allocations must never
-exceed the parent's.
+A privileged actor may split a Contract into child Contracts (§F.1 tenet 12 /
+§F.2 D.9, D.19). Each child is a strict subset of its parent; the sum of all
+children's allocations must never exceed the parent's.
 
 #### §4.3.3 — Atomic admission
 
-Splitting or binding a Contract requires chip-global hardware arbitration that
-succeeds or fails atomically. On failure, no state is changed.
+Splitting or binding a Contract (§F.2 D.19) requires chip-global hardware
+arbitration that succeeds or fails atomically. On failure, no state is changed.
 
 #### §4.3.4 — Dissolution
 
-When a Contract's last member ECID releases it, or the owning Group is destroyed,
-the Contract dissolves and its resources return to the parent Contract.
+When a Contract's last member ECID releases it, or the owning Group is destroyed
+(§F.2 D.15 — teardown returns resources to the parent), the Contract dissolves
+and its resources return to the parent Contract.
 
 #### §4.3.5 — Delegation depth
 
-Contract trees are bounded by the same D as ECID delegation (see §5).
+Contract trees are bounded by the same D as ECID delegation (§F.2 D.8; see §5).
 
 #### §4.3.6 — Per-extension delegation instructions
 
@@ -587,10 +598,11 @@ Chapter 7.
 ### 4.4 Banks vs ECS
 
 - **Banks** hold fast-path register state. CME's 1–9 cycle save/restore
-  touches Banks and `current_ecid` only.
+  touches Banks and `current_ecid` only (§F.1 tenet 11 — the fast path
+  never scans).
 - **ECS** holds metadata, slow-path saved state, and references (bank IDs,
   contract descriptors, OS bookkeeping). The DMA path (`ec.im`, `ec.om`)
-  reads/writes ECS.
+  reads/writes ECS. Banks and ECS are distinct objects (§F.2 D.2).
 
 A context switch between two ECIDs whose state is already in Banks does
 not touch ECS at all.
@@ -1359,7 +1371,20 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.27 (this version).** §3 reconciled to the Foundation (charter-rewrite
+- **v0.28 (this version).** §4.1–§4.4 reconciled to the Foundation
+  (charter-rewrite loop, session 3a/N).
+
+  §4 head gains an operationalizing note. §4.1 items 1–3 reference §F.1
+  tenets 4,5,8 / §F.2 D.4,D.6,D.20; reversal-trick and O(1) mechanism kept.
+  §4.2 items 4–5 reference §F.1 tenet 4 / §F.2 D.4 and §F.1 tenet 12.
+  §4.3.0 Definition gains a one-sentence divisible-resource reference. §4.3.1
+  references §F.2 D.4/D.5. §4.3.2 references §F.1 tenet 12 / §F.2 D.9,D.19.
+  §4.3.3 references §F.2 D.19, keeping "chip-global hardware arbitration" and
+  "on failure no state changed." §4.3.4 references §F.2 D.15. §4.3.5
+  references §F.2 D.8. §4.4 references §F.1 tenet 11 and §F.2 D.2. §4.3.6
+  and §4.5 untouched. No operational detail removed.
+
+- **v0.27.** §3 reconciled to the Foundation (charter-rewrite
   loop, session 2/N).
 
   §3.1 item 1 ("Hart-local") now references §F.1 tenets 1 and 3 / §F.2 D.1
@@ -1655,4 +1680,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.27.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.28.*
