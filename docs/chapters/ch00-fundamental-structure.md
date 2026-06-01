@@ -14,6 +14,11 @@ integration details in later chapters reference this chapter.
 This chapter is normative. When a later chapter conflicts with this
 chapter, this chapter takes precedence.
 
+*Lockstep note (charter §7.4): ch00 has been reconciled to Frozen Logical Core
+v1.0 in lockstep with charter v1.0. The normative principles in §0.2–§0.11 derive
+from the charter Foundation (§F.1 tenets 1–12, §F.2 invariants D.1–D.21); ch00
+retains the long-form operational elaboration.*
+
 ---
 
 ## 0.2 Execution Context Identifier (ECID)
@@ -493,21 +498,22 @@ works identically on RV32 and RV64.
 
 ## 0.11 Architectural Principle: Software Runs Unchanged at Any Delegation Level
 
-A foundational property of CE Suite is that **software running at any delegation
-level operates on the same abstractions, with the same scales and semantics,
-regardless of where it sits in the delegation hierarchy.** A kernel running
-directly on bare metal at L=0 and the same kernel image running at L=1, L=2, or
-L=3 inside a virtualization hierarchy use identical code and interpret the same
+Foundation §F.1 tenet 8 / §F.2 D.20 establishes that **software running at any
+delegation level operates on the same abstractions, with the same scales and
+semantics, regardless of where it sits in the delegation hierarchy.** This section
+elaborates how that invariant manifests across the CE Suite extensions. A kernel
+running directly on bare metal at L=0 and the same kernel image running at L=1, L=2,
+or L=3 inside a virtualization hierarchy use identical code and interpret the same
 numerical values the same way. The delegation hierarchy is invisible to the running
 software by default; only software that explicitly queries `current_ecid_level`
 learns its depth.
 
-This principle is foundational. It is what makes CE Suite deployable in real
-multi-tenant environments: a Linux distribution image runs unchanged whether
-installed on bare metal, in a VM under a hypervisor, in a nested VM inside another
-hypervisor, or in a deeper combination. Without this property, every OS image would
-need to be aware of its installation depth, multiplying the deployment matrix by the
-number of supported levels.
+This invariant (Foundation §F.1 tenet 8 / §F.2 D.20) is what makes CE Suite
+deployable in real multi-tenant environments: a Linux distribution image runs
+unchanged whether installed on bare metal, in a VM under a hypervisor, in a nested
+VM inside another hypervisor, or in a deeper combination. Without this property,
+every OS image would need to be aware of its installation depth, multiplying the
+deployment matrix by the number of supported levels.
 
 The principle manifests differently across CE Suite extensions according to the
 resource each governs:
@@ -537,8 +543,8 @@ resource each governs:
 The architectural mechanism that realizes the principle differs per extension
 (up-pointers for CME, stored-global pre-flattening with Formula 2 readback for MSE,
 etc.), but the *property* is uniform: software runs unchanged at any level.
-Implementers should treat this as a hard invariant when designing CE Suite-compliant
-hardware and when writing OS code.
+Because this is a hard Foundation invariant (§F.2 D.20), hardware designers and OS
+authors must preserve it.
 
 ---
 
