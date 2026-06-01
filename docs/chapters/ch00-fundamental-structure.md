@@ -537,12 +537,13 @@ resource each governs:
 
 - **CPE (cache ways).** Cache partition assignments are conceptually the same — a
   delegated partition appears as a local resource to the child, with hardware
-  enforcing isolation. The cluster F resolution will formalize this for QoS; CPE
-  semantics are similar but limited to cache ways, which are a smaller, more
-  constrained resource.
+  enforcing isolation. CPE semantics are similar but limited to cache ways, which
+  are a smaller, more constrained resource.
 
-- **QoS (I/O bandwidth).** When cluster F resolves, QoS will apply the same
-  local-view principle for I/O fabric domains.
+- **QoS (I/O bandwidth).** QoS realizes the same local-view principle for I/O-fabric
+  bandwidth: a QoS local-view readback CSR (the I/O-fabric analog of
+  `mse_absolute_bw`) presents the running EC's I/O-bandwidth guarantee on the same
+  0–255 scale via Formula 2, single-level in v1. See charter §4.5.7.
 
 The architectural mechanism that realizes the principle differs per extension
 (up-pointers for CME, stored-global pre-flattening with Formula 2 readback for MSE,
