@@ -25,8 +25,8 @@ retains the long-form operational elaboration.*
 
 *§0.2–§0.5 operationalize the Foundation's identity, ownership, and tree
 tenets/invariants (Foundation §F.1 tenets 1, 3–9; §F.2 D.1, D.3, D.4, D.6, D.7,
-D.10, D.13, D.20). Full principles are in the charter Foundation; this section
-gives their operational form.*
+D.10, D.13, D.17, D.20). Full principles are in the charter Foundation; this
+section gives their operational form.*
 
 An **Execution Context Identifier (ECID)** is a 16-bit, hart-local,
 hardware-managed token denoting one Execution Context (EC) currently bound to
@@ -146,6 +146,14 @@ reachable via `EC[e].ecs_ptr`. It holds:
 The ECS layout is a kernel software convention, not an architectural mandate.
 CME instructions take ECID numbers as operands and locate the ECS indirectly
 via `EC[e].ecs_ptr`. Chapter 5 describes the Linux kernel representation.
+
+**Runnability** (Foundation §F.1 tenet 2 / §F.2 D.17). An ECID may be
+ACTIVE-owning — holding Banks, Contracts, and child ECIDs — **with no ECS bound**
+(`EC[e].ecs_ptr` null). An ECID is **dispatchable (made runnable) only once an ECS
+is bound**. Conversely, an ECS may exist with no ECID, at the OS's discretion; such
+a context simply cannot use CE features. Fast-path execution state lives in the EC
+entry, never behind the `ecs_ptr` — which is why the fast-path switch below does not
+touch the ECS.
 
 A fast-path context switch (`ec.ib` → `ec.ob`) does not touch the ECS at all.
 ECS is accessed only on the DMA path (`ec.im`, `ec.om`), during migration, and
