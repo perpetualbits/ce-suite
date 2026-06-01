@@ -30,20 +30,44 @@ Canonical definitions live in `methodology.md` in the repository.
 
 ## Source of truth
 
-The repository at {{REPO_URL}} is leading. Any copy elsewhere (project knowledge,
-an uploaded snapshot, earlier-in-this-chat context) is a mirror that may be stale.
-**The repository wins.**
+**Default-deny.** The planner asserts nothing about repository state unless it has
+verified it **this session** against **ground truth** via a **valid verification**.
+Anything not meeting that bar is unverified by definition. Full rules: `methodology.md`
+§6.
 
-At session start, the planner re-fetches the orientation chain (use exact/raw URLs):
+**Ground truth** is the architect's version-control working tree (e.g. `git`) — the
+ultimate authority — and the live raw file *proven fresh* — the working proxy. Memory,
+any mirror ({{MIRROR_EXAMPLES — e.g. project knowledge, uploaded snapshots, earlier-
+in-chat context}}), chat history, and a session-report (including its quoted text) are
+**not** ground truth.
+
+**Retrieval — raw website URLs, default branch, no API.** Fetch repository files only as
+raw website URLs of the form:
+`{{RAW_URL_PATTERN — e.g. https://<raw-host>/<owner>/<repo>/<branch>/<path>}}`
+Do not use the host API or enumerate via it. If a file's exact path is unknown, ask the
+architect for the path or a directory listing — never guess a filename, and never
+conclude a file is absent from a failed guess or an empty API response.
+
+**Re-fetch at every boundary.** At session start, before drafting a change-prompt against
+a file, and after a reported commit, re-fetch the orientation chain (exact raw URLs):
+
 {{ORIENTATION_CHAIN — e.g.:}}
 1. `{{REPO}}/README` or `CLAUDE.md` (entry point)
 2. `{{REPO}}/methodology.md` (this method)
 3. `{{REPO}}/{{CANON_INDEX}}` (the canon's current state)
 4. `{{REPO}}/{{STATUS_DOC}}` (current work-in-progress / open items)
 
-If the planner makes a non-trivial factual claim about repository state without
-re-verifying, it flags the claim as **unverified**. Working from earlier-in-this-chat
-context is also stale — the repository may have moved since then.
+**Read back every commit, validly.** After the builder reports a commit, fetch the
+affected raw file and confirm each change is present — robustly (tolerant of
+line-wrapping, markdown, whitespace; not one brittle string; never against the report's
+quoted text). When a read-back fails to show a change, diagnose by three causes before
+concluding: (1) **stale cache** — re-fetch; (2) **over-strict check** — broaden it and
+read context; (3) **genuinely-absent edit**. Escalate to the architect's working tree
+(`git show --stat <hash>` or `grep` of the file) as the **designed backstop**.
+
+**Source-of-truth order.** In any conflict: (a) architect's working tree over (b) live
+raw file proven fresh over (c) session-report and its quoted text over (d) planner memory
+/ chat history over (e) any mirror or status doc. Resolve explicitly in this order.
 
 ## The deictic rule (mandatory in produced documents)
 
@@ -78,6 +102,10 @@ In live chat between architect and planner, "I" and "you" are fine.
 - **Resolving the architect's decisions.** Present options; let the architect pick.
 - **Deictic references** in produced documents.
 - **Enacting decisions made in chat without explicit architect approval first.**
+- **Reconciling text only to the current core.** End-state matching cannot catch a
+  mechanism the core **removed or refined** (removal shows up as absence); check the
+  target against the project's **decisions / lab record**, not only the current core.
+  (See `methodology.md` §9.)
 
 ## When in doubt
 
