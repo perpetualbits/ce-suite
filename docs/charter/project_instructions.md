@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.29
+**Version:** 0.30
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -891,9 +891,14 @@ The QoS local-view readback CSR address is assigned in Chapter 13.
 
 ## 5. Delegation
 
+*§5 operationalizes the Foundation's delegation-tree and lifecycle tenets/invariants
+(§F.1 tenets 6–7, 9; §F.2 D.7, D.8, D.13, D.15) and the resource-sufficiency scope
+boundary (§F.2 after D.21).*
+
 ### 5.1 Delegation level L and the cap D
 
-1. Every ECID has a delegation level `L`, `0 ≤ L ≤ D`, stored in `EC[e]`.
+1. Every ECID has a delegation level `L`, `0 ≤ L ≤ D`, stored in `EC[e]`
+   (§F.2 D.8).
 2. The architectural maximum is **D ≤ 3**, giving up to four levels
    (0, 1, 2, 3). This matches the four virtualization levels intended
    to be supported simultaneously: L0 host kernel, L1 hypervisor, L2
@@ -908,19 +913,30 @@ The QoS local-view readback CSR address is assigned in Chapter 13.
 ### 5.2 Parent/child relationship
 
 1. Every ECID except the root has exactly one parent ECID, stored in
-   `EC[e].parent_ecid`.
+   `EC[e].parent_ecid` (§F.1 tenets 6–7 / §F.2 D.7 — acyclic delegation
+   tree with the root's self-loop as termination sentinel).
 2. Only the parent (or a privileged ancestor) may revoke a child ECID's
-   resources or destroy the child.
+   resources or destroy the child (§F.1 tenet 9 / §F.2 D.10 — authority
+   only by delegation from a holder).
 3. Destroying an ECID destroys all of its descendants and reclaims all
-   their resources, recursively, in O(log N) walks of the radix tree.
+   their resources (§F.2 D.13 / D.15 — complete teardown returning resources
+   to the parent), recursively, in O(log N) walks of the radix tree.
 
 ### 5.3 Forced destruction
 
 Forced destruction of an ECID (and its subtree) must always succeed, even
-if the target is a zombie, blocked, or hostile. See §6.5 for the
-instruction (`ec.oe`).
+if the target is a zombie, blocked, or hostile (§F.2 D.13 — a slot returns
+to FREE after complete synchronous teardown; forced destruction always
+resolves). See §6.5 for the instruction (`ec.oe`).
 
 ### 5.4 Self-Preservation Invariant
+
+*Operationalizes the Foundation's resource-sufficiency scope boundary (§F.2
+"Scope boundary on resource sufficiency" after D.21): item 5 (MSE/CPE/QoS no
+architectural floor) realizes "CE does not guarantee a workable amount after
+delegation — software responsibility"; item 4 (CME Bank structural floor) builds
+on "self is non-delegable." Also relates to §F.1 tenet 12 / §F.2 D.19
+(divisibility and sum-never-exceeds-parent).*
 
 1. A non-leaf EC must retain enough of each resource type to remain
    operational. No EC may delegate all of any one resource type to its
@@ -1378,7 +1394,19 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.29 (this version).** §4.5 reconciled to the Foundation (charter-rewrite
+- **v0.30 (this version).** §5 reconciled to the Foundation (charter-rewrite
+  loop, session 4/N).
+
+  §5 head gains an operationalizing note. §5.1 item 1 references §F.2 D.8.
+  §5.2 items 1–3 reference §F.1 tenets 6–7 / §F.2 D.7 (acyclic tree), §F.1
+  tenet 9 / §F.2 D.10 (authority by delegation), and §F.2 D.13/D.15 (teardown
+  returning resources) respectively; O(log N) radix-walk mechanism kept. §5.3
+  references §F.2 D.13; pointer to §6.5 kept. §5.4 gains a head note referencing
+  the Foundation's resource-sufficiency scope boundary (§F.2 after D.21) and
+  §F.1 tenet 12 / §F.2 D.19; all six items kept verbatim. No operational detail
+  removed.
+
+- **v0.29.** §4.5 reconciled to the Foundation (charter-rewrite
   loop, session 3b/N).
 
   §4.5.0 reframed: opens with "MSE realizes the Foundation's local-view principle
@@ -1701,4 +1729,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.29.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.30.*
