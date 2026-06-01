@@ -277,7 +277,9 @@ Contract, at most one CPE Contract, and one QoS Contract per `domain_id`.
 loaded atomically into per-hart hardware registers by `ec.ob`. *Admission-control
 state* (running sums, group caps, the existence of the binding) lives in
 implementation-defined per-controller SRAM, keyed by ECID; the architectural
-requirement is that admission is atomic and chip-global (§0.7.4).
+requirement is that admission is atomic and made at the arbiter's scope for the
+resource class — chip-global for MSE/QoS bandwidth Contracts, core-local for
+CPE cache Contracts (Foundation §F.2 D.19; §0.7.4).
 
 **Lifecycle.** A Contract is created when a privileged actor successfully executes
 `ms.ir`, `qs.ir`, or `cp.ir` (assignment from its own resources) or `ms.it`,
@@ -317,8 +319,10 @@ sum of all children's allocations never exceeds the parent's.
 
 ### §0.7.4 — Atomic admission
 
-Splitting or binding a Contract requires chip-global arbitration that succeeds or
-fails atomically (Foundation §F.2 D.19). On failure, no state changes.
+Splitting or binding a Contract requires hardware arbitration at the arbiter's
+scope for the resource class — chip-global for bandwidth (MSE, QoS), core-local
+for cache (CPE) — that succeeds or fails atomically (Foundation §F.2 D.19). On
+failure, no state changes.
 
 ### §0.7.5 — Dissolution
 
