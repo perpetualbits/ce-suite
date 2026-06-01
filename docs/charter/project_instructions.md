@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.25
+**Version:** 0.26
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -99,6 +99,208 @@ refactor.
 - **`ec.od`** — Renamed to `ec.oe` (see §6.5, v0.8). The trailing letter
   `d`=destroy was the one exception to the rule that trailing letters name
   target objects or kinds; `e`=existence restores full consistency.
+
+---
+
+## Foundation — Tenets and Invariants (Frozen Logical Core v1.0)
+
+The following tenets and invariants constitute **Frozen Logical Core v1.0**,
+frozen 2026-06-01. They are the charter's normative foundation. The remaining
+sections (§3–§8) operationalize them; where any section conflicts with the
+foundation, the foundation prevails. Changing any frozen tenet or invariant
+requires a deliberate un-freeze decision by the architect with a version bump.
+
+### F.1 Tenets (1–12)
+
+The non-negotiable architectural principles of the CE Suite.
+
+1. ECID is architectural identity; it indexes the per-hart EC table and is never
+   a pointer.
+2. ECID (architectural identity) and ECS (optional OS metadata) are distinct
+   objects. An ECID may exist and own resources with no ECS bound. An ECID must
+   have a bound ECS before it can be made runnable / dispatched. An ECS may
+   exist with no ECID, at the OS's discretion — such contexts simply cannot use
+   CE features. Fast-path execution state lives in the EC entry, never behind
+   the ECS pointer.
+3. Identity is hart-local: a context is `(hart, ecid)`; the same ECID on another
+   hart is a different identity; identity does not move between harts.
+4. Every ownable object has exactly one canonical owner Group, and GroupID =
+   ECID. A Group is abstract — membership is realized only by up-pointers from
+   owned objects (Banks, Contracts, and child ECIDs) to the owning ECID. The
+   child-ECID up-pointer is the parent reference held in the EC entry.
+5. Ownership is represented upward; up-pointers are truth. Downward member lists
+   are derived accelerators, never canonical, and a disagreeing derived index is
+   architecturally impossible to act on (the up-pointer wins).
+6. The delegation tree is the transitive closure of up-pointers, and is acyclic
+   apart from the root's `parent(root) = root` self-loop — a termination sentinel
+   (tenet 7, D.7), not a delegation edge. No ECID other than the root is its own
+   ancestor.
+7. There is exactly one root ECID per hart authority domain (L0, ECID 0), with
+   `parent(root) = root` when CE is enabled in hardware. For every non-root ECID,
+   parent is strictly higher in the tree; no non-root ECID is its own ancestor.
+   Ancestry walks terminate at the root's self-loop.
+8. A child sees only its virtualized view; it cannot infer host, sibling, or
+   global topology — and even partial inference (e.g. via timing) must not be
+   convertible into authority.
+9. Authority over a resource cannot be acquired by guessing, writing, or
+   replaying an ID — only by delegation from a holder.
+10. CE defines a serialization surface: Bank state has architectural
+    save/restore via spill/fill; live bindings to shared hardware (cache
+    reservations, bandwidth contracts, interrupt routing, timers) — whether
+    hart-local or chip-global — have none. State without a serialization cannot
+    be moved without loss.
+11. The fast path never scans; slow paths may, within the bounded ceiling
+    (O(1)/O(D_fixed) fast; `≤ O(N log N)` slow).
+12. A resource is either **exclusive** or **divisible**. An exclusive resource (a
+    Bank, a child ECID) is owned whole by exactly one Group. A divisible resource
+    (memory bandwidth, cache, I/O bandwidth) is shared by carving it into Contracts —
+    separate, non-overlapping slices, each exclusively owned by its holder, the
+    slices never summing to more than the parent held. This exclusive-vs-divisible
+    split is fundamental to how CME, CPE, MSE, and QoS all work. (Operationalized by
+    D.9 and D.19.)
+
+**Scope boundary (migration).** Migration — cross-hart, cross-hypervisor,
+cross-level — is an OS operation composed from CE primitives. CE has no migration
+concept. An execution context is a software abstraction facilitated by the ECID
+and ECS; it is not a thing the hart can act on as "migrate." CE proper owns only
+the primitives the OS composes (allocate, spill/fill, free, ownership update) and
+enforces its per-operation invariants on each step. "Pinned / non-migratable" is
+therefore not a CE property but the OS observing that some CE state has no
+serialization.
+
+### F.2 Invariants (D.1–D.21)
+
+Properties every algorithm must preserve and every profile must satisfy. The
+security invariants (D.11–D.13) carry both a prohibition and a positive
+operational form stating what the hardware does so the prohibition holds.
+
+**Identity & structure**
+
+1. Each hart (hardware execution thread, including each SMT sibling) has exactly
+   one current ECID at any instant. SMT siblings on one core are distinct harts
+   that may share the physical EC table and Bank storage but never share a
+   `current_ecid`.
+2. ECID slot (identity) and ECS (metadata) are distinct objects; neither is ever
+   the other.
+3. An operand never carries a raw physical slot number; software sees only
+   virtualized-per-group numbers. L0's namespace coincides with the physical
+   table.
+
+**Ownership**
+
+4. Every ownable object (Bank, Contract, child ECID) has exactly one owner
+   Group, realized by a single up-pointer to the owning ECID.
+5. No object has two owners; no ownable object is unowned while live.
+6. Ownership is recoverable by following up-pointers; any downward/derived index
+   that disagrees yields to the up-pointers.
+
+**Delegation tree**
+
+7. Exactly one root per hart authority domain, `parent(root)=root`; every
+   non-root parent is strictly higher; no non-root ECID is its own ancestor;
+   ancestry walks terminate at the root self-loop.
+8. A child's level is its parent's + 1, bounded by D; an ECID at level D
+   delegates no children.
+9. Incomparable ECIDs (neither ancestor of the other) never both own the same
+   single exclusive resource object. They may each own separate, non-overlapping
+   slices carved from one divisible resource (bandwidth, cache); each slice is
+   exclusively its owner's.
+
+**Authority & visibility**
+
+10. Authority is never acquired by guessing, writing, or replaying an ID — only
+    by delegation from a holder.
+11. A child cannot observe or infer host, sibling, or global topology, including
+    via allocation results or operand values; partial inference is not
+    escalatable into authority.
+
+    *Positive form:* a child observes its resources only in its own local view,
+    and no global quantity is exposed for inference. Operands it supplies and
+    allocation results returned to it are local-namespace values — a local index
+    or count (hardware-picks), rebased to the child's local base (D.3, D.20),
+    never a global slot number. Local-view CSR readbacks (Formula 2) present the
+    child's share as a fraction relative to its parent; hardware computes this
+    from stored-global values — the child's own and its parent's — that the child
+    never sees, so the child observes only the resulting fraction and cannot
+    recover those inputs or any global total.
+
+12. A context can name only resources within its own group/subtree entitlement;
+    it cannot name self-as-deletable, parent, or siblings.
+
+    *Positive form:* operands are interpreted in the caller's local
+    group/subtree namespace; names outside it are not representable in that
+    namespace and an out-of-range name traps rather than resolving elsewhere;
+    "self" is the reserved local base ("self = 0") and is structurally
+    non-nameable as a delegation or deletion target.
+
+**Lifecycle**
+
+13. A slot returns to FREE only after complete synchronous teardown: all child
+    ECIDs, Banks, Contracts, and inbound routes (interrupt/QoS/timer) resolved.
+    No lazy reuse.
+
+    *Positive form:* every inbound route is fully cleared before the slot frees.
+    Interrupt routes follow the fixed order mask → pending → routing → free,
+    which discards any latched interrupt. QoS routes (DMA channel bindings) and
+    timer routes follow the same resolve-before-free discipline but with their
+    own steps — they have no mask/pending bits. `ec.oe` performs forced reclaim by
+    reverse-walking up-pointers — revoking Contracts, freeing Banks, marking the
+    subtree FREE — before the slot can be reallocated; with the D.14 scrub, no
+    successor observes predecessor state.
+
+14. On free or before reallocation, resource content is scrubbed (by whatever
+    bulk hardware mechanism applies — cache-line invalidate, way-flush, zeroing
+    engine — not bit-by-bit); no successor owner observes a predecessor's
+    leftovers.
+15. Teardown returns a freed child's resources to its parent, never outside the
+    parent's subtree.
+
+**Cost**
+
+16. Every operation is tier-classified, exhaustively: fast path O(1)/O(D_fixed),
+    never scans; slow path bounded `≤ O(N log N)`, proportional to work. Nothing
+    unclassified.
+
+**Runnability, serialization, divisible resources**
+
+17. An ECID may be ACTIVE-owning with no ECS bound; it may be dispatched (made
+    runnable) only with an ECS bound.
+18. Only register/Bank state is architecturally serializable, via spill/fill.
+    Live arrangements with shared hardware — cache reservations, bandwidth
+    guarantees, interrupt routing, timers — cannot be saved as bytes; they must
+    be re-established on the destination, which may fail. CE alone cannot
+    recreate them. (This is why "pinned" exists: a context is pinned exactly when
+    it holds such an un-saveable arrangement.)
+19. A divisible resource (Contract) may be split among child contexts. Each
+    child's share is a strict subset of the parent's, and the children's shares
+    never sum to more than the parent held. Granting or splitting is all-or-
+    nothing and atomic at the arbiter's scope (chip-wide for bandwidth,
+    core-local for cache): it either fully succeeds or leaves everything
+    unchanged.
+
+**Rebasing, local view, and vault**
+
+20. **(rebasing / local view)** Every delegation level observes its delegated
+    resources — ECID ranges, VMT banks, non-VMT banks, and contract scales —
+    rebased into its own local namespace beginning at a local base, and cannot
+    observe the parent/physical numbering. The realizing mechanism may differ per
+    resource (up-pointers, per-Group slot rebasing, MSE stored-global Formula-2
+    readback) but the property is uniform. (This is the positive operational form
+    of D.11 for the numbering channel.)
+21. **(sealed-Bank confidentiality)** A Bank sealed by `ec.iv` holds its contents
+    only as ciphertext at rest; the plaintext is observable solely via an M-mode
+    `ec.ov` unseal. No non-M-mode operation exposes sealed plaintext: `ec.ob`
+    refuses to restore a sealed Bank (it must be unsealed first), and spill/fill
+    (`ec.im`/`ec.om`) move only the sealed ciphertext. (Key derivation, rotation,
+    and attestation are out of scope — deferred per charter §8; this invariant
+    covers only the confidentiality property.)
+
+**Scope boundary on resource sufficiency** (not an invariant CE enforces). CE
+does not guarantee that any actor retains a *workable* amount of resource after
+delegation. Arranging a workable situation is the programmer's / OS's
+responsibility. CE's structural guarantee is that ECIDs cannot become
+*unreachable*: an ECID holding child ECIDs cannot give away itself (self is
+non-delegable), so authority over a subtree can always be reached from above.
 
 ---
 
@@ -1148,7 +1350,21 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.25 (this version).** QoS local-view made normative (Cluster F).
+- **v0.26 (this version).** Frozen Logical Core v1.0 inserted as the charter's
+  normative foundation (charter-rewrite loop, session 1/N).
+
+  Adds the Foundation section between §2 (Glossary) and §3 (ECID identity),
+  containing Frozen Logical Core v1.0 (frozen 2026-06-01): tenets 1–12 (§F.1)
+  and invariants D.1–D.21 with positive-form clauses on D.11–D.13 (§F.2). The
+  foundation is the charter's normative anchor; §3–§8 operationalize it.
+  Changing any frozen tenet or invariant requires a deliberate un-freeze with a
+  new version bump.
+
+  Section numbers §3–§8 are unchanged. The charter-rewrite loop continues with
+  sessions 2–6 (reconciling §3, §4, §5, §6, then §1/§2/§7/§8 to derive from
+  and reference the foundation). Target: Charter v1.0 on loop completion.
+
+- **v0.25.** QoS local-view made normative (Cluster F).
 
   QoS now realizes the §4.5.0 local-view principle for I/O fabric bandwidth:
   a QoS local-view readback CSR (I/O-fabric analog of `mse_absolute_bw`)
@@ -1419,4 +1635,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.25.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.26.*
