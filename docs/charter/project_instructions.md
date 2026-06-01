@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 1.2
+**Version:** 1.3
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -24,6 +24,14 @@ read this first, then Chapter 0, then refactor the drifting chapter.
 
 A companion document, **Working Notes for Authors**, holds workflow rules and
 warnings about common drift patterns. Workflow guidance does not belong here.
+The **Verification Protocol** in Working Notes Part 7 is mandatory for every
+session: web-Claude works only from files it has fetched from the live repo this
+session (never from memory, the project-files mirror, chat history, or a
+session-report); retrieves repo files only as raw `main` website URLs
+(`https://raw.githubusercontent.com/perpetualbits/ce-suite/main/<path>`), never
+via the GitHub API; and verifies every code-Claude commit by reading the affected
+file back from the repo before treating the change as done. The full rules are in
+Working Notes Part 7; they are not reproduced here.
 
 ---
 
@@ -1425,7 +1433,16 @@ the rest of the spec.
 
 ## Changelog
 
-- **v1.2 (this version).** Admission scope corrected per §F.2 D.19; minor
+- **v1.3 (this version).** §0 gains a binding pointer to the Working Notes
+  Part 7 Verification Protocol.
+
+  §0 now names the Verification Protocol (Working Notes Part 7) as mandatory for
+  every session: read-before-drafting (never from memory, mirror, or report), raw
+  `main` website URLs only (no API), and read-back of every code-Claude commit
+  before treating the change as done. Rules are referenced, not duplicated — §0
+  states "workflow guidance does not belong here." No Foundation change.
+
+- **v1.2.** Admission scope corrected per §F.2 D.19; minor
   stale text cleared.
 
   - **§4.3.0 and §4.3.3**: "chip-global" admission scope corrected to
@@ -1836,4 +1853,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v1.2.*
+*End of CE Suite Project Instructions and Axiom Charter, v1.3.*
