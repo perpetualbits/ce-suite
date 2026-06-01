@@ -56,11 +56,12 @@ the scheduler moves an EC from one hart to another, the kernel unbinds the
 source ECID and allocates a fresh ECID on the destination hart, reusing the
 same in-memory ECS. Migration is rebinding, not literal ECID transfer.
 
-**Generation counters** (Foundation §F.2 D.14 — ABA safety on reuse). Each
-`EC[e]` slot holds a generation counter incremented on every slot reuse. A
-software reference to a `(hart_id, ECID, generation)` triple is stale when the
-counter in `EC[e]` no longer matches. This prevents ABA hazards when a slot is
-freed and reallocated.
+**Slot reuse is safe without generation counters.** Reallocation occurs only
+after complete synchronous teardown (Foundation §F.2 D.13 — no lazy reuse).
+Software never holds a raw slot reference — only ECID identity, which hardware
+allocates (Foundation §F.2 D.3); there is therefore no stale handle to detect.
+The live identity reference is `(hart_id, ECID)`. (The ABA window generation
+counters once guarded is closed by D.3 + D.13.)
 
 **ECID allocation — radix tree** (Foundation §F.1 tenets 6–7 / §F.2 D.7 —
 acyclic delegation tree). ECIDs are allocated by the kernel from a radix tree
@@ -91,7 +92,6 @@ structure of each entry is:
 ```c
 struct EC_entry {
     void     *ecs_ptr;        /* canonical ECS pointer — always at offset 0 */
-    uint8_t   generation;     /* incremented on every slot reuse             */
     uint8_t   delegation_L;   /* delegation level, 0 ≤ L ≤ D                */
     uint16_t  parent_ecid;    /* ECID of the parent in the delegation tree   */
     /* implementation-defined: cached bank/contract refs, flags, etc.        */
@@ -366,9 +366,9 @@ parent or a privileged ancestor may revoke or destroy a child.
 resolves). Destroying an ECID and its entire subtree must always succeed. The
 instruction `ec.oe` (§0.9) revokes all Contracts, frees all Banks (Foundation
 §F.2 D.15 — resources return to the parent), marks the radix-tree subtree as
-free, and increments the generation counter for every freed `EC[e]` slot
-(Foundation §F.2 D.14 — ABA safety). A destroyed EC cannot stall its own
-reclamation.
+free, and scrubs freed `EC[e]` slot content before reallocation (Foundation
+§F.2 D.14 — no successor observes predecessor state). A destroyed EC cannot
+stall its own reclamation.
 
 ---
 
@@ -429,8 +429,8 @@ diagnostic use but are not the primary error channel. Two exceptions return
 success-path information in `rd` rather than an error code: `ec.ib` (bank slot
 index written) and `ec.oe` (ECIDs freed count). Both trap on error; use `x0` to
 discard.
-Any instruction referencing an unallocated slot, a stale generation, or a
-privilege violation must raise a defined trap or return a documented failure
+Any instruction referencing an unallocated slot or a privilege violation must
+raise a defined trap or return a documented failure
 code in `rd`. Silent ignore is prohibited (Foundation §F.2 D.16 — all operation
 outcomes must be defined, not silently discarded).
 
