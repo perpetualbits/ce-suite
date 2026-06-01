@@ -1,5 +1,34 @@
 # CE Core Design-Loop — Session Capture
 
+> ## ★ FROZEN — 2026-06-01 — Frozen Logical Core v1.0
+>
+> The CE logical core is **frozen** as of 2026-06-01.
+>
+> **Frozen set:** Part C tenets 1–12 and Part D invariants D.1–D.21.
+>
+> **All five exit criteria (Part B) are met.** Convergence reached after two
+> consecutive zero-change red-team passes (correspondence/independence pass and
+> scenario/boundary-stress pass) over the twelve-tenet / D.1–D.21 set.
+>
+> **Path to the freeze.** The red-team stress-corrected the set en route:
+> tenet 10 ("hart-local" qualifier wrong for chip-global bandwidth), D.19 scope
+> ("chip-wide" over-generalized for cache), D.11–D.13 positive forms (deferred,
+> then added and tightened), tenet 6 ("acyclic" needed the root self-loop
+> qualification), D.20 (fold-in from Part L.0/P.2 — cited but absent), D.21
+> (vault confidentiality — previously uncaptured), tenet 12 (divisibility
+> elevated, architect's pre-freeze structural completion). The set was
+> stress-corrected, not merely asserted.
+>
+> **What freezing means.** Changing any frozen tenet or invariant now requires a
+> deliberate un-freeze decision by the architect with a new version bump. Routine
+> work no longer edits Part C or Part D content.
+>
+> **What comes next (post-freeze sequencing):**
+> 1. Rewrite the charter and Chapter 0 from the frozen core.
+> 2. Propagate to all chapters.
+> 3. QoS chapters (ch00 QoS bullet, ch11, ch13) and the standing `work-items.md` /
+>    `refamiliarize.md` Cluster F updates are downstream work outside the core.
+
 > ## ▣ ROUND THREE — OPENED 2026-06-01 (repo at charter v0.25)
 >
 > One-glance orientation for round four. This stamp supersedes the ROUND TWO
@@ -19,10 +48,10 @@
 >   the core → rewrite the charter and ch00 from the frozen core → propagate to all
 >   chapters → fix the QoS chapters last.
 >
-> **STATE OF THE FIVE CRITERIA:**
+> **STATE OF THE FIVE CRITERIA: all met. Core frozen.**
 > - Criteria 1–3: complete.
-> - Criterion 4: **complete** (scoped core; QoS-fabric deferred per Part L.5).
-> - Criterion 5: **in progress** — *Pass one (2026-06-01): red-teamed Part C +
+> - Criterion 4: complete (scoped core; QoS-fabric deferred per Part L.5).
+> - Criterion 5: **met** (two consecutive clean passes; see pass log) — *Pass one (2026-06-01): red-teamed Part C +
 >   D.1–D.20 (completeness pass extended to D.1–D.21). Findings: (1) tenet 10 mislabeled bandwidth contracts as
 >   "hart-local" — corrected; (2) D.19 "decided chip-wide" over-generalizes
 >   (cache is core-local) — corrected to "atomic at the arbiter's scope"; (3)
@@ -41,20 +70,29 @@
 >   D.1–D.21; (9) divisibility principle elevated to tenet 12 (architect's
 >   pre-freeze choice, not a defect — existed only at D.9/D.19 and tenet 4's
 >   passing mention). All deliberate dated changes; see Part C and Part D.
->   Two-clean-pass streak reset to zero. Next step: two fresh consecutive
->   red-team passes over the twelve-tenet / D.1–D.21 set.* Both former
->   criterion-5 blockers were resolved in round two: generations (Part Q) and
->   allocator policy F.4(a) (Part P.1).
+>   Two-clean-pass streak reset to zero after finding (9). Clean pass 1
+>   (2026-06-01, correspondence/independence): every tenet is backed by at least
+>   one invariant and every invariant grounded in at least one tenet; tenet 12
+>   now anchors D.9/D.19; D.14/D.21 are grounded in tenets 8 and 10; the set
+>   is minimal with no orphans. No change. Clean pass 2 (2026-06-01,
+>   scenario/boundary stress): OS-mapping (Part J), L0–L3 nesting (Part K), and
+>   multi-hart cluster (Part L) scenarios all hold; edge cases (CE-Embedded D=0,
+>   force-destroy near root, maximum nesting depth, concurrent chip-global
+>   admission, bank-exhaustion recovery, force-destroying a sealed Bank) checked
+>   without violating any invariant. No change. Consecutive zero-change streak =
+>   2. **Criterion 5 met. Core frozen as Frozen Logical Core v1.0.*** Both
+>   former criterion-5 blockers were resolved in round two: generations (Part Q)
+>   and allocator policy F.4(a) (Part P.1).
 >
-> **ROUND FOUR PICKS UP AT:**
-> 1. **Begin criterion 5:** a full red-team pass over tenets (Part C) + invariants
->    (D.1–D.21); zero changes = pass one. A second clean pass = converged → freeze
->    is then a deliberate architect decision with a version bump.
-> 2. If a pass produces changes, resolve them and re-run.
+> **POST-FREEZE: next activities (not loop work):**
+> 1. Rewrite the charter and Chapter 0 from Frozen Logical Core v1.0.
+> 2. Propagate the rewrite to all chapters.
+> 3. QoS chapter updates (ch00 QoS bullet, ch11, ch13) and `work-items.md` /
+>    `refamiliarize.md` Cluster F status update — downstream work, not core work.
 >
-> **DO FIRST in round four (process):** re-fetch the current repo before asserting
-> any repo state — this capture reflects the repo as read 2026-06-01 (charter
-> v0.25) and Claude has no memory across sessions.
+> **DO FIRST in any post-freeze session:** re-fetch the current repo before
+> asserting repo state — this capture reflects the repo as read 2026-06-01
+> (charter v0.25) and Claude has no memory across sessions.
 
 > ## ▣ ROUND TWO — CLOSED 2026-05-31 (repo at charter v0.24)
 >
@@ -234,6 +272,10 @@ levels in `{0,1,2,3}` the depth terms collapse to constants.
 
 ## Part C — Frozen tenets
 
+**★ FROZEN — Frozen Logical Core v1.0 (2026-06-01). Tenets 1–12. Editing any
+tenet requires a deliberate un-freeze decision by the architect with a new
+version bump.**
+
 The non-negotiable referent for the lab document. Frozen in session.
 
 1. ECID is architectural identity; it indexes the per-hart EC table and is never
@@ -319,7 +361,11 @@ cross-level migration in CE to permit or forbid.
 
 ---
 
-## Part D — Candidate invariants
+## Part D — Invariants
+
+**★ FROZEN — Frozen Logical Core v1.0 (2026-06-01). Invariants D.1–D.21. Editing
+any invariant requires a deliberate un-freeze decision by the architect with a new
+version bump.**
 
 Properties every algorithm must preserve and every profile must satisfy. The
 security invariants (D.11–D.13) are stated as prohibitions; each now carries a
