@@ -3,7 +3,7 @@
 
 # CE Suite — Project Instructions and Axiom Charter
 
-**Version:** 0.30
+**Version:** 0.31
 **Status:** Normative for the CE Suite specification.
 **Scope:** All CE Suite chapters, appendices, and supporting documents.
 
@@ -978,6 +978,10 @@ Full instruction definitions are in Chapter 3. This section fixes the
 **global rules** that all CME (and by extension, CPE, MSE, QoS) instructions
 must obey.
 
+*§6 operationalizes the Foundation's addressing, ownership-lookup, lifecycle, and
+local-view tenets/invariants (§F.1 tenets 1, 8; §F.2 D.3, D.4, D.13, D.14, D.15,
+D.20).*
+
 ### 6.1 Naming convention
 
 All CE Suite instructions follow:
@@ -1023,8 +1027,9 @@ changelog entry) before they may appear in any chapter.
 ### 6.2 ECID-first operands
 
 1. Any CME instruction that targets a context **other than the current
-   one** uses an **ECID number** as the operand. Never a C pointer, never
-   a bank ID.
+   one** uses an **ECID number** as the operand (§F.1 tenet 1 / §F.2 D.3 —
+   ECID is architectural identity; no raw slot numbers). Never a C pointer,
+   never a bank ID.
 2. Instructions operating on the current ECID may omit the ECID operand
    and consult `current_ecid` implicitly.
 3. Example:
@@ -1050,6 +1055,9 @@ ecs_ptr   = ec_entry.ecs_ptr                 # offset 0
 group     = e                                # GroupID = ECID
 # further indirections via ECS or Group metadata
 ```
+
+This pattern realizes §F.2 D.1 (per-hart EC table) and D.4 (GroupID = ECID; one owner
+Group per ECID).
 
 ### 6.4 OS conventions are non-architectural
 
@@ -1081,11 +1089,14 @@ Semantics:
 
 1. Revokes all Contracts held by the target ECID and its descendants.
 2. Frees all Banks owned by the target and descendants, returning them
-   to the parent's Group.
+   to the parent's Group (§F.2 D.15 — teardown returns resources to the
+   parent).
 3. Marks the radix-tree subtree as free.
-4. Increments the generation counter for each freed `EC[e]` slot.
+4. Increments the generation counter for each freed `EC[e]` slot (§F.2
+   D.14 — resource content is scrubbed before reallocation; generation
+   increment closes the ABA window).
 5. **Always succeeds.** Forward progress is guaranteed; zombies cannot
-   stall reclamation.
+   stall reclamation (§F.2 D.13 — forced destruction always resolves).
 6. **`rd` returns the total count of ECIDs freed**, including the target
    itself. Each ECID in the destroyed subtree is counted exactly once.
    Callers that do not need the count write to `x0`.
@@ -1192,8 +1203,9 @@ qualifications, is in ch03 once propagated.
 
 1. **Local Bank numbering.** Each EC sees its non-VMT Banks numbered
    `0 .. K-1` in its own local view, where `K` is the count of non-VMT Banks
-   the EC holds. This local-view numbering is the CME analog of the local-view
-   property established for MSE telescoping (§4.5.0): software at any delegation
+   the EC holds. This local-view numbering is the CME realization of the
+   Foundation's local-view invariant (§F.1 tenet 8 / §F.2 D.20); the MSE
+   realization of the same principle is in §4.5.0. Software at any delegation
    level observes the same numbering scheme regardless of depth.
 2. **Bank 0 is structurally retained, and over-range counts trap.** Local
    Bank 0 — the EC's first non-VMT Bank — is never an individual `ec.it`
@@ -1394,7 +1406,19 @@ the rest of the spec.
 
 ## Changelog
 
-- **v0.30 (this version).** §5 reconciled to the Foundation (charter-rewrite
+- **v0.31 (this version).** §6 reconciled to the Foundation (charter-rewrite
+  loop, session 5/N).
+
+  §6 head gains an operationalizing note. §6.2 item 1 references §F.1 tenet 1
+  / §F.2 D.3; ECID-first operand rule and examples kept. §6.3 gains a
+  one-sentence D.1/D.4 reference after the lookup pattern. §6.5 items 2, 4, 5
+  reference §F.2 D.15, D.14, D.13 respectively; all six semantic points and
+  mnemonic history kept. §6.9 item 1 redirects from "established for MSE
+  telescoping (§4.5.0)" to the Foundation (§F.1 tenet 8 / §F.2 D.20) with a
+  §4.5.0 pointer kept as the MSE realization. §6.1, §6.4, §6.6, §6.7, §6.8,
+  §6.9 items 2–7 untouched. No operational detail removed.
+
+- **v0.30.** §5 reconciled to the Foundation (charter-rewrite
   loop, session 4/N).
 
   §5 head gains an operationalizing note. §5.1 item 1 references §F.2 D.8.
@@ -1729,4 +1753,4 @@ the rest of the spec.
 
 ---
 
-*End of CE Suite Project Instructions and Axiom Charter, v0.30.*
+*End of CE Suite Project Instructions and Axiom Charter, v0.31.*
