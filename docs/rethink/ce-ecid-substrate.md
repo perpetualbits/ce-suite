@@ -169,8 +169,15 @@ OS at L2, and that guest's containers at L3, every layer hardware-accelerated. T
 capability lets a hyperscaler offer virtualized, hardware-accelerated hypervisor clusters
 to tenants.
 
-The bound `D ≤ 3` is what makes upward operations O(1): no walk through the structure is
-ever longer than the depth, and the depth is a small constant.
+The bound `D ≤ 3` serves two purposes. Structurally, it keeps upward operations O(1): no
+walk through the structure is ever longer than the depth, and the depth is a small constant.
+But the deeper reason it is *three* and not more comes from the resource contracts (covered
+in the MSE/CPE/QOS chapters and the principles document, not here): for a realtime guarantee
+to subdivide and still fit inside its parent's, each level deeper imposes a fitting
+constraint — a child's latency bound at least doubles and its bandwidth guarantee at most
+halves. Three such halvings already reach about ⅛ of the bandwidth and 8× the latency, which
+is near the practical limit of a useful realtime guarantee. So `D ≤ 3` is where the fractal
+of nested guarantees stops yielding something worth having — not an arbitrary hardware cap.
 
 ---
 
@@ -180,11 +187,14 @@ Every ECID is the **root of its own universe**. It sees **itself as 0** and numb
 it owns **1, 2, 3, …**. A context never observes absolute slot numbers, its parent, or
 its siblings — only its own virtualized namespace and its hart number.
 
-This is what lets the **same OS image run unchanged at any level**: a kernel always
-believes it is "0" with children "1..n", whether it is installed at L0, L1, L2, or L3.
-It is the identity analogue of the bandwidth telescoping used by the memory-scheduling
-extension — each level works in its own normalized world, and hardware bridges to the
-absolute representation.
+This is what ensures **CE never forces a context to carry per-level code**: a kernel always
+believes it is "0" with children "1..n", whether it sits at L0, L1, L2, or L3, so nothing in
+CE obliges a distro to ship a different build per level. It is the identity analogue of the
+bandwidth telescoping used by the memory-scheduling extension — each level works in its own
+normalized world, and hardware bridges to the absolute representation. (Running a *full*
+unmodified OS image at depth additionally requires the platform to virtualize privilege
+state, CSRs, traps, timers, and interrupts — the RVA23 hypervisor extension's job, §10 — not
+CE's. CE removes the per-level *identity* obstacle; RVA23 removes the rest.)
 
 The `vnum` field stores each ECID's number in its **owner's** universe, fixed at
 allocation. Two structural consequences follow:
@@ -445,6 +455,14 @@ acceleration.
 Each bank record carries an `owner` up-pointer to its current holding ECID. Software does
 not address a bank by number (§9.3): a context simply *has* a bank or does not. An ECID
 with no bank stores a "no bank" sentinel and uses the RAM path (§10) instead.
+
+For the fast path to be O(1), the hardware must find a banked ECID's bank without searching.
+The `owner` up-pointer answers the *reverse* question (which ECID owns this bank); the fast
+path needs the *forward* binding (this ECID → its scalar and VMT banks). That binding is
+held in CE-private per-slot metadata so it resolves in O(1) — by the same logic as the
+forward index, the reverse pointer is for slow-path enumeration while the forward binding
+serves the switch. Software never observes or names these bindings; only the hardware uses
+them, and only to locate the bank a running or targeted ECID already owns.
 
 **An interrupt handler can be its own banked ECID.** On a conventional design, taking an
 interrupt traps into the kernel, which spills registers and sets up the handler — the
@@ -731,12 +749,20 @@ The arrays are per-hart, but real workloads span harts. The model rests on one s
 
 - The hardware **slot** number is **hart-local** — slot 7 on one hart is unrelated to
   slot 7 on another.
-- The **durable, global identity** of a context is its **ECS in RAM** (the `ecs`
-  pointer), together with the owner's virtual name for it. This is the migration anchor.
+- A context's hardware identity is its **`[hart#, vnum]`**, and its saved state is the
+  **one ECS** that belongs to that `[hart#, vnum]`. The ECS is *not* a hart-independent
+  global identity — it is the state of *one* context *on one hart*. There is no single
+  cross-hart "the same context"; a workload that spans harts is several contexts (§10.2).
+
+The *durable, software-level* identity of "a thread" or "a VM" — the thing that survives
+migration and ties a workload together — is whatever the **OS** maintains in its own memory
+(a task structure, a VM descriptor), referencing the per-hart ECS records by their
+`[hart#, vnum]`. CE supplies the per-hart contexts and their names; the OS supplies the
+notion that several of them are "one thing."
 
 A scheduler refers to its placed contexts by the coordinate **(hart number, virtualized
-ECID number)** and stores that in the ECS records it keeps. The hardware on each hart
-holds the full local tree; software sees only its own universe.
+ECID number)**. The hardware on each hart holds the full local tree; software sees only its
+own universe.
 
 ### 10.1 Why the fast path stays local
 
@@ -745,50 +771,72 @@ hart to switch it in**. Therefore the running context's full ancestor chain to r
 always co-resident on the hart. The up-pointer ancestry check on `ec.ob` walks only these
 on-hart pointers — never RAM — so it stays O(1). Root (L0) is resident on **every** hart.
 
-### 10.2 The same context across harts
+### 10.2 A multi-hart workload is many contexts, not one shared context
 
-A context that spans harts (e.g. the kernel of a multi-vCPU VM) has **one ECID slot per
-hart it touches**, all sharing **one ECS in RAM**. The virtualized number is
-hart-independent (a stable name); the absolute slots need not agree across harts. A
-containment check is computed locally on each hart and yields the same logical answer.
+**Every ECID in use is associated with exactly one ECS. Distinct ECIDs never share an ECS
+— and certainly not ECIDs on different harts**, because an ECS is identified by its
+context's `[hart#, vnum]`, and the hart is part of that identity. A single ECS cannot
+belong to two harts any more than it can belong to two contexts.
 
-The picture stores no forward pointers *in the array itself*. The backward facts
-(`owner`, `vnum`) live in each record; the only other stored links are the `ecs` pointers
-into RAM. The forward index a parent uses to switch to a child by vnum (§5.2–5.3) is not in
-the array, the bank, or the ECS — it is a hart-local cache, rebuilt on whichever hart the
-parent runs. So "K's child by vnum 1" is resolved on hart A from the index K built while
-running on A, and independently on hart B from the index K built while running on B; each
-hart's index maps the same vnum to that hart's local slot. Enumerating K's children for
-reconfiguration (not switching) is still a slow-path scan for `owner=K`.
+So a workload that spans harts is not one context with one shared state — it is **several
+contexts, one per hart, each with its own ECID and its own ECS.** Take a multi-vCPU VM. If
+it uses CE, each **vCPU** is its own execution context: its own ECID (on the hart that vCPU
+runs on), and its own kernel ECS, identified by that ECID's `[hart#, vnum]`. A four-vCPU VM
+therefore has four ECIDs and four ECSs, not one of either.
+
+What the vCPUs *do* share is the VM's **memory space** — all four ECS records live in that
+VM's memory — and the *software* notion of "one kernel." The operating system coordinates
+its vCPUs through that shared memory with its own locks and per-CPU data, exactly as SMP
+Linux does today across physical cores. CE changes none of that: to the hardware there are
+simply four independent contexts; the "single kernel" is a software abstraction layered
+over four separate ECID/ECS pairs.
+
+The `[hart#, vnum]` name is what lets software keep track of which vCPU is which. The
+absolute slots are hart-local and need not agree across harts; the vnum is each vCPU's
+number in its parent's universe; together with the hart they name one specific vCPU's ECS.
 
 ```
         HART A                              HART B
-  kernel K is slot 5                  kernel K is slot 12
-
-  slot 7:  owner=5, vnum=1            slot 30: owner=12, vnum=1
-  slot 9:  owner=5, vnum=2            slot 31: owner=12, vnum=2
-            │                                   │
-            │ owner up-pointers                 │ owner up-pointers
-            ▼                                    ▼
-  slot 5:  ecs ──────────────► ECS_K in RAM ◄────────────── slot 12: ecs
+  the VM's vCPU-0 is slot 5            the VM's vCPU-1 is slot 12
+  ecs ─► ECS for vCPU-0                ecs ─► ECS for vCPU-1
+         [hart A, vnum ..]                    [hart B, vnum ..]
+              │                                    │
+              └──────── both ECS records live in ──┘
+                        the VM's shared memory space
+                        (distinct records, never one shared ECS)
 ```
 
-On hart A, K's first child is whichever record has `owner=5, vnum=1` (here slot 7); on
-hart B the same logical child is `owner=12, vnum=1` (here slot 30). The absolute slots
-differ and need not agree; the up-pointers are local; the shared `ecs` is what unifies
-the two harts' views of the same kernel.
+Each `ecs` pointer targets a **different** ECS. They happen to sit in the same VM memory
+space (which is how the guest kernel reaches all of them as software), but they are
+separate records for separate contexts. Nothing in CE ever points two ECIDs at one ECS.
+
+The forward index is likewise per-hart and never shared: a parent that runs on both harts
+builds an independent `vnum → slot` index on each, mapping the same vnum to that hart's
+local slot (§5.2–5.3). Enumerating a parent's children for reconfiguration is a slow-path
+scan for `owner == parent` on the relevant hart.
 
 ### 10.3 Migration
 
-Moving a context from one hart to another reuses the existing instructions:
+Because the ECS belongs to a specific `[hart#, vnum]`, migrating a context to another hart
+does **not** reuse the same ECS — the destination is a different hart, hence a different
+identity, hence a different ECS. Migration moves the *state*, under the OS's durable
+software identity for the thread, into a freshly created context on the destination:
 
-1. Source hart: `ec.im` spills the running context's state to its ECS in RAM (or, if it
-   has a bank, `ec.ib` then a copy); free the slot (bump `gen` if used).
-2. Destination hart: `ec.ir` allocates a fresh slot; `ec.om` fills it from the ECS.
+1. Source hart: `ec.im` spills the context's architectural state to its (source) ECS in
+   RAM — or, if it has a bank, `ec.ib` then a copy. Then tear the source context down,
+   freeing its slot.
+2. Destination hart: `ec.ir` allocates a fresh slot (a new ECID with its own `[hart#,
+   vnum]` and its own ECS); the OS copies the saved state into that new ECS; `ec.om` fills
+   the destination from it.
+3. The OS updates its own task/VM descriptor to point at the new `[hart#, vnum]`. The
+   *software* identity of the thread persists across the move; the *hardware* context and
+   its ECS are new on the destination.
 
-**Banks never travel; state travels through RAM; identity is the ECS.** This is why
-per-hart banks are a feature, not a limitation. Hard-realtime contexts are typically
-**pinned** (their hart number is fixed); best-effort contexts migrate freely.
+**Banks never travel; state travels through RAM as ordinary data; the durable identity is
+the OS's software handle, not the ECS.** This is why per-hart banks are a feature, not a
+limitation — nothing hardware-resident has to follow the context. Hard-realtime contexts
+are typically **pinned** (their hart is fixed, so they never migrate and their timing is
+stable); best-effort contexts migrate freely.
 
 ### 10.4 What an ECS contains, and how the hardware finds its parts
 
@@ -945,7 +993,10 @@ until specified.
 - The forward index and the `[hart#, vnum]` tuple are **CE-private**: the index never
   reaches addressable memory, and `[hart#, vnum]` is authoritative in the array (vnum is
   stored, hart is implied by which array). The ECS may mirror the tuple for software only.
-- Identity is the **ECS in RAM**; slot numbers are hart-local; banks never migrate.
+- Every ECID in use has **exactly one ECS**; distinct ECIDs never share an ECS, and ECIDs
+  on different harts certainly do not (the hart is part of `[hart#, vnum]`). Slot numbers
+  are hart-local; banks never migrate; the durable cross-hart identity of a workload is the
+  **OS's own software handle**, not the ECS.
 - Optional generation counters make freed-and-reused slots safe against stale *remembered*
   references; not needed for integrity, since hardware is the arrays' only writer.
 
