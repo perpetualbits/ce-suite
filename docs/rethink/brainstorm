@@ -1,0 +1,33 @@
+For my CE suite, I am researching a solution for the core ECID datastructure, and the forward and reverse lookups.
+
+Situation:
+
+There is an array of records, called the ECID array.
+
+* the place in the array, named the "slot number" is also the absolute number of the array. This implicit number (not directly recorded, just the position in the array) we call ecid.
+* the array has 2^k records, and take k to be 10 for the sake of argument. It could also be 8..12. 
+* the first record is called the absolute "root", with number 0. We can call this absolute root record RA. There are also relative roots. More about that below.
+* each record has an "up pointer" pointing to another record; the meaning of pointing is "I am owned by". At the start, all up_pointers point to RA, including absolute root itself. So all up_pointers are 0000 0000 0000 at start.
+* each record also has a child_counter, and a in_use counter for the number of children of this record that are in use.
+* each record also has an ECS pointer to an in-memory data structure named ECS, and as of this moment it is not clear yet if this is an absolute pointer or relative pointer, so [ in the address space of a VM / the address space of a hypervisor that itself runs as a VM ]. All pointers, except for absolute root, are NULL initially. This means the record is not in use.
+* each record also has a "vnum". A virtualized ECID number.
+* Initially, al vnums are equal to the slot number. This is because they are all still children of absolute root.
+* We now assign one of these children, say C_1_1 = [ecid, ecs_pointer, up_pointer, child_counter, in_use, vnum] = [m, NULL, 0, 0, 0, j], to be the child of some non-absolute-root ECID P_1  = [n, NULL, 0, 0, 0, i]. We also set the ecs_pointer of P_1.
+* P_1 is now a parent of C_1_1, and P is still a child of RA.
+* P_1 becomes [n, ecs_P_1, 0, 1, 0, 0], C_1_1 becomes [m, NULL, n, 0, 0, 1]. RA changes too, it was [0, ecs_RA, 0, 2^k - 1, 0, 0] and becomes [0, ecs_RA, 0, 2^k - 2, 1, 0]
+* You can create more parents P_2, P_3, ... , each with children P_2_1, P_2_2, ..., P_3_1, P_3_2, .... and so on, until all children of RA are either a P (child of RA) or a C (child of some P_x).
+* You can only make direct children of P, not children_of_children directly. Only the C_x_y can do that, if P_x becomes the local root ECID in use by a vpus of a virtual machine, for instance. P_x can also belong to a nested hypervisor or some other application that wants to use hardware nesting and virtualization. Some specialized software for a flight computer or something like that.
+* There are at most 4 levels, L0, L1, L2, L3. So, 0 <= L <= D <=3. D is fixed architecturally, and can be set to a lower value in firmware, down to 0.
+* We can now go on like this, say with C_2_3 getting ECID from P_2
+* A hart has access to all this information
+* But a hart must find this information in O(constant) time for context switches, with constant being a low number of steps, computable within one clock cycle.* For tree reconfiguration: assigning children, unassigning children, tearing down a tree of children, it can spend a little more steps, but ideally no more than O(log k) steps, k being the exponent in 2^k, which is the size of the array. That may or may not be possible.
+
+* what does a kernel know at any level?
+* a kernel at any L in 0..3 running in some hart only knows: hart number, number of free children it has, their vnums, number of children in use.
+* now it uses an ec.ob instruction, and it uses the vnum for that.
+
+* how is the hart now going to find the right ECID (the ecid number) using the information supplied to it, in O(constant) time. Only using an array that is some constant S*2^k in size, not S*2^2k (so a matrix of 2^k by 2^k).
+
+We need to find the right algorithm and data structure to do this.
+
+
